@@ -1,0 +1,120 @@
+name: default
+config:
+  cloud-init.user-data: |
+    #cloud-config
+    package_update: true
+    package_upgrade: true
+    
+    packages:
+      - git
+      - build-essential
+      - curl
+      - python3
+      - unzip
+      - gfortran
+      - libblas-dev
+      - liblapack-dev
+      - libopenmpi-dev
+      - pkg-config
+      - cmake
+      - lmod
+      - make
+      # Slurm core dependencies (always required)
+      - libcurl4-openssl-dev
+      - libglib2.0-dev
+      - libjson-c-dev
+      - liblz4-dev
+      - libssl-dev
+      - libreadline-dev
+      - zlib1g-dev
+      # Slurm optional dependencies (commonly used variants)
+      - libhwloc-dev
+      - libhdf5-dev
+      - libdbus-1-dev
+      - libpam0g-dev
+      - libyaml-dev
+      # Build tools and system utilities (high-impact optimizations)
+      - autoconf
+      - automake
+      - libtool
+      - bison
+      - flex
+      - findutils
+      - diffutils
+      - tar
+      - gawk
+      - gettext
+      - libncurses-dev
+      - libbz2-dev
+      - libbz2-1.0
+      - liblzma-dev
+      - liblzma5
+      - libzstd-dev
+      - libzstd1
+      - libxml2-dev
+      - zlib1g
+      - zlib1g-dev
+      # Additional build tools and system packages (more optimization)
+      - make
+      - m4
+      - mawk
+      - pkg-config
+      - libgdbm-dev
+      - libdb-dev
+      - libjansson-dev
+      - libgcrypt20-dev
+      - libgpg-error-dev
+      - libsigsegv2
+      - libsigsegv-dev
+      - libevent-dev
+      - libnuma-dev
+    
+    write_files:
+      - path: /etc/profile.d/spack.sh
+        permissions: '0644'
+        owner: root:root
+        content: |
+          # Spack system-wide environment
+          if [ -f /opt/spack/share/spack/setup-env.sh ]; then
+            . /opt/spack/share/spack/setup-env.sh
+          fi
+    
+    runcmd:
+      # Create symlinks for multiarch library compatibility (needed for autotools detection)
+      - |
+        # Fix common library detection issues in Ubuntu multiarch layout
+        cd /usr/lib/x86_64-linux-gnu
+        for lib in libz libevent libevent_core libhwloc libssl libcrypto libcurl libglib-2.0 \
+                   libjson-c liblz4 libreadline libncurses libbz2 liblzma libzstd libxml2 \
+                   libgdbm libdb libjansson libgcrypt libgpg-error libsigsegv libnuma; do
+          for ext in so so.* a; do
+            if [ -f "${lib}.${ext}" ] && [ ! -f "/usr/lib/${lib}.${ext}" ]; then
+              ln -sf "/usr/lib/x86_64-linux-gnu/${lib}.${ext}" "/usr/lib/${lib}.${ext}" || true
+            fi
+          done
+        done
+      # Install Spack v1.0.0 into /opt/spack (idempotent)
+      - |
+        bash -lc '
+          set -euo pipefail
+          if [ ! -d /opt/spack ]; then
+            git clone --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
+            chown -R root:root /opt/spack
+            chmod -R a+rX /opt/spack
+          fi
+        '
+
+devices:
+  eth0:
+    name: eth0
+    network: lxdbr0
+    type: nic
+  root:
+    path: /
+    pool: default
+    type: disk
+  slurm-factory-cache:
+    path: /opt/slurm-factory-cache
+    source: CACHE_SOURCE_PLACEHOLDER
+    shift: true
+    type: disk
