@@ -6,68 +6,55 @@ config:
     package_upgrade: true
     
     packages:
+      # Essential build system and version control
       - git
       - build-essential
-      - curl
       - python3
       - unzip
       - gfortran
-      - libblas-dev
-      - liblapack-dev
-      - libopenmpi-dev
-      - pkg-config
-      - cmake
-      - lmod
-      - make
-      # Slurm core dependencies (always required)
-      - libcurl4-openssl-dev
-      - libglib2.0-dev
-      - libjson-c-dev
-      - liblz4-dev
-      - libssl-dev
-      - libreadline-dev
-      - zlib1g-dev
-      # Slurm optional dependencies (commonly used variants)
-      - libhwloc-dev
-      - libhdf5-dev
-      - libdbus-1-dev
-      - libpam0g-dev
-      - libyaml-dev
-      # Build tools and system utilities (high-impact optimizations)
+      
+      # Core build tools (needed by Spack build process)
       - autoconf
       - automake
       - libtool
       - bison
       - flex
+      - cmake
+      - make
+      - m4
+      - pkg-config
+      
+      # System utilities (used by Spack/autotools)
       - findutils
       - diffutils
       - tar
       - gawk
       - gettext
-      - libncurses-dev
-      - libbz2-dev
-      - libbz2-1.0
-      - liblzma-dev
-      - liblzma5
-      - libzstd-dev
-      - libzstd1
-      - libxml2-dev
-      - zlib1g
-      - zlib1g-dev
-      # Additional build tools and system packages (more optimization)
-      - make
-      - m4
-      - mawk
-      - pkg-config
-      - libgdbm-dev
-      - libdb-dev
-      - libjansson-dev
-      - libgcrypt20-dev
-      - libgpg-error-dev
-      - libsigsegv2
-      - libsigsegv-dev
-      - libevent-dev
-      - libnuma-dev
+      
+      # Module system
+      - lmod
+      
+      # System libraries used as externals by Spack (not built, just linked)
+      # These reduce build time while maintaining functionality
+      - libbz2-dev           # bzip2 external
+      - liblzma-dev          # xz external
+      - libzstd-dev          # zstd external
+      - libdbus-1-dev        # dbus external
+      - libpam0g-dev         # linux-pam external
+      - libyaml-dev          # libyaml external
+      - libglib2.0-dev       # glib external
+      - libxml2-dev          # libxml2 external
+      - libevent-dev         # libevent external
+      - libgdbm-dev          # gdbm external
+      - libdb-dev            # berkeley-db external
+      - libjansson-dev       # jansson external
+      - libgcrypt20-dev      # libgcrypt external
+      - libgpg-error-dev     # libgpg-error external
+      - libsigsegv-dev       # libsigsegv external
+      - libhdf5-dev          # hdf5 external
+      
+      # Note: Runtime dependencies (munge, json-c, curl, openssl, readline, ncurses, lz4, zlib, hwloc, numactl)
+      # are built by Spack to ensure consistent versions and proper linking with Slurm.
     
     write_files:
       - path: /etc/profile.d/spack.sh
@@ -84,9 +71,8 @@ config:
       - |
         # Fix common library detection issues in Ubuntu multiarch layout
         cd /usr/lib/x86_64-linux-gnu
-        for lib in libz libevent libevent_core libhwloc libssl libcrypto libcurl libglib-2.0 \
-                   libjson-c liblz4 libreadline libncurses libbz2 liblzma libzstd libxml2 \
-                   libgdbm libdb libjansson libgcrypt libgpg-error libsigsegv libnuma; do
+        for lib in libevent libevent_core libglib-2.0 libbz2 liblzma libzstd libxml2 \
+                   libgdbm libdb libjansson libgcrypt libgpg-error libsigsegv; do
           for ext in so so.* a; do
             if [ -f "${lib}.${ext}" ] && [ ! -f "/usr/lib/${lib}.${ext}" ]; then
               ln -sf "/usr/lib/x86_64-linux-gnu/${lib}.${ext}" "/usr/lib/${lib}.${ext}" || true

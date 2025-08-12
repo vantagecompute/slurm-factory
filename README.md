@@ -92,18 +92,27 @@ uv run slurm-factory build
 # Build specific version with GPU support
 uv run slurm-factory build --slurm-version 24.11 --gpu
 
+# Build minimal Slurm (no OpenMPI, smaller size)
+uv run slurm-factory build --minimal
+
 # Build with verbose output
 uv run slurm-factory --verbose build
 ```
+
+**Note**: All builds now automatically generate self-contained Lmod modules that include proper environment variables for dependencies, eliminating the need for separate dependency modules.
 
 ### Deploying Packages
 
 ```bash
 # Extract software package on target system
-sudo tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-software.tar.gz -C /opt/
+sudo mkdir -p /opt/slurm
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /opt/
 
-# Extract module files
-sudo tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-module.tar.gz -C /usr/share/lmod/
+# Extract module files (use updated version if available)
+sudo mkdir -p /usr/share/lmod/lmod/modulefiles/slurm
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-module-updated.tar.gz -C /usr/share/lmod/lmod/modulefiles/slurm
+# OR use original if not updated:
+# sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-module.tar.gz -C /usr/share/lmod/lmod/modulefiles/slurm
 
 # Load the module
 module load slurm/25.05
