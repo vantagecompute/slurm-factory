@@ -53,7 +53,7 @@ def generate_module_config(
                 "hierarchy": [],  # Flat hierarchy for simpler deployment
                 "all": {
                     "autoload": "direct", 
-                    "conflict": ["{{name}}"],
+                    "conflict": ["{name}"],
                     "suffixes": {
                         "^openmpi": "mpi",
                         "^cuda": "cuda",
@@ -65,43 +65,33 @@ def generate_module_config(
                     "environment": {
                         "set": {
                             "SLURM_CONF": "/etc/slurm/slurm.conf", 
-                            "SLURM_ROOT": "{{prefix}}",
+                            "SLURM_ROOT": "{prefix}",
                             # Add build-specific metadata
                             "SLURM_BUILD_TYPE": build_type,
                             "SLURM_VERSION": slurm_package_version
                         },
                         "prepend_path": {
-                            "LD_LIBRARY_PATH": ["{{prefix}}/lib"],
-                            "PATH": ["{{prefix}}/bin", "{{prefix}}/sbin"],
-                            "CPATH": ["{{prefix}}/include"],
-                            "PKG_CONFIG_PATH": ["{{prefix}}/lib/pkgconfig"],
-                            "MANPATH": ["{{prefix}}/share/man"],
-                            "CMAKE_PREFIX_PATH": ["{{prefix}}"]
-                        }
+                            "LD_LIBRARY_PATH": "{prefix}/lib",
+                            "PATH": "{prefix}/bin:{prefix}/sbin",
+                            "CPATH": "{prefix}/include",
+                            "PKG_CONFIG_PATH": "{prefix}/lib/pkgconfig",
+                            "MANPATH": "{prefix}/share/man",
+                            "CMAKE_PREFIX_PATH": "{prefix}"
+                        },
                     },
-                    # Include all essential runtime dependencies in the view
-                    "include": ["munge", "json-c", "curl", "openssl", "readline", "ncurses", "lz4", "zlib-ng", "hwloc", "numactl", "gcc-runtime"]
                 },
-                # Configure dependency packages to not generate separate modules
-                "munge": {"blacklisted": True},
-                "gcc-runtime": {"blacklisted": True},
-                "pmix": {"blacklisted": True},
-                "hwloc": {"blacklisted": True},
-                "libevent": {"blacklisted": True},
             },
-        }
+        },
     }
     
     # Add GPU-specific dependencies if GPU support is enabled
     if gpu_support:
-        # Include GPU dependencies in the module
-        modules_config["default"]["lmod"]["slurm"]["include"].extend(["cuda", "rocm"])
-        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"].extend([
-            "{{prefix}}/lib64",  # CUDA libraries typically go in lib64
-        ])
-        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"].extend([
-            "{{prefix}}/bin",  # GPU tools
-        ])
+        # Add GPU-specific library paths for CUDA/ROCm
+        current_ld_path = modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"]
+        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"] = f"{current_ld_path}:{{prefix}}/lib64"
+        
+        current_path = modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"]
+        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"] = f"{current_path}:{{prefix}}/bin"
     
     # Configure OpenMPI module behavior based on build type
     if not minimal:
@@ -110,9 +100,6 @@ def generate_module_config(
                 "set": {"OMPI_MCA_plm": "slurm"}
             }
         }
-    else:
-        # Blacklist OpenMPI for minimal builds
-        modules_config["default"]["lmod"]["openmpi"] = {"blacklisted": True}
     
     return modules_config
 
@@ -172,6 +159,16 @@ def generate_spack_config(
             slurm_spec,
         ]
 
+    # Base view packages (runtime dependencies)
+    view_packages = ["slurm", "munge", "json-c", "curl", "openssl", "readline", "ncurses", "lz4", "zlib-ng", "hwloc", "numactl", "gcc-runtime"]
+    
+    # Add conditional packages based on build type
+    if not minimal:
+        view_packages.extend(["openmpi", "pmix", "libevent"])
+    
+    if gpu_support:
+        view_packages.extend(["cuda", "rocm"])
+
     # Base configuration
     config = {
         "spack": {
@@ -182,8 +179,11 @@ def generate_spack_config(
             },
             "develop": {},
             "view": {
-                "root": view_root,
-                "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
+                "default": {
+                    "root": view_root,
+                    "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
+                    "select": view_packages  # Only include essential runtime dependencies in view
+                }
             },
             "config": {
                 "install_tree": {"root": install_tree_root},
@@ -192,8 +192,19 @@ def generate_spack_config(
                 "binary_index_root": binary_index_root,
                 "checksum": True,
                 "deprecated": True,
+                # Spack 1.x performance enhancements
+                "build_jobs": 4,  # Parallel build jobs
+                "ccache": True,   # Disable ccache since it's not available
+                "connect_timeout": 30,  # Network timeout for downloads
+                "verify_ssl": True,     # Security setting
+                "suppress_gpg_warnings": False  # Show GPG warnings
             },
-            "mirrors": {"local-buildcache": {"url": f"file://{buildcache_root}", "signed": False}},
+            "mirrors": {
+                "local-buildcache": {"url": f"file://{buildcache_root}", "signed": False},
+                # Add multiple mirror sources for redundancy (Spack 1.x feature)
+                "spack-public": {"url": "https://mirror.spack.io", "signed": True},
+                "binary-mirror": {"url": f"file://{binary_index_root}", "signed": False}
+            },
             "compilers": [
                 {
                     "compiler": {
@@ -207,18 +218,22 @@ def generate_spack_config(
                         "operating_system": "ubuntu24.04",
                         "target": "x86_64",
                         "modules": [],  # Required field
+                        # Spack 1.x enhancements
+                        "environment": {},  # Environment variables for compiler
+                        "extra_rpaths": []  # Additional runtime library paths
                     }
                 }
             ],
             "packages": {
                 # Keep build tools as externals (not needed at runtime)
-                "cmake": {"externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}], "buildable": False},
-                "python": {"externals": [{"spec": "python@3.12.3", "prefix": "/usr"}], "buildable": False},
-                "autoconf": {"externals": [{"spec": "autoconf@2.71", "prefix": "/usr"}], "buildable": False},
-                "automake": {"externals": [{"spec": "automake@1.16.5", "prefix": "/usr"}], "buildable": False},
-                "libtool": {"externals": [{"spec": "libtool@2.4.7", "prefix": "/usr"}], "buildable": False},
-                "bison": {"externals": [{"spec": "bison@3.8.2", "prefix": "/usr"}], "buildable": False},
-                "flex": {"externals": [{"spec": "flex@2.6.4", "prefix": "/usr"}], "buildable": False},
+                # Use 'require' in Spack 1.x to enforce external usage
+                "cmake": {"externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}], "buildable": False, "require": "@3.28.3"},
+                "python": {"externals": [{"spec": "python@3.12.3", "prefix": "/usr"}], "buildable": False, "require": "@3.12.3"},
+                "autoconf": {"externals": [{"spec": "autoconf@2.71", "prefix": "/usr"}], "buildable": False, "require": "@2.71"},
+                "automake": {"externals": [{"spec": "automake@1.16.5", "prefix": "/usr"}], "buildable": False, "require": "@1.16.5"},
+                "libtool": {"externals": [{"spec": "libtool@2.4.7", "prefix": "/usr"}], "buildable": False, "require": "@2.4.7"},
+                "bison": {"externals": [{"spec": "bison@3.8.2", "prefix": "/usr"}], "buildable": False, "require": "@3.8.2"},
+                "flex": {"externals": [{"spec": "flex@2.6.4", "prefix": "/usr"}], "buildable": False, "require": "@2.6.4"},
                 "findutils": {"externals": [{"spec": "findutils@4.9.0", "prefix": "/usr"}], "buildable": False},
                 "diffutils": {"externals": [{"spec": "diffutils@3.10", "prefix": "/usr"}], "buildable": False},
                 "tar": {"externals": [{"spec": "tar@1.34", "prefix": "/usr"}], "buildable": False},
@@ -232,16 +247,16 @@ def generate_spack_config(
                 
                 # Essential runtime libraries that must be built for Slurm linking
                 # These are critical dependencies that Slurm links against at runtime
-                "munge": {"buildable": True, "version": ["0.5.15"]},      # Authentication - must be consistent version
-                "json-c": {"buildable": True, "version": ["0.17"]},       # JSON parsing - linked at runtime
-                "curl": {"buildable": True, "version": ["8.5.0"]},        # HTTP client for REST API
-                "openssl": {"buildable": True, "version": ["3.3.1"]},     # SSL/TLS for curl and auth
-                "readline": {"buildable": True, "version": ["8.2"]},      # Interactive command line
-                "ncurses": {"buildable": True, "version": ["6.5"]},       # Terminal control for readline
-                "lz4": {"buildable": True, "version": ["1.9.4"]},         # Fast compression - linked at runtime (shown in ldd)
-                "zlib-ng": {"buildable": True, "version": ["2.1.6"]},     # Compression - linked at runtime by many libs
-                "hwloc": {"buildable": True, "version": ["2.10.0"]},      # Hardware topology - used by Slurm for CPU binding
-                "numactl": {"buildable": True, "version": ["2.0.16"]},    # NUMA support - used by Slurm for memory binding
+                "munge": {"buildable": True},                             # Authentication - let Spack pick latest available
+                "json-c": {"buildable": True},                            # JSON parsing - linked at runtime
+                "curl": {"buildable": True},                              # HTTP client for REST API
+                "openssl": {"buildable": True, "version": ["3:"]},        # SSL/TLS for curl and auth - use OpenSSL 3.x series
+                "readline": {"buildable": True},                          # Interactive command line
+                "ncurses": {"buildable": True},                           # Terminal control for readline
+                "lz4": {"buildable": True},                               # Fast compression - linked at runtime
+                "zlib-ng": {"buildable": True},                           # lz4 compression lib - linked at runtime
+                "hwloc": {"buildable": True, "version": ["2:"]},          # Hardware topology - use hwloc 2.x series
+                "numactl": {"buildable": True},                           # NUMA support - used by Slurm for memory binding
                 
                 # System libraries that can use externals (build-time or utilities only)
                 # These are not linked at runtime by Slurm or are system-level abstractions
@@ -266,7 +281,6 @@ def generate_spack_config(
                 "libsigsegv": {"externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}], "buildable": False},
                 "hdf5": {"externals": [{"spec": "hdf5@1.10.10", "prefix": "/usr"}], "buildable": False},
                 
-                # PMix for full builds
                 "pmix": {
                     "variants": "~munge ~python",
                     "version": ["5.0.8"],
@@ -279,11 +293,15 @@ def generate_spack_config(
                 # Slurm itself
                 "slurm": {"version": [slurm_package_version], "buildable": True},
                 
-                # Global preferences
+                # Global preferences with Spack 1.x enhancements
                 "all": {
                     "target": ["x86_64"],
-                    "prefer": ["%gcc", "+shared"],  # Prefer shared libraries for smaller package
-                    "variants": "+shared"  # Ensure shared libraries are built
+                    "prefer": ["%gcc@13.3.0", "+shared", "~static"],  # More specific preferences
+                    "variants": "+shared ~static",  # Consistent shared library preference
+                    "permissions": {
+                        "read": "world",
+                        "write": "user"
+                    }
                 },
             },
             "modules": generate_module_config(slurm_version, gpu_support, minimal),
@@ -328,9 +346,6 @@ def generate_yaml_string(slurm_version: str = "25.05", gpu_support: bool = False
 
     # Generate YAML with proper formatting
     yaml_content = yaml.dump(config, default_flow_style=False, sort_keys=False, indent=2)
-    
-    # Replace double braces with single braces for Spack template variables
-    yaml_content = yaml_content.replace("{{name}}", "{name}").replace("{{prefix}}", "{prefix}")
 
     return f"{header}\n{yaml_content}"
 

@@ -23,6 +23,7 @@ config:
       - make
       - m4
       - pkg-config
+      - ccache
       
       # System utilities (used by Spack/autotools)
       - findutils
