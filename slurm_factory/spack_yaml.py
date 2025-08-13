@@ -62,32 +62,25 @@ def generate_module_config(
                         "set": {
                             # Allow runtime override with environment variable fallback
                             "SLURM_CONF": "/etc/slurm/slurm.conf", 
-                            "SLURM_ROOT": "${{SLURM_INSTALL_PREFIX:-{prefix}}}",
+                            "SLURM_ROOT": "{prefix}",
                             # Add build-specific metadata
                             "SLURM_BUILD_TYPE": build_type,
                             "SLURM_VERSION": slurm_package_version,
                             # Add dynamic prefix support for redistributable packages
-                            "SLURM_PREFIX": "${{SLURM_INSTALL_PREFIX:-{prefix}}}",
+                            "SLURM_PREFIX": "{prefix}",
                             # Add hint for users about customization capability
                             "SLURM_MODULE_HELP": "Set SLURM_INSTALL_PREFIX before loading to override installation path"
                         },
                         "prepend_path": {
-                            # Use environment variable in paths with fallback to build-time prefix
-                            "LD_LIBRARY_PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/lib",
-                            "PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/bin:${{SLURM_INSTALL_PREFIX:-{prefix}}}/sbin",
-                            "CPATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/include",
-                            "PKG_CONFIG_PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/lib/pkgconfig",
-                            "MANPATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/share/man",
-                            "CMAKE_PREFIX_PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}"
+                            # Use standard Spack prefix paths
+                            "LD_LIBRARY_PATH": "{prefix}/lib",
+                            "PATH": "{prefix}/bin:{prefix}/sbin",
+                            "CPATH": "{prefix}/include",
+                            "PKG_CONFIG_PATH": "{prefix}/lib/pkgconfig",
+                            "MANPATH": "{prefix}/share/man",
+                            "CMAKE_PREFIX_PATH": "{prefix}"
                         },
                     },
-                    # Add context for custom template variables if needed
-                    "context": {
-                        "installation_root": "{prefix}",
-                        "redistributable": True,
-                        "supports_relocation": True,
-                        "relocation_variable": "SLURM_INSTALL_PREFIX"
-                    }
                 },
             },
         },
@@ -97,10 +90,12 @@ def generate_module_config(
     if gpu_support:
         # Add GPU-specific library paths for CUDA/ROCm with dynamic prefix support
         current_ld_path = modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"]
-        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"] = f"{current_ld_path}:${{SLURM_INSTALL_PREFIX:-{{prefix}}}}/lib64"
+        # Use shell variable syntax with proper escaping for module files
+        prefix_var = "${SLURM_INSTALL_PREFIX:-" + "{prefix}" + "}"
+        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"] = f"{current_ld_path}:{prefix_var}/lib64"
         
         current_path = modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"]
-        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"] = f"{current_path}:${{SLURM_INSTALL_PREFIX:-{{prefix}}}}/bin"
+        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"] = f"{current_path}:{prefix_var}/bin"
     
     # Configure OpenMPI module behavior based on build type
     if not minimal:
