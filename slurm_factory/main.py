@@ -19,12 +19,17 @@ app = typer.Typer(name="Slurm Build Factory", add_completion=False)
 @app.callback()
 def main(
     ctx: typer.Context,
-    project_name: str = typer.Option(
-        "slurm-factory",
-        envvar="IF_PROJECT_NAME",
-        help="The LXD project in which resources are going to be created",
-    ),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="Enable verbose output"),
+    project_name: Annotated[
+        str,
+        typer.Option(
+            "--project-name",
+            envvar="IF_PROJECT_NAME",
+            help="The LXD project in which resources are going to be created",
+        ),
+    ] = "slurm-factory",
+    verbose: Annotated[
+        bool, typer.Option("--verbose", "-v", help="Enable verbose output")
+    ] = False,
 ):
     """Handle global options for the application."""
     # Configure logging level based on verbose flag
@@ -56,7 +61,10 @@ def main(
 
 @app.command("clean")
 def clean(
-    ctx: typer.Context, all_instances: bool = typer.Option(False, "--all", help="Delete base instances too")
+    ctx: typer.Context,
+    all_instances: Annotated[
+        bool, typer.Option("--all", help="Delete base instances too")
+    ] = False,
 ):
     """
     Clean up LXD instances from the project.
@@ -165,7 +173,7 @@ def build(
         SlurmVersion, typer.Option("--slurm-version", help="Slurm version to build")
     ] = SlurmVersion.v25_05,
     gpu: Annotated[
-        bool, typer.Option(False, "--gpu", help="Enable GPU support (CUDA/ROCm) - creates larger packages")
+        bool, typer.Option("--gpu", help="Enable GPU support (CUDA/ROCm) - creates larger packages")
     ] = False,
     minimal: Annotated[
         bool, typer.Option("--minimal", help="Build minimal Slurm only (no OpenMPI, smaller size)")

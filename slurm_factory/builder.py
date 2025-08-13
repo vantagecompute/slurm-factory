@@ -22,6 +22,7 @@ from .constants import (
     CONTAINER_BUILD_OUTPUT_DIR,
     CONTAINER_CACHE_DIR,
     CONTAINER_PATCHES_DIR,
+    CONTAINER_SPACK_TEMPLATES_DIR,
     CONTAINER_ROOT_DIR,
     CONTAINER_SLURM_DIR,
     CONTAINER_SPACK_CACHE_DIR,
@@ -32,6 +33,7 @@ from .constants import (
     LXD_IMAGE_REMOTE,
     PACKAGE_CREATION_SCRIPT,
     PATCH_COPY_SCRIPT,
+    TEMPLATE_COPY_SCRIPT,
     SLURM_VERSIONS,
     SPACK_BUILD_CACHE_SCRIPT,
     SPACK_INSTALL_SCRIPT,
@@ -335,6 +337,41 @@ def _copy_patches_to_container(
         logger.warning(f"Patches directory not found at {patches_source}")
 
 
+def _copy_templates_to_container(
+    lxd_instance: lxd.LXDInstance, verbose: bool = False, target_description: str = "container"
+):
+    """Copy template files into the container."""
+    templates_source = _get_data_file("templates")
+
+    if templates_source.exists():
+        logger.debug(f"Copying template files from {templates_source} into {target_description}")
+
+        # Read the template files and copy them into the container
+        for template_file in templates_source.glob("*"):
+            if template_file.is_file():
+                with open(template_file, "r") as f:
+                    template_content = f.read()
+
+                script_content = TEMPLATE_COPY_SCRIPT.substitute(
+                    templates_dir=CONTAINER_SPACK_TEMPLATES_DIR, 
+                    template_name=template_file.name, 
+                    template_content=template_content
+                )
+
+                copy_template_commands = BASH_HEADER + [script_content]
+
+                _stream_exec_output(
+                    lxd_instance,
+                    copy_template_commands,
+                    f"Copying template file {template_file.name} to {target_description}",
+                    verbose=verbose,
+                )
+
+        logger.debug(f"Copied template files to {target_description}")
+    else:
+        logger.warning(f"Templates directory not found at {templates_source}")
+
+
 def _setup_base_instance_buildcache(lxd_instance: lxd.LXDInstance, version: str, gpu_support: bool = False, minimal: bool = False):
     """Set up build cache in the base instance with ALL dependencies from dynamic spack configuration."""
     # Generate dynamic Spack configuration
@@ -342,6 +379,9 @@ def _setup_base_instance_buildcache(lxd_instance: lxd.LXDInstance, version: str,
 
     # Copy patches to container
     _copy_patches_to_container(lxd_instance, verbose=False, target_description="base instance")
+
+    # Copy templates to container
+    _copy_templates_to_container(lxd_instance, verbose=False, target_description="base instance")
 
     script_content = SPACK_BUILD_CACHE_SCRIPT.substitute(
         project_dir=CONTAINER_SPACK_PROJECT_DIR,
@@ -572,6 +612,10 @@ def build(
     # Copy the global patches into the container
     _copy_patches_to_container(lxd_instance, verbose=verbose)
     console.print("[bold green]Copied patch files to container[/bold green]")
+
+    # Copy template files into the container
+    _copy_templates_to_container(lxd_instance, verbose=verbose)
+    console.print("[bold green]Copied template files to container[/bold green]")
 
     # Mount a build output directory to persist results
     #logger.debug(f"Mounting build output directory: {settings.builds_dir}")

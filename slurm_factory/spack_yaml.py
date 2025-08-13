@@ -5,14 +5,13 @@ This module generates Spack environment configurations as Python dictionaries,
 allowing for easy parameterization of Slurm versions and GPU support options.
 """
 
-from pathlib import Path
 from typing import Any, Dict
 
 from slurm_factory.constants import SLURM_VERSIONS
 
-# Get the project root directory for template paths
-PROJECT_ROOT = Path(__file__).parent.parent
-TEMPLATE_PATH = PROJECT_ROOT / "templates" / "relocatable_modulefile.lua"
+# Template name for custom relocatable module template  
+# When placed in Spack's templates directory, reference by name
+TEMPLATE_NAME = "relocatable_modulefile.lua"
 
 
 def generate_module_config(
@@ -63,7 +62,7 @@ def generate_module_config(
                     }
                 },
                 "slurm": {
-                    "template": str(TEMPLATE_PATH),
+                    "template": TEMPLATE_NAME,
                     "environment": {
                         "set": {
                             # Allow runtime override with environment variable fallback

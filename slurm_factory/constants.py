@@ -33,6 +33,7 @@ class BuildType(str, Enum):
 # Container paths
 CONTAINER_CACHE_DIR = "/opt/slurm-factory-cache"
 CONTAINER_PATCHES_DIR = "/srv/global-patches"
+CONTAINER_SPACK_TEMPLATES_DIR = "/opt/spack/share/spack/templates"
 CONTAINER_SPACK_PROJECT_DIR = "/root/spack-project"
 CONTAINER_SLURM_DIR = "/opt/slurm"
 CONTAINER_BUILD_OUTPUT_DIR = f"{CONTAINER_CACHE_DIR}/builds"
@@ -113,6 +114,24 @@ PATCH_COPY_SCRIPT = Template(
         EOF
 
         echo "Copied ${patch_name} to container"
+        """
+    )
+)
+
+# Template copy script template
+TEMPLATE_COPY_SCRIPT = Template(
+    textwrap.dedent(
+        """
+        set -e
+        # Create templates directory in container (Spack's expected location)
+        mkdir -p ${templates_dir}
+
+        # Copy ${template_name} into container
+        cat > ${templates_dir}/${template_name} << 'EOF'
+        ${template_content}
+        EOF
+
+        echo "Copied ${template_name} to container at ${templates_dir}"
         """
     )
 )
@@ -318,18 +337,19 @@ PACKAGE_CREATION_SCRIPT = Template(
 
         # Create the proper directory structure for module deployment
         echo 'Structuring module files for deployment...'
-        mkdir -p ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm
+        mkdir -p ${slurm_dir}/module-package/slurm
         
         # Copy the module files
         if [ -d "${slurm_dir}/modules" ] && [ "$$(ls -A ${slurm_dir}/modules 2>/dev/null)" ]; then
             echo "Copying module files to package structure..."
-            cp -r ${slurm_dir}/modules/* ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm/
-            ls -la ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm/
+            cp -r ${slurm_dir}/modules/* ${slurm_dir}/module-package/slurm/
+            ls -la ${slurm_dir}/module-package/slurm/
         else
             echo "Error: No module files found after generation"
             exit 1
         fi
 
+        # Create tarball with the correct structure for extraction to /usr/share/lmod/lmod/modulefiles/
         tar -czf ${slurm_dir}/redistributable/slurm-${version}-module.tar.gz -C ${slurm_dir}/module-package .
 
         echo 'Redistributable packages created successfully!'
