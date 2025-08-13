@@ -55,6 +55,7 @@ def generate_module_config(
                 "all": {
                     "autoload": "direct", 
                     "conflict": ["{name}"],
+                    "template": TEMPLATE_NAME,
                     "suffixes": {
                         "^openmpi": "mpi",
                         "^cuda": "cuda",
@@ -62,7 +63,6 @@ def generate_module_config(
                     }
                 },
                 "slurm": {
-                    "template": TEMPLATE_NAME,
                     "environment": {
                         "set": {
                             # Allow runtime override with environment variable fallback

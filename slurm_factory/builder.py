@@ -714,9 +714,9 @@ def build(
     console.print(f"  • [green]slurm-{version}-module.tar.gz[/green] (Lmod module)")
     console.print(f"  • [green]slurm-{version}-software.tar.gz[/green] (Compiled software)")
 
-    logger.debug("Cleaning up LXD container")
-    console.print("[bold yellow]Build complete, destroying LXD container.[/bold yellow]")
-    lxc.delete(instance_name=instance_name, project=project_name, force=True)
+    logger.debug("Keeping LXD container for debugging")
+    console.print(f"[bold yellow]Build complete, keeping container [cyan]{instance_name}[/cyan] for debugging.[/bold yellow]")
+    # lxc.delete(instance_name=instance_name, project=project_name, force=True)
 
     console.print(
         f"[bold green]🎉 Build artifacts available in: ~/.slurm-factory/builds/[/bold green]"

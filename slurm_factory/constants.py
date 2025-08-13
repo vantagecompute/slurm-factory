@@ -33,7 +33,7 @@ class BuildType(str, Enum):
 # Container paths
 CONTAINER_CACHE_DIR = "/opt/slurm-factory-cache"
 CONTAINER_PATCHES_DIR = "/srv/global-patches"
-CONTAINER_SPACK_TEMPLATES_DIR = "/opt/spack/share/spack/templates"
+CONTAINER_SPACK_TEMPLATES_DIR = "/opt/spack/share/spack/templates/modules"
 CONTAINER_SPACK_PROJECT_DIR = "/root/spack-project"
 CONTAINER_SLURM_DIR = "/opt/slurm"
 CONTAINER_BUILD_OUTPUT_DIR = f"{CONTAINER_CACHE_DIR}/builds"
