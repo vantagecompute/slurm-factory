@@ -1,8 +1,8 @@
-<div align="center">
-
- <a href="https://www.vantagecompute.ai/">
-  <img src="https://vantage-compute-public-s3.us-east-1.amazonaws.com/branding/vantage-logo-text-black-horz.png" alt="Vantage Compute Logo" width="100" style="margin-bottom: 0.5em;"/>
+<a href="https://www.vantagecompute.ai/">
+  <img src="https://vantage-compute-public-assets.s3.us-east-1.amazonaws.com/branding/vantage-logo-text-black-horz.png" alt="Vantage Compute Logo" width="100" style="margin-bottom: 0.5em;"/>
 </a>
+
+<div align="center">
 
 # Slurm Factory
 
