@@ -38,14 +38,14 @@ permalink: /
     </div>
   </div>
   <h2 style="margin: 0; color: #111827; font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; background: linear-gradient(135deg, #6B46C1, #9333EA, #A855F7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Slurm Factory Documentation</h2>
-  <p style="margin: 0; color: #6B7280; font-size: 1.25rem; font-weight: 500; max-width: 600px; margin: 0 auto;">Modern HPC cluster builder using LXD containers and Spack package manager</p>
+  <p style="margin: 0; color: #6B7280; font-size: 1.25rem; font-weight: 500; max-width: 600px; margin: 0 auto;">Relocatable HPC cluster builder with optimized caching and portable packages</p>
   <div style="margin-top: 2rem; display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap;">
     <a href="#quick-start" style="background: linear-gradient(135deg, #6B46C1, #9333EA); color: white; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1.1rem; box-shadow: 0 4px 15px rgba(107, 70, 193, 0.3); transition: all 0.2s ease; display: inline-block;">Get Started</a>
     <a href="https://github.com/vantagecompute/slurm-factory" style="background: white; color: #6B46C1; padding: 1rem 2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 1.1rem; border: 2px solid #6B46C1; transition: all 0.2s ease; display: inline-block;">View on GitHub</a>
   </div>
 </div>
 
-Slurm Factory is a Python CLI tool that automates the building of Slurm workload manager packages using LXD containers and the Spack package manager. It creates portable, optimized packages that can be deployed across HPC environments with minimal configuration.
+Slurm Factory is a Python CLI tool that automates the building of **relocatable** Slurm workload manager packages using LXD containers and the Spack package manager. It creates optimized, portable packages that can be deployed across HPC environments with **runtime path configuration** and intelligent build caching for ultra-fast rebuilds.
 
 ## Quick Start {#quick-start}
 
@@ -70,24 +70,31 @@ sudo snap install lxd
 sudo lxd init
 ```
 
-### Build Your First Package
+### Build Your First Relocatable Package
 ```bash
-# Build latest Slurm with CPU optimizations
+# Build latest Slurm with CPU optimizations and caching
 slurm-factory build --slurm-version 25.05
 
-# Build with GPU support (larger package)
+# Build with GPU support (includes CUDA/ROCm)
 slurm-factory build --slurm-version 25.05 --gpu
+
+# Build minimal package (smallest footprint)
+slurm-factory build --slurm-version 25.05 --minimal
 ```
 
-### Deploy to Your Cluster
+### Deploy Anywhere
 ```bash
-# Extract packages to target system
-sudo mkdir -p /opt/slurm /opt/modules
+# Standard deployment
+sudo mkdir -p /opt/slurm
 sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /opt/slurm/
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-module.tar.gz -C /opt
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-module.tar.gz -C /usr/share/lmod/lmod/modulefiles/
 
-# Load the module
-export MODULEPATH=/opt/modules:$MODULEPATH
+# Load with default path
+module load slurm/25.05
+
+# Or deploy to custom location  
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /shared/apps/
+export SLURM_INSTALL_PREFIX=/shared/apps/software
 module load slurm/25.05
 ```
 
@@ -95,8 +102,8 @@ module load slurm/25.05
 
 <div class="feature-grid">
   <div class="feature-card">
-    <h3>🚀 Automated Builds</h3>
-    <p>One-command Slurm package creation that handles all dependencies automatically.</p>
+    <h3>� Relocatable Packages</h3>
+    <p>Deploy the same package to any filesystem path using runtime environment variable overrides.</p>
   </div>
   
   <div class="feature-card">

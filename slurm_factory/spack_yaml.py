@@ -33,16 +33,13 @@ def generate_module_config(
     
     slurm_package_version = SLURM_VERSIONS[slurm_version]
     
-    # Build type description for template naming
+    # Build type description for metadata
     if minimal:
         build_type = "minimal build"
-        template_suffix = "minimal"
     elif gpu_support:
         build_type = "GPU-enabled build"
-        template_suffix = "gpu"
     else:
         build_type = "standard build"
-        template_suffix = "standard"
     
     # Base module configuration
     modules_config = {
@@ -61,24 +58,36 @@ def generate_module_config(
                     }
                 },
                 "slurm": {
-                    "template": f"slurm_self_contained_{template_suffix}.lua",
                     "environment": {
                         "set": {
+                            # Allow runtime override with environment variable fallback
                             "SLURM_CONF": "/etc/slurm/slurm.conf", 
-                            "SLURM_ROOT": "{prefix}",
+                            "SLURM_ROOT": "${{SLURM_INSTALL_PREFIX:-{prefix}}}",
                             # Add build-specific metadata
                             "SLURM_BUILD_TYPE": build_type,
-                            "SLURM_VERSION": slurm_package_version
+                            "SLURM_VERSION": slurm_package_version,
+                            # Add dynamic prefix support for redistributable packages
+                            "SLURM_PREFIX": "${{SLURM_INSTALL_PREFIX:-{prefix}}}",
+                            # Add hint for users about customization capability
+                            "SLURM_MODULE_HELP": "Set SLURM_INSTALL_PREFIX before loading to override installation path"
                         },
                         "prepend_path": {
-                            "LD_LIBRARY_PATH": "{prefix}/lib",
-                            "PATH": "{prefix}/bin:{prefix}/sbin",
-                            "CPATH": "{prefix}/include",
-                            "PKG_CONFIG_PATH": "{prefix}/lib/pkgconfig",
-                            "MANPATH": "{prefix}/share/man",
-                            "CMAKE_PREFIX_PATH": "{prefix}"
+                            # Use environment variable in paths with fallback to build-time prefix
+                            "LD_LIBRARY_PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/lib",
+                            "PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/bin:${{SLURM_INSTALL_PREFIX:-{prefix}}}/sbin",
+                            "CPATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/include",
+                            "PKG_CONFIG_PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/lib/pkgconfig",
+                            "MANPATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}/share/man",
+                            "CMAKE_PREFIX_PATH": "${{SLURM_INSTALL_PREFIX:-{prefix}}}"
                         },
                     },
+                    # Add context for custom template variables if needed
+                    "context": {
+                        "installation_root": "{prefix}",
+                        "redistributable": True,
+                        "supports_relocation": True,
+                        "relocation_variable": "SLURM_INSTALL_PREFIX"
+                    }
                 },
             },
         },
@@ -86,12 +95,12 @@ def generate_module_config(
     
     # Add GPU-specific dependencies if GPU support is enabled
     if gpu_support:
-        # Add GPU-specific library paths for CUDA/ROCm
+        # Add GPU-specific library paths for CUDA/ROCm with dynamic prefix support
         current_ld_path = modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"]
-        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"] = f"{current_ld_path}:{{prefix}}/lib64"
+        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["LD_LIBRARY_PATH"] = f"{current_ld_path}:${{SLURM_INSTALL_PREFIX:-{{prefix}}}}/lib64"
         
         current_path = modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"]
-        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"] = f"{current_path}:{{prefix}}/bin"
+        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"] = f"{current_path}:${{SLURM_INSTALL_PREFIX:-{{prefix}}}}/bin"
     
     # Configure OpenMPI module behavior based on build type
     if not minimal:

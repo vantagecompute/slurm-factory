@@ -1,104 +1,143 @@
 ---
 layout: page
 title: Deployment Guide
-description: Complete guide for deploying Slurm packages built with slurm-factory
+description: Complete guide for deploying relocatable Slurm packages built with slurm-factory
 permalink: /deployment/
 ---
 
-# Deployment Guide
+# Relocatable Deployment Guide
 
-Complete guide for deploying Slurm packages built with slurm-factory to production HPC clusters.
+Complete guide for deploying **relocatable** Slurm packages built with slurm-factory to production HPC clusters with flexible installation paths.
 
-## Quick Deployment
+## Quick Relocatable Deployment
 
-### 1. Build Slurm Package
+### 1. Build Relocatable Package
 
 ```bash
-# Build CPU-optimized package (recommended)
+# Build CPU-optimized package (recommended for most clusters)
 uv run slurm-factory build --slurm-version 25.05
 
-# Or build with GPU support (larger package)
+# Or build with GPU support (larger package with CUDA/ROCm)
 uv run slurm-factory build --slurm-version 25.05 --gpu
+
+# Or minimal build (basic Slurm only, no OpenMPI)
+uv run slurm-factory build --slurm-version 25.05 --minimal
 ```
 
-### 2. Deploy to Target System
+### 2. Deploy to Any Location
+
+The generated packages support **runtime path configuration** - deploy to any filesystem location:
 
 ```bash
-# Create installation directories
-sudo mkdir -p /opt/slurm /opt/modules
-
-# Extract software package
+# Option A: Standard /opt deployment
+sudo mkdir -p /opt/slurm
 sudo tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-software.tar.gz -C /opt/slurm/
+sudo tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-module.tar.gz -C /usr/share/lmod/lmod/modulefiles/
 
-# Extract module package  
-sudo tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-module.tar.gz -C /opt/modules/
+# Option B: Shared filesystem deployment  
+sudo mkdir -p /shared/apps/slurm-25.05
+sudo tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-software.tar.gz -C /shared/apps/slurm-25.05/
+sudo tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-module.tar.gz -C /usr/share/lmod/lmod/modulefiles/
+
+# Option C: User-space deployment (no sudo required)
+mkdir -p ~/software/slurm-25.05 ~/modules
+tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-software.tar.gz -C ~/software/slurm-25.05/
+tar -xzf ~/.slurm-factory/builds/25.05/slurm-25.05-module.tar.gz -C ~/modules/
 ```
 
-### 3. Configure Module System
+### 3. Configure Runtime Path
+
+Set the installation path at module load time:
 
 ```bash
-# Add to module path (temporary)
-export MODULEPATH=/opt/modules:$MODULEPATH
-
-# Make permanent for all users
-echo 'export MODULEPATH=/opt/modules:$MODULEPATH' | sudo tee -a /etc/profile.d/modules.sh
-
-# Or per-user in ~/.bashrc
-echo 'export MODULEPATH=/opt/modules:$MODULEPATH' >> ~/.bashrc
-```
-
-### 4. Load and Verify
-
-```bash
-# Check available modules
-module avail slurm
-
-# Load Slurm module
+# For standard /opt deployment (uses default built-in path)
 module load slurm/25.05
 
-# Verify installation
-which srun squeue sinfo slurmd slurmctld
-slurmd --version
+# For custom location (override with environment variable)
+export SLURM_INSTALL_PREFIX=/shared/apps/slurm-25.05/software
+module load slurm/25.05
+
+# For user-space deployment
+export MODULEPATH=$HOME/modules:$MODULEPATH
+export SLURM_INSTALL_PREFIX=$HOME/software/slurm-25.05/software  
+module load slurm/25.05
 ```
 
-## Package Contents
+### 4. Verify Relocatable Installation
+
+```bash
+# Check that paths point to your custom location
+which srun squeue sinfo        # Should show custom path
+echo $SLURM_ROOT              # Should show: /your/custom/path
+echo $SLURM_PREFIX            # Should show: /your/custom/path
+
+# Verify functionality
+slurmd --version
+sinfo --help
+```
+
+## Package Structure & Contents
 
 ### Software Package (`slurm-25.05-software.tar.gz`)
 
-**Size**: ~2-5GB (CPU) / ~15-25GB (GPU)
+**Size**: ~2-5GB (CPU) / ~15-25GB (GPU) / ~1-2GB (minimal)
 
-**Contains**:
+**Relocatable Structure**:
 ```
-software/
-├── bin/           # Slurm executables (srun, sbatch, squeue, etc.)
-├── sbin/          # Slurm daemons (slurmd, slurmctld, etc.)  
-├── lib/           # Shared libraries
-│   └── slurm/     # Slurm plugin libraries
-├── share/         # Documentation and data files
-└── etc/           # Configuration file templates
+software/                    # Relocatable root directory
+├── bin/                     # Slurm executables  
+│   ├── srun, sbatch, squeue # Job management commands
+│   ├── sinfo, scontrol      # Cluster management
+│   └── sacct, sreport       # Accounting tools
+├── sbin/                    # System daemons
+│   ├── slurmd              # Compute node daemon
+│   ├── slurmctld           # Controller daemon  
+│   ├── slurmdbd            # Database daemon
+│   └── slurmrestd          # REST API daemon
+├── lib/                     # Runtime libraries
+│   ├── libslurm.so*        # Core Slurm library
+│   ├── slurm/              # Plugin libraries
+│   │   ├── accounting_storage_*.so
+│   │   ├── job_submit_*.so
+│   │   ├── select_*.so
+│   │   └── task_*.so
+│   └── dependencies/        # Bundled runtime deps
+│       ├── libmunge.so*    # Authentication
+│       ├── libjson-c.so*   # JSON parsing
+│       ├── libcurl.so*     # HTTP client
+│       └── libssl.so*      # SSL/TLS
+├── include/                 # Development headers
+│   └── slurm/
+├── share/                   # Documentation & configs
+│   ├── man/                # Manual pages
+│   ├── doc/                # Documentation
+│   └── slurm/              # Example configs
+└── etc/                     # Configuration templates
+    └── slurm.conf.example
 ```
-
-**Key Binaries**:
-- `srun` - Run jobs interactively or in batch
-- `sbatch` - Submit batch jobs
-- `squeue` - View job queue
-- `sinfo` - View cluster information  
-- `scancel` - Cancel jobs
-- `scontrol` - Administrative control
-- `slurmd` - Compute node daemon
-- `slurmctld` - Controller daemon
-- `slurmdbd` - Database daemon (accounting)
 
 ### Module Package (`slurm-25.05-module.tar.gz`)
 
 **Size**: ~4KB
 
-**Contains**:
+**Relocatable Module Structure**:
 ```
 modules/
 └── slurm/
-    └── 25.05.lua  # Lmod module file
+    └── 25.05.lua           # Dynamic Lmod module
+
+# Alternative hierarchy support  
+modulefiles/
+└── slurm/
+    └── 25.05               # Traditional module format
 ```
+
+**Module Features**:
+- **Dynamic Prefix**: `${SLURM_INSTALL_PREFIX:-{prefix}}` substitution
+- **Build Metadata**: Version, type, GPU support indicators
+- **Conflict Management**: Prevents loading multiple Slurm versions
+- **Help Integration**: Usage instructions and path customization help
+- **Environment Setup**: Comprehensive PATH, LD_LIBRARY_PATH configuration
 
 **Module automatically configures**:
 - `PATH` - Adds `/opt/slurm/software/bin` and `/opt/slurm/software/sbin`

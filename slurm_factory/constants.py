@@ -298,10 +298,15 @@ PACKAGE_CREATION_SCRIPT = Template(
         # Look in the environment's module directory first
         ENV_MODULE_DIR="$$(pwd)/.spack-env/modules"
         GLOBAL_MODULE_DIR="$$(spack config get modules:default:roots:lmod 2>/dev/null || echo '/opt/spack/modules')"
+        SPACK_MODULE_DIR="$$(spack location -p)/share/spack/lmod"
+        # Spack's actual module location with architecture-specific subdirs
+        SPACK_ARCH_MODULE_DIR="/opt/spack/share/spack/lmod"
         SLURM_SPEC="slurm@${slurm_spec_version}"
 
         echo "Environment module directory: $$ENV_MODULE_DIR"
         echo "Global module directory: $$GLOBAL_MODULE_DIR"
+        echo "Spack module directory: $$SPACK_MODULE_DIR"
+        echo "Spack arch module directory: $$SPACK_ARCH_MODULE_DIR"
         mkdir -p ${slurm_dir}/modules
 
         # Generate modules explicitly first
@@ -309,9 +314,20 @@ PACKAGE_CREATION_SCRIPT = Template(
         spack module lmod refresh --delete-tree -y
         spack module lmod refresh -y
         
-        # Show what modules were generated
+        # Show what modules were generated and where
         echo "Looking for generated module files..."
         spack module lmod find slurm 2>/dev/null || echo "No slurm module found via spack module lmod find"
+        
+        # Show all possible module locations for debugging
+        echo "Debugging: Checking all potential module locations..."
+        for debug_dir in "$$ENV_MODULE_DIR" "$$GLOBAL_MODULE_DIR" "$$SPACK_MODULE_DIR" "$$SPACK_ARCH_MODULE_DIR" "/opt/spack/share/spack/lmod"; do
+            if [ -d "$$debug_dir" ]; then
+                echo "Found directory: $$debug_dir"
+                find "$$debug_dir" -name "*.lua" -path "*slurm*" 2>/dev/null | head -5 || echo "No slurm modules in $$debug_dir"
+            else
+                echo "Directory does not exist: $$debug_dir"
+            fi
+        done
 
         # Search for modules in multiple locations
         FOUND_MODULES=false
@@ -319,60 +335,94 @@ PACKAGE_CREATION_SCRIPT = Template(
         # 1. Check environment module directory
         if [ -d "$$ENV_MODULE_DIR" ]; then
             echo "Searching in environment modules: $$ENV_MODULE_DIR"
-            find "$$ENV_MODULE_DIR" -name "*.lua" -path "*slurm*" -exec cp -v {} ${slurm_dir}/modules/ \\; && FOUND_MODULES=true
+            if find "$$ENV_MODULE_DIR" -name "*.lua" -path "*slurm*" -exec cp -v {} ${slurm_dir}/modules/ \\; 2>/dev/null; then
+                FOUND_MODULES=true
+                echo "Found modules in environment directory"
+            fi
         fi
         
-        # 2. Check global module directory
+        # 2. Check Spack architecture-specific module directory (most likely location)
+        if [ -d "$$SPACK_ARCH_MODULE_DIR" ] && [ "$$FOUND_MODULES" = false ]; then
+            echo "Searching in Spack arch modules: $$SPACK_ARCH_MODULE_DIR"
+            if find "$$SPACK_ARCH_MODULE_DIR" -name "*.lua" -path "*slurm*" -exec cp -v {} ${slurm_dir}/modules/ \\; 2>/dev/null; then
+                FOUND_MODULES=true
+                echo "Found modules in Spack architecture directory"
+            fi
+        fi
+        
+        # 3. Check global module directory
         if [ -d "$$GLOBAL_MODULE_DIR" ] && [ "$$FOUND_MODULES" = false ]; then
             echo "Searching in global modules: $$GLOBAL_MODULE_DIR"
-            find "$$GLOBAL_MODULE_DIR" -name "*.lua" -path "*slurm*" -exec cp -v {} ${slurm_dir}/modules/ \\; && FOUND_MODULES=true
+            if find "$$GLOBAL_MODULE_DIR" -name "*.lua" -path "*slurm*" -exec cp -v {} ${slurm_dir}/modules/ \\; 2>/dev/null; then
+                FOUND_MODULES=true
+                echo "Found modules in global directory"
+            fi
         fi
         
-        # 3. Try Spack's internal module command to get the path
-        echo "Trying spack module lmod find command..."
-        MODULE_NAME=$$(spack module lmod find slurm 2>/dev/null || echo "")
-        if [ -n "$$MODULE_NAME" ]; then
-            echo "Found module name: $$MODULE_NAME"
-            # Try to find the actual file for this module
-            for search_dir in "$$ENV_MODULE_DIR" "$$GLOBAL_MODULE_DIR" "/opt/spack/share/spack/lmod" "$$(spack location -i)/share/spack/lmod"; do
-                if [ -d "$$search_dir" ]; then
-                    MODULE_FILE=$$(find "$$search_dir" -name "*.lua" -path "*$$MODULE_NAME*" 2>/dev/null | head -1)
-                    if [ -n "$$MODULE_FILE" ] && [ -f "$$MODULE_FILE" ]; then
-                        echo "Found module file: $$MODULE_FILE"
-                        cp -v "$$MODULE_FILE" ${slurm_dir}/modules/
-                        FOUND_MODULES=true
-                        break
-                    fi
-                fi
-            done
+        # 4. Check Spack module directory
+        if [ -d "$$SPACK_MODULE_DIR" ] && [ "$$FOUND_MODULES" = false ]; then
+            echo "Searching in Spack modules: $$SPACK_MODULE_DIR"
+            if find "$$SPACK_MODULE_DIR" -name "*.lua" -path "*slurm*" -exec cp -v {} ${slurm_dir}/modules/ \\; 2>/dev/null; then
+                FOUND_MODULES=true
+                echo "Found modules in Spack directory"
+            fi
         fi
         
-        # 4. Create a basic module if none found
+        # 5. Try Spack's internal module command to get the path
         if [ "$$FOUND_MODULES" = false ]; then
-            echo "No auto-generated modules found, creating basic module..."
-            cat > ${slurm_dir}/modules/slurm.lua << 'MODULE_EOF'
-        -- Slurm ${version} Module
-        help([==[
-        This module provides access to Slurm ${version} workload manager.
-        ]==])
-
-        whatis("Slurm ${version} - Simple Linux Utility for Resource Management")
-        whatis("Homepage: https://slurm.schedmd.com")
-
-        local slurm_root = "/opt/slurm/software"
-
-        prepend_path("PATH", pathJoin(slurm_root, "bin"))
-        prepend_path("PATH", pathJoin(slurm_root, "sbin"))
-        prepend_path("MANPATH", pathJoin(slurm_root, "share/man"))
-        prepend_path("LD_LIBRARY_PATH", pathJoin(slurm_root, "lib"))
-        prepend_path("PKG_CONFIG_PATH", pathJoin(slurm_root, "lib/pkgconfig"))
-
-        setenv("SLURM_ROOT", slurm_root)
-        setenv("SLURM_CONF", "/etc/slurm/slurm.conf")
-        MODULE_EOF
+            echo "Trying spack module lmod find command..."
+            MODULE_NAME=$$(spack module lmod find slurm 2>/dev/null || echo "")
+            if [ -n "$$MODULE_NAME" ]; then
+                echo "Found module name: $$MODULE_NAME"
+                # Try to find the actual file for this module
+                for search_dir in "$$ENV_MODULE_DIR" "$$SPACK_ARCH_MODULE_DIR" "$$GLOBAL_MODULE_DIR" "$$SPACK_MODULE_DIR" "/opt/spack/share/spack/lmod" "$$(spack location -i)/share/spack/lmod"; do
+                    if [ -d "$$search_dir" ]; then
+                        MODULE_FILE=$$(find "$$search_dir" -name "*.lua" -path "*$$MODULE_NAME*" 2>/dev/null | head -1)
+                        if [ -n "$$MODULE_FILE" ] && [ -f "$$MODULE_FILE" ]; then
+                            echo "Found module file: $$MODULE_FILE"
+                            cp -v "$$MODULE_FILE" ${slurm_dir}/modules/
+                            FOUND_MODULES=true
+                            break
+                        fi
+                    fi
+                done
+            fi
+        fi
+        
+        # 6. If still no modules found, try broader search
+        if [ "$$FOUND_MODULES" = false ]; then
+            echo "No modules found via standard methods, trying broader search..."
+            # Search entire spack installation for slurm modules
+            SPACK_ROOT=$$(spack location -r)
+            if [ -d "$$SPACK_ROOT" ]; then
+                echo "Searching entire Spack installation: $$SPACK_ROOT"
+                find "$$SPACK_ROOT" -name "*.lua" -path "*slurm*" -exec cp -v {} ${slurm_dir}/modules/ \\; 2>/dev/null && FOUND_MODULES=true
+            fi
+        fi
+        
+        # Show final status
+        if [ "$$FOUND_MODULES" = true ]; then
+            echo "Successfully found and copied Slurm modules"
+            ls -la ${slurm_dir}/modules/
+        else
+            echo "Warning: No Slurm modules found - package will not include module files"
+        fi
+        
+        # Create the proper directory structure for module deployment
+        echo 'Structuring module files for deployment...'
+        mkdir -p ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm
+        
+        # Check if modules directory exists and has content before copying
+        if [ -d "${slurm_dir}/modules" ] && [ "$(ls -A ${slurm_dir}/modules 2>/dev/null)" ]; then
+            echo "Copying found module files..."
+            cp -r ${slurm_dir}/modules/* ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm/
+        else
+            echo "Warning: No module files found, creating placeholder structure"
+            # Create an empty directory structure so tar doesn't fail
+            touch ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm/.gitkeep
         fi
 
-        tar -czf ${slurm_dir}/redistributable/slurm-${version}-module.tar.gz -C ${slurm_dir} modules/
+        tar -czf ${slurm_dir}/redistributable/slurm-${version}-module.tar.gz -C ${slurm_dir}/module-package .
 
         echo 'Redistributable packages created successfully!'
         ls -la ${slurm_dir}/redistributable/
@@ -491,10 +541,24 @@ conflict("slurm")
 
 -- Ensure MANPATH is properly terminated
 append_path("MANPATH", "")
-MODULE_EOF
+        MODULE_EOF
         fi
 
-        tar -czf ${slurm_dir}/redistributable/slurm-${version}-module.tar.gz -C ${slurm_dir} modules/
+        # Create the proper directory structure for module deployment
+        echo 'Structuring module files for deployment...'
+        mkdir -p ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm
+        
+        # Check if modules directory exists and has content before copying
+        if [ -d "${slurm_dir}/modules" ] && [ "$(ls -A ${slurm_dir}/modules 2>/dev/null)" ]; then
+            echo "Copying found module files..."
+            cp -r ${slurm_dir}/modules/* ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm/
+        else
+            echo "Warning: No module files found, creating placeholder structure"
+            # Create an empty directory structure so tar doesn't fail
+            touch ${slurm_dir}/module-package/usr/share/lmod/lmod/modulefiles/slurm/.gitkeep
+        fi
+
+        tar -czf ${slurm_dir}/redistributable/slurm-${version}-module.tar.gz -C ${slurm_dir}/module-package .
 
         echo 'Self-contained redistributable packages created successfully!'
         ls -la ${slurm_dir}/redistributable/
