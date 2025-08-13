@@ -9,9 +9,8 @@ from typing import Any, Dict
 
 from slurm_factory.constants import SLURM_VERSIONS
 
-# Template name for custom relocatable module template  
-# When placed in Spack's templates directory, reference by name
-TEMPLATE_NAME = "relocatable_modulefile.lua"
+# Template name for relocatable module files (relative to Spack templates directory)
+TEMPLATE_NAME = "modules/relocatable_modulefile.lua"
 
 
 def generate_module_config(
@@ -52,17 +51,11 @@ def generate_module_config(
             "lmod": {
                 "core_compilers": ["gcc@13.3.0"],
                 "hierarchy": [],  # Flat hierarchy for simpler deployment
-                "all": {
+                "include": ["slurm"],  # Only generate modules for Slurm
+                "slurm": {
+                    "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
                     "autoload": "direct", 
                     "conflict": ["{name}"],
-                    "template": TEMPLATE_NAME,
-                    "suffixes": {
-                        "^openmpi": "mpi",
-                        "^cuda": "cuda",
-                        "^rocm": "rocm"
-                    }
-                },
-                "slurm": {
                     "environment": {
                         "set": {
                             # Allow runtime override with environment variable fallback
