@@ -165,7 +165,7 @@ def build(
         SlurmVersion, typer.Option("--slurm-version", help="Slurm version to build")
     ] = SlurmVersion.v25_05,
     gpu: Annotated[
-        bool, typer.Option("--gpu", help="Enable GPU support (CUDA/ROCm) - creates larger packages")
+        bool, typer.Option(False, "--gpu", help="Enable GPU support (CUDA/ROCm) - creates larger packages")
     ] = False,
     minimal: Annotated[
         bool, typer.Option("--minimal", help="Build minimal Slurm only (no OpenMPI, smaller size)")
