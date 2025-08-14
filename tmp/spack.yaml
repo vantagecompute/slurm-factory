@@ -1,0 +1,308 @@
+# Spack environment for building Slurm 25.05 (minimal build - basic Slurm only)
+spack:
+  specs:
+  - gcc@13.3.0 +binutils
+  - gcc-runtime@13.3.0
+  - perl %gcc@13.3.0
+  - munge %gcc@13.3.0
+  - slurm@25-05-1-1 +readline ~hwloc ~pmix ~restd ~nvml ~rsmi ~cgroup sysconfdir=/etc/slurm %gcc@13.3.0
+  concretizer:
+    unify: true
+    reuse: true
+  develop: {}
+  view:
+    default:
+      root: /opt/slurm/view
+      link_type: hardlink
+      select:
+      - slurm
+      - munge
+      - json-c
+      - curl
+      - openssl
+      - readline
+      - ncurses
+      - lz4
+      - zlib-ng
+      - numactl
+      - gcc-runtime
+      - gcc
+      - linux-pam
+      - libevent
+      - jansson
+      - libyaml
+      - bzip2
+      - xz
+      - zstd
+  config:
+    install_tree:
+      root: /opt/slurm/software
+      padded_length: 0
+    build_stage: /tmp/spack-stage
+    misc_cache: /opt/slurm-factory-cache/spack-sourcecache
+    binary_index_root: /opt/slurm-factory-cache/binary_index
+    checksum: true
+    deprecated: true
+    build_jobs: 4
+    ccache: true
+    connect_timeout: 30
+    verify_ssl: true
+    suppress_gpg_warnings: false
+    shared_linking:
+      missing_library_policy: error
+  mirrors:
+    local-buildcache:
+      url: file:///opt/slurm-factory-cache/spack-buildcache
+      signed: false
+    spack-public:
+      url: https://mirror.spack.io
+      signed: true
+    binary-mirror:
+      url: file:///opt/slurm-factory-cache/binary_index
+      signed: false
+  compilers:
+  - compiler:
+      spec: gcc@=13.3.0
+      paths:
+        cc: /usr/bin/gcc
+        cxx: /usr/bin/g++
+        f77: /usr/bin/gfortran
+        fc: /usr/bin/gfortran
+      operating_system: ubuntu24.04
+      target: x86_64
+      modules: []
+      environment: {}
+      extra_rpaths: []
+  packages:
+    gcc:
+      externals: []
+    perl:
+      require:
+      - ^bzip2
+      - ^gdbm
+      - ^berkeley-db
+    cmake:
+      externals:
+      - spec: cmake@3.28.3
+        prefix: /usr
+      buildable: false
+      require: '@3.28.3'
+    python:
+      externals:
+      - spec: python@3.12.3
+        prefix: /usr
+      buildable: false
+      require: '@3.12.3'
+    autoconf:
+      externals:
+      - spec: autoconf@2.71
+        prefix: /usr
+      buildable: false
+      require: '@2.71'
+    automake:
+      externals:
+      - spec: automake@1.16.5
+        prefix: /usr
+      buildable: false
+      require: '@1.16.5'
+    libtool:
+      externals:
+      - spec: libtool@2.4.7
+        prefix: /usr
+      buildable: false
+      require: '@2.4.7'
+    bison:
+      externals:
+      - spec: bison@3.8.2
+        prefix: /usr
+      buildable: false
+      require: '@3.8.2'
+    flex:
+      externals:
+      - spec: flex@2.6.4
+        prefix: /usr
+      buildable: false
+      require: '@2.6.4'
+    findutils:
+      externals:
+      - spec: findutils@4.9.0
+        prefix: /usr
+      buildable: false
+    diffutils:
+      externals:
+      - spec: diffutils@3.10
+        prefix: /usr
+      buildable: false
+    tar:
+      externals:
+      - spec: tar@1.34
+        prefix: /usr
+      buildable: false
+    gawk:
+      externals:
+      - spec: gawk@5.2.1
+        prefix: /usr
+      buildable: false
+    gettext:
+      externals:
+      - spec: gettext@0.21
+        prefix: /usr
+      buildable: false
+    gmake:
+      externals:
+      - spec: gmake@4.3
+        prefix: /usr
+      buildable: false
+    m4:
+      externals:
+      - spec: m4@1.4.18
+        prefix: /usr
+      buildable: false
+    mawk:
+      externals:
+      - spec: mawk@1.3.4
+        prefix: /usr
+      buildable: false
+    pkg-config:
+      externals:
+      - spec: pkg-config@0.29.2
+        prefix: /usr
+      buildable: false
+    pkgconf:
+      externals:
+      - spec: pkgconf@1.8.1
+        prefix: /usr
+      buildable: false
+    munge:
+      buildable: true
+    json-c:
+      buildable: true
+    curl:
+      buildable: true
+    openssl:
+      buildable: true
+      version:
+      - '3:'
+    readline:
+      buildable: true
+    ncurses:
+      buildable: true
+    lz4:
+      buildable: true
+    zlib-ng:
+      buildable: true
+    hwloc:
+      buildable: true
+      version:
+      - '2:'
+    numactl:
+      buildable: true
+    dbus:
+      externals:
+      - spec: dbus@1.14.10
+        prefix: /usr
+      buildable: false
+      variants: system-socket=/var/run/dbus/system_bus_socket
+    glib:
+      externals:
+      - spec: glib@2.80.0
+        prefix: /usr
+      buildable: false
+    libxml2:
+      externals:
+      - spec: libxml2@2.9.14
+        prefix: /usr
+      buildable: false
+    gdbm:
+      buildable: true
+    berkeley-db:
+      buildable: true
+    libgcrypt:
+      buildable: true
+    libgpg-error:
+      buildable: true
+    libsigsegv:
+      externals:
+      - spec: libsigsegv@2.14
+        prefix: /usr
+      buildable: false
+    hdf5:
+      externals:
+      - spec: hdf5@1.10.10
+        prefix: /usr
+      buildable: false
+    linux-pam:
+      buildable: true
+    libevent:
+      buildable: true
+    jansson:
+      buildable: true
+    libyaml:
+      buildable: true
+    bzip2:
+      buildable: true
+    xz:
+      buildable: true
+    zstd:
+      buildable: true
+    gcc-runtime:
+      buildable: true
+      version:
+      - 13.3.0
+    slurm:
+      version:
+      - 25-05-1-1
+      buildable: true
+      variants: +shared ~static
+    all:
+      target:
+      - x86_64
+      prefer:
+      - '%gcc@13.3.0'
+      - +shared
+      - ~static
+      variants: +shared ~static
+      permissions:
+        read: world
+        write: user
+  modules:
+    default:
+      enable:
+      - lmod
+      lmod:
+        core_compilers:
+        - gcc@13.3.0
+        hierarchy: []
+        include:
+        - slurm
+        all:
+          environment:
+            set:
+              SPACK_COMPILER_SPEC: '{compiler.name}@{compiler.version}'
+          filter:
+            exclude_env_vars:
+            - LD_LIBRARY_PATH
+            - DYLD_LIBRARY_PATH
+        slurm:
+          template: modules/relocatable_modulefile.lua
+          autoload: direct
+          conflict:
+          - '{name}'
+          environment:
+            set:
+              SLURM_CONF: /etc/slurm/slurm.conf
+              SLURM_ROOT: '{prefix}'
+              SLURM_BUILD_TYPE: minimal build
+              SLURM_VERSION: 25-05-1-1
+              SLURM_PREFIX: '{prefix}'
+              SLURM_MODULE_HELP: Set SLURM_INSTALL_PREFIX before loading to override installation path
+              SLURM_COMPILER: '{compiler.name}@{compiler.version}'
+              SLURM_TARGET_ARCH: '{architecture}'
+              SLURM_GCC_RUNTIME_PREFIX: '{^gcc-runtime.prefix}'
+            prepend_path:
+              PATH: '{prefix}/bin:{prefix}/sbin'
+              CPATH: '{prefix}/include'
+              PKG_CONFIG_PATH: '{prefix}/lib/pkgconfig'
+              MANPATH: '{prefix}/share/man'
+              CMAKE_PREFIX_PATH: '{prefix}'
+
