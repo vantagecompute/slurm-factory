@@ -1,6 +1,7 @@
 """Slurm build process management."""
 
 import logging
+import textwrap
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -32,8 +33,6 @@ from .constants import (
     LXD_IMAGE,
     LXD_IMAGE_REMOTE,
     PACKAGE_CREATION_SCRIPT,
-    PATCH_COPY_SCRIPT,
-    TEMPLATE_COPY_SCRIPT,
     SLURM_VERSIONS,
     SPACK_BUILD_CACHE_SCRIPT,
     SPACK_BOOTSTRAPPED_INSTALL_SCRIPT,
@@ -47,6 +46,31 @@ from .spack_yaml import generate_yaml_string
 
 # Set up logging following craft-providers pattern
 logger = logging.getLogger(__name__)
+
+
+def _push_script_to_container(
+    lxd_instance: lxd.LXDInstance, 
+    script_content: str, 
+    script_name: str,
+    container_path: str = "/tmp",
+    verbose: bool = False
+) -> str:
+    """Push a script to the container and return the path for execution."""
+    import io
+    
+    script_path = f"{container_path}/{script_name}"
+    content_io = io.BytesIO(script_content.encode('utf-8'))
+    
+    lxd_instance.push_file_io(
+        destination=Path(script_path),
+        content=content_io,
+        file_mode="0755"  # Make it executable
+    )
+    
+    if verbose:
+        logger.info(f"Pushed script {script_name} to container at {script_path}")
+    
+    return script_path
 
 
 def _get_data_file(filename: str) -> Path:
@@ -225,8 +249,8 @@ def _wait_for_cloud_init_with_output(instance: lxd.LXDInstance):
 
 def _get_base_instance_name(project_name: str, gpu_support: bool = False, minimal: bool = False) -> str:
     """Get the base instance name for the project with timestamp and build configuration."""
-    # Use current date as timestamp for base instance naming
-    timestamp_str = datetime.now().strftime("%Y%m%d")
+    # Use current timestamp including seconds to ensure unique instances for each build
+    timestamp_str = datetime.now().strftime("%Y%m%d-%H%M%S")
     
     # Add configuration suffix to differentiate base instances
     config_suffix = ""
@@ -303,6 +327,22 @@ def _pre_build_base_instance_setup(lxd_instance: lxd.LXDInstance):
         cwd=Path(CONTAINER_ROOT_DIR),
     )
 
+    # Clear any previous Spack state that might have leftover failure marks
+    logger.debug("Clearing any previous Spack state")
+    clean_commands = BASH_HEADER + [
+        "spack clean -a >/dev/null 2>&1 || true",
+        "rm -rf ~/.spack/cache >/dev/null 2>&1 || true",
+        "echo 'Spack environment cleaned'"
+    ]
+
+    _stream_exec_output(
+        lxd_instance,
+        clean_commands,
+        "Cleaning previous Spack state",
+        verbose=True,
+        cwd=Path(CONTAINER_ROOT_DIR),
+    )
+
 
 def _copy_patches_to_container(
     lxd_instance: lxd.LXDInstance, verbose: bool = False, target_description: str = "container"
@@ -313,24 +353,34 @@ def _copy_patches_to_container(
     if patches_source.exists():
         logger.debug(f"Copying global patches from {patches_source} into {target_description}")
 
-        # Read the patch files and copy them into the container
+        # Create the patches directory in the container first
+        mkdir_commands = BASH_HEADER + [f"mkdir -p {CONTAINER_PATCHES_DIR}"]
+        _stream_exec_output(
+            lxd_instance,
+            mkdir_commands,
+            f"Creating patches directory in {target_description}",
+            verbose=verbose,
+        )
+
+        # Copy each patch file directly using LXD file operations
         for patch_file in patches_source.glob("*"):
             if patch_file.is_file():
-                with open(patch_file, "r") as f:
+                import io
+                with open(patch_file, "rb") as f:
                     patch_content = f.read()
-
-                script_content = PATCH_COPY_SCRIPT.substitute(
-                    patches_dir=CONTAINER_PATCHES_DIR, patch_name=patch_file.name, patch_content=patch_content
+                
+                # Use LXD's push_file_io to copy the file directly
+                content_io = io.BytesIO(patch_content)
+                target_path = Path(f"{CONTAINER_PATCHES_DIR}/{patch_file.name}")
+                
+                lxd_instance.push_file_io(
+                    destination=target_path,
+                    content=content_io,
+                    file_mode="0644"
                 )
-
-                copy_patch_commands = BASH_HEADER + [script_content]
-
-                _stream_exec_output(
-                    lxd_instance,
-                    copy_patch_commands,
-                    f"Copying patch file {patch_file.name} to {target_description}",
-                    verbose=verbose,
-                )
+                
+                if verbose:
+                    logger.info(f"Copied {patch_file.name} to container")
 
         logger.debug(f"Copied patch files to {target_description}")
     else:
@@ -347,25 +397,33 @@ def _copy_templates_to_container(
         logger.debug(f"Copying template files from {templates_source} into {target_description}")
 
         # Read the template files and copy them into the container
+        # Create the templates directory in the container first
+        create_dir_commands = BASH_HEADER + [f"mkdir -p {CONTAINER_SPACK_TEMPLATES_DIR}"]
+        _stream_exec_output(
+            lxd_instance,
+            create_dir_commands,
+            f"Creating templates directory in {target_description}",
+            verbose=verbose,
+        )
+
         for template_file in templates_source.glob("*"):
             if template_file.is_file():
-                with open(template_file, "r") as f:
-                    template_content = f.read()
-
-                script_content = TEMPLATE_COPY_SCRIPT.substitute(
-                    templates_dir=CONTAINER_SPACK_TEMPLATES_DIR, 
-                    template_name=template_file.name, 
-                    template_content=template_content
-                )
-
-                copy_template_commands = BASH_HEADER + [script_content]
-
-                _stream_exec_output(
-                    lxd_instance,
-                    copy_template_commands,
-                    f"Copying template file {template_file.name} to {target_description}",
-                    verbose=verbose,
-                )
+                # Use LXD's file copying to avoid shell escaping issues
+                destination_path = f"{CONTAINER_SPACK_TEMPLATES_DIR}/{template_file.name}"
+                
+                try:
+                    from io import BytesIO
+                    from pathlib import PurePath
+                    
+                    lxd_instance.push_file_io(
+                        content=BytesIO(template_file.read_bytes()),
+                        destination=PurePath(destination_path),
+                        file_mode="644",
+                    )
+                    logger.info(f"Copied {template_file.name} to container at {CONTAINER_SPACK_TEMPLATES_DIR}")
+                except Exception as e:
+                    logger.error(f"Failed to copy template file {template_file.name}: {e}")
+                    raise
 
         logger.debug(f"Copied template files to {target_description}")
     else:
@@ -394,7 +452,12 @@ def _setup_base_instance_buildcache(lxd_instance: lxd.LXDInstance, version: str,
         spack_repo_path=SPACK_REPO_PATH,
     )
 
-    build_cache_commands = BASH_HEADER + [script_content]
+    # Push the build cache script to container and execute it
+    script_path = _push_script_to_container(
+        lxd_instance, script_content, "spack_build_cache.sh", verbose=False
+    )
+    
+    build_cache_commands = BASH_HEADER + [script_path]
 
     _stream_exec_output(
         lxd_instance,
@@ -604,7 +667,12 @@ def build(
         project_dir=CONTAINER_SPACK_PROJECT_DIR, spack_config=spack_yaml_content
     )
 
-    setup_commands = BASH_HEADER + [script_content]
+    # Push the setup script to container and execute it
+    script_path = _push_script_to_container(
+        lxd_instance, script_content, "spack_setup.sh", verbose=verbose
+    )
+    
+    setup_commands = BASH_HEADER + [script_path]
 
     _stream_exec_output(
         lxd_instance, setup_commands, "Setting up dynamic Spack configuration in container", verbose=verbose
@@ -629,7 +697,7 @@ def build(
         lxd_instance.mount(host_source=spack_cache, target=Path(CONTAINER_SPACK_CACHE_DIR))
 
     # Check if we're using the base instance (cloud-init already completed) or need to wait
-    if used_instance.startswith(BASE_INSTANCE_PREFIX):
+    if used_instance and used_instance.startswith(BASE_INSTANCE_PREFIX):
         logger.debug("Using base instance with cloud-init already completed, skipping wait")
         console.print(
             "[bold green]Using base instance - cloud-init already completed, "
@@ -681,7 +749,12 @@ def build(
         slurm_spec_version=SLURM_VERSIONS[version],
     )
 
-    package_commands = BASH_HEADER + [script_content]
+    # Push the package creation script to container and execute it
+    script_path = _push_script_to_container(
+        lxd_instance, script_content, "package_creation.sh", verbose=verbose
+    )
+    
+    package_commands = BASH_HEADER + [script_path]
 
     _stream_exec_output(
         lxd_instance,

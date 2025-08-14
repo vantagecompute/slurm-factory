@@ -118,24 +118,6 @@ PATCH_COPY_SCRIPT = Template(
     )
 )
 
-# Template copy script template
-TEMPLATE_COPY_SCRIPT = Template(
-    textwrap.dedent(
-        """
-        set -e
-        # Create templates directory in container (Spack's expected location)
-        mkdir -p ${templates_dir}
-
-        # Copy ${template_name} into container
-        cat > ${templates_dir}/${template_name} << 'EOF'
-        ${template_content}
-        EOF
-
-        echo "Copied ${template_name} to container at ${templates_dir}"
-        """
-    )
-)
-
 # Spack project setup script template
 SPACK_PROJECT_SETUP_SCRIPT = Template(
     textwrap.dedent(
@@ -175,6 +157,9 @@ SPACK_BUILD_CACHE_SCRIPT = Template(
         echo 'Generated dynamic Spack configuration for version ${version} (GPU: ${gpu_support})'
         echo 'Binary cache mirrors configured:'
         spack mirror list
+
+        spack install gcc@13.3.0
+        spack compiler find $$(spack location -i gcc@13.3.0)
 
         echo 'Starting Spack concretization...'
         spack concretize -f
@@ -245,6 +230,9 @@ SPACK_INSTALL_SCRIPT = Template(
         echo 'Binary cache mirrors configured:'
         spack mirror list
 
+        spack install gcc@13.3.0
+        spack compiler find $$(spack location -i gcc@13.3.0)
+
         echo 'Concretizing environment for Slurm version...'
         spack concretize -f
 
@@ -295,10 +283,11 @@ SPACK_BOOTSTRAPPED_INSTALL_SCRIPT = Template(
 
         echo 'Stage 4: Build Slurm with bootstrapped compiler...'
         echo 'All subsequent packages will use the Spack-built gcc@13.3.0'
-        spack install -j$$(nproc) --verbose --use-buildcache=auto -y
+        # Force clean build without using any cache or previous state
+        spack install -j$$(nproc) --verbose --no-cache --fresh -y
         echo ''
 
-        echo 'Stage 5: Verify relocatability (if verification enabled)...'
+        echo 'Stage 6: Verify relocatability (if verification enabled)...'
         if [ "${verify}" = "True" ]; then
             echo 'Running relocatability verification...'
             spack verify libraries slurm || echo 'Warning: Some verification checks failed'

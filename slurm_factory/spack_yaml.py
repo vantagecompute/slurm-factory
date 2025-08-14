@@ -51,15 +51,18 @@ def generate_module_config(
             "lmod": {
                 "core_compilers": ["gcc@13.3.0"],  # Mark gcc as core for relocatable binaries
                 "hierarchy": [],  # Flat hierarchy for simpler deployment
-                "include": ["slurm"],  # Only generate modules for Slurm
-                # Don't let any module touch these - enforces proper RPATH usage
-                "exclude_env_vars": ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"],
+                "include": (["slurm", "openmpi"] if not minimal else ["slurm"]),  # Include OpenMPI for full builds
                 "all": {
+                    "autoload": "direct",   # consistent autoload across all modules
                     "environment": {
                         "set": {
                             # Ensure relocatable binaries don't depend on build-time compiler paths
                             "SPACK_COMPILER_SPEC": "{compiler.name}@{compiler.version}"
                         }
+                    },
+                    "filter": {
+                        # Don't let any module touch these - enforces proper RPATH usage
+                        "exclude_env_vars": ["LD_LIBRARY_PATH", "DYLD_LIBRARY_PATH"]
                     }
                 },
                 "slurm": {
@@ -98,11 +101,9 @@ def generate_module_config(
         },
     }
     
-    # Add GPU-specific dependencies if GPU support is enabled
+    # Remove unnecessary GPU PATH duplication - RPATH covers libs and PATH already includes {prefix}/bin
     if gpu_support:
-        # Add GPU-specific binary paths for CUDA/ROCm (no library paths - rely on RPATH)
-        current_path = modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"]
-        modules_config["default"]["lmod"]["slurm"]["environment"]["prepend_path"]["PATH"] = current_path + ":{prefix}/bin"
+        pass  # nothing to add here; RPATH covers libs and PATH already includes {prefix}/bin
     
     # Configure OpenMPI module behavior based on build type
     if not minimal:
@@ -160,6 +161,8 @@ def generate_spack_config(
             # Build a bootstrapped compiler first (in-DAG)
             "gcc@13.3.0 +binutils",
             "gcc-runtime@13.3.0 +shared ~static",
+            # Build Perl inside Spack to avoid system XS module linkage issues
+            "perl %gcc@13.3.0",
             # Build Munge with the same toolchain (Slurm links against it)
             "munge %gcc@13.3.0",
             # Build Slurm with the Spack-built gcc (after registration)
@@ -172,10 +175,12 @@ def generate_spack_config(
             # Build a bootstrapped compiler first (in-DAG)
             "gcc@13.3.0 +binutils",
             "gcc-runtime@13.3.0 +shared ~static",
+            # Build Perl inside Spack to avoid system XS module linkage issues
+            "perl %gcc@13.3.0",
             # Build Munge with the same toolchain (Slurm links against it)
             "munge %gcc@13.3.0",
             # Build OpenMPI and Slurm with the Spack-built gcc (after registration)
-            f"openmpi@5.0.3 schedulers=slurm fabrics=auto ^hwloc ^libevent ^pmix %gcc@13.3.0",
+            f"openmpi@5.0.3 schedulers=slurm fabrics=auto ^hwloc ^libevent ^pmix~munge~python %gcc@13.3.0",
             f"slurm@{slurm_package_version} +readline +hwloc +pmix +restd "
             f"{gpu_flags} +cgroup sysconfdir=/etc/slurm %gcc@13.3.0"
         ]
@@ -224,7 +229,7 @@ def generate_spack_config(
                 "deprecated": True,
                 # Spack 1.x performance enhancements
                 "build_jobs": 4,  # Parallel build jobs
-                "ccache": True,   # Disable ccache since it's not available
+                "ccache": False,  # Disable ccache if not present
                 "connect_timeout": 30,  # Network timeout for downloads
                 "verify_ssl": True,     # Security setting
                 "suppress_gpg_warnings": False,  # Show GPG warnings
@@ -293,7 +298,7 @@ def generate_spack_config(
                 "readline": {"buildable": True},                          # Interactive command line
                 "ncurses": {"buildable": True},                           # Terminal control for readline
                 "lz4": {"buildable": True},                               # Fast compression - linked at runtime
-                "zlib-ng": {"buildable": True},                           # lz4 compression lib - linked at runtime
+                "zlib-ng": {"buildable": True, "variants": "+compat"},   # zlib-ng with zlib compatibility - linked at runtime
                 "hwloc": {"buildable": True, "version": ["2:"]},          # Hardware topology - use hwloc 2.x series
                 "numactl": {"buildable": True},                           # NUMA support - used by Slurm for memory binding
                 
@@ -306,10 +311,19 @@ def generate_spack_config(
                 },
                 "glib": {"externals": [{"spec": "glib@2.80.0", "prefix": "/usr"}], "buildable": False},
                 "libxml2": {"externals": [{"spec": "libxml2@2.9.14", "prefix": "/usr"}], "buildable": False},
-                "gdbm": {"externals": [{"spec": "gdbm@1.23", "prefix": "/usr"}], "buildable": False},
-                "berkeley-db": {"externals": [{"spec": "berkeley-db@5.3.28", "prefix": "/usr"}], "buildable": False},
-                "libgcrypt": {"externals": [{"spec": "libgcrypt@1.10.1", "prefix": "/usr"}], "buildable": False},
-                "libgpg-error": {"externals": [{"spec": "libgpg-error@1.47", "prefix": "/usr"}], "buildable": False},
+                # Build these inside Spack to avoid Perl XS module linking to external system libraries
+                "gdbm": {"buildable": True},
+                "berkeley-db": {"buildable": True},
+                # Force Perl to use Spack-built dependencies for XS modules
+                "perl": {
+                    "require": [
+                        "^bzip2",
+                        "^gdbm", 
+                        "^berkeley-db"
+                    ]
+                },
+                "libgcrypt": {"buildable": True},
+                "libgpg-error": {"buildable": True},
                 "libsigsegv": {"externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}], "buildable": False},
                 "hdf5": {"externals": [{"spec": "hdf5@1.10.10", "prefix": "/usr"}], "buildable": False},
                 
@@ -327,8 +341,11 @@ def generate_spack_config(
                 # GCC runtime for relocatable binaries (Spack 1.x approach)
                 "gcc-runtime": {
                     "buildable": True, 
-                    "version": ["13.3.0"],
-                    "variants": "+shared ~static"  # Ensure shared runtime libraries
+                    "version": ["13.3.0"]
+                },
+                "gcc": {
+                    "buildable": True,
+                    "externals": [],   # hard override: do NOT use host GCC
                 },
                 
                 # Slurm itself - enhanced for relocatability
@@ -341,7 +358,7 @@ def generate_spack_config(
                 
                 # Global preferences with Spack 1.x enhancements
                 "all": {
-                    "compiler": ["gcc@13.3.0"],  # Prefer the installed GCC everywhere
+                    "compiler": ["gcc@13.3.0"],  # prefer the Spack-built GCC
                     "target": ["x86_64"],
                     "prefer": ["%gcc@13.3.0", "+shared", "~static"],  # More specific preferences
                     "variants": "+shared ~static",  # Consistent shared library preference
