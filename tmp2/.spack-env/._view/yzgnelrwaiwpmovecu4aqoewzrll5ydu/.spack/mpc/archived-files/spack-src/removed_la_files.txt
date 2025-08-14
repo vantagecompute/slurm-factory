@@ -1,1 +1,0 @@
-/home/bdx/spack/opt/spack/linux-skylake/mpc-1.3.1-afld6r2amlt76eoq4xewxjrvd7ek3y7k/.spack/archived-files/spack-src/removed_la_files.txt

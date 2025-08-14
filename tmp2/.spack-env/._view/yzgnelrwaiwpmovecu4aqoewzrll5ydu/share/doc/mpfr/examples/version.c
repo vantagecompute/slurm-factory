@@ -1,1 +1,0 @@
-/home/bdx/spack/opt/spack/linux-skylake/mpfr-4.2.1-d3exekt65msaetjfujxip5e5l5ngby5a/share/doc/mpfr/examples/version.c

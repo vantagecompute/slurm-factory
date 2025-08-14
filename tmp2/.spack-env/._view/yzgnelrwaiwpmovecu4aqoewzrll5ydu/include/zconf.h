@@ -1,1 +1,0 @@
-/home/bdx/spack/opt/spack/linux-skylake/zlib-ng-2.2.4-wqfg43kkrj35rmkvnpuxektozaqclooe/include/zconf.h
