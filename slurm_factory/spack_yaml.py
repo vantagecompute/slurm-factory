@@ -160,7 +160,7 @@ def generate_spack_config(
         specs = [
             # Build a bootstrapped compiler first (in-DAG)
             "gcc@13.3.0 +binutils",
-            "gcc-runtime@13.3.0 +shared ~static",
+            "gcc-runtime@13.3.0",
             # Build Perl inside Spack to avoid system XS module linkage issues
             "perl %gcc@13.3.0",
             # Build Munge with the same toolchain (Slurm links against it)
@@ -174,7 +174,7 @@ def generate_spack_config(
         specs = [
             # Build a bootstrapped compiler first (in-DAG)
             "gcc@13.3.0 +binutils",
-            "gcc-runtime@13.3.0 +shared ~static",
+            "gcc-runtime@13.3.0",
             # Build Perl inside Spack to avoid system XS module linkage issues
             "perl %gcc@13.3.0",
             # Build Munge with the same toolchain (Slurm links against it)
@@ -346,6 +346,7 @@ def generate_spack_config(
                 "gcc": {
                     "buildable": True,
                     "externals": [],   # hard override: do NOT use host GCC
+                    "version": ["13.3.0"]
                 },
                 
                 # Slurm itself - enhanced for relocatability
@@ -358,7 +359,6 @@ def generate_spack_config(
                 
                 # Global preferences with Spack 1.x enhancements
                 "all": {
-                    "compiler": ["gcc@13.3.0"],  # prefer the Spack-built GCC
                     "target": ["x86_64"],
                     "prefer": ["%gcc@13.3.0", "+shared", "~static"],  # More specific preferences
                     "variants": "+shared ~static",  # Consistent shared library preference

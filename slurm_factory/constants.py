@@ -100,40 +100,7 @@ CACHE_SETUP_SCRIPT = Template(
     )
 )
 
-# Patch copy script template
-PATCH_COPY_SCRIPT = Template(
-    textwrap.dedent(
-        """
-        set -e
-        # Create patches directory in container
-        mkdir -p ${patches_dir}
 
-        # Copy ${patch_name} into container
-        cat > ${patches_dir}/${patch_name} << 'EOF'
-        ${patch_content}
-        EOF
-
-        echo "Copied ${patch_name} to container"
-        """
-    )
-)
-
-# Spack project setup script template
-SPACK_PROJECT_SETUP_SCRIPT = Template(
-    textwrap.dedent(
-        """
-        set -e
-        # Create the spack project directory
-        mkdir -p ${project_dir}
-
-        # Write the dynamic spack.yaml configuration
-        cat > ${project_dir}/spack.yaml << 'EOF'
-        ${spack_config}
-        EOF
-        echo "Created dynamic spack.yaml configuration in container"
-        """
-    )
-)
 
 # Spack build cache setup script template
 SPACK_BUILD_CACHE_SCRIPT = Template(
@@ -158,17 +125,14 @@ SPACK_BUILD_CACHE_SCRIPT = Template(
         echo 'Binary cache mirrors configured:'
         spack mirror list
 
-        spack install gcc@13.3.0
-        spack compiler find $$(spack location -i gcc@13.3.0)
-
-        echo 'Starting Spack concretization...'
-        spack concretize -f
-
         # Apply patches for Slurm package
         mkdir -p ${spack_repo_path}
         cp ${patches_dir}/slurm_prefix.patch ${spack_repo_path}
         cp ${patches_dir}/package.py ${spack_repo_path}
         echo 'Custom patches applied successfully'
+
+        echo 'Starting Spack concretization...'
+        spack concretize -j $$(nproc) -f
 
         echo 'Installing ALL dependencies from dynamic configuration into build cache...'
         echo 'This will build and cache everything: Slurm, OpenMPI, dependencies, etc.'
@@ -217,41 +181,6 @@ SPACK_BUILD_CACHE_SCRIPT = Template(
     )
 )
 
-# Spack install script template (original for non-bootstrapped builds)
-SPACK_INSTALL_SCRIPT = Template(
-    textwrap.dedent(
-        """
-        set -e
-        cd ${project_dir}
-        source ${spack_setup}
-        spack env activate .
-
-        echo 'Using cached base instance with ALL dependencies pre-built...'
-        echo 'Binary cache mirrors configured:'
-        spack mirror list
-
-        spack install gcc@13.3.0
-        spack compiler find $$(spack location -i gcc@13.3.0)
-
-        echo 'Concretizing environment for Slurm version...'
-        spack concretize -f
-
-        echo 'Installing Slurm from build cache (should be extremely fast)...'
-        echo 'Everything should be cached from the base instance build.'
-        spack install -j$$(nproc) --verbose --use-buildcache=auto -y
-
-        echo 'Cleaning up build-only dependencies...'
-        # Remove packages that are only needed for building (not runtime)
-        spack gc -y
-
-        echo 'Verifying installation completed successfully...'
-        spack find
-
-        echo 'Slurm installation from cache completed successfully!'
-        """
-    )
-)
-
 # Bootstrapped compiler install script template for truly relocatable builds
 SPACK_BOOTSTRAPPED_INSTALL_SCRIPT = Template(
     textwrap.dedent(
@@ -265,29 +194,18 @@ SPACK_BOOTSTRAPPED_INSTALL_SCRIPT = Template(
         echo '=================================================================='
         echo ''
 
-        echo 'Stage 1: Concretize environment (includes bootstrapped compiler)...'
-        spack concretize -f
-        echo 'Build plan generated with bootstrapped compiler workflow'
+        echo 'Stage 1: Concretize environment ...'
+        spack concretize -j$$(nproc) -f
+        echo 'Build plan generated.'
         echo ''
 
-        echo 'Stage 2: Install bootstrapped compiler (gcc@13.3.0 +binutils)...'
-        # Install gcc and gcc-runtime first (they may not be in cache)
-        spack install gcc@13.3.0 gcc-runtime@13.3.0 -j$$(nproc) --verbose --use-buildcache=auto -y
-        echo 'Bootstrapped compiler installed successfully'
-        echo ''
-
-        echo 'Stage 3: Register bootstrapped compiler in environment...'
-        spack compiler find $$(spack location -i gcc@13.3.0)
-        echo 'Compiler registration completed'
-        echo ''
-
-        echo 'Stage 4: Build Slurm with bootstrapped compiler...'
+        echo 'Stage 2: Build Slurm.'
         echo 'All subsequent packages will use the Spack-built gcc@13.3.0'
         # Force clean build without using any cache or previous state
         spack install -j$$(nproc) --verbose --no-cache --fresh -y
         echo ''
 
-        echo 'Stage 6: Verify relocatability (if verification enabled)...'
+        echo 'Stage 3: Verify relocatability (if verification enabled)...'
         if [ "${verify}" = "True" ]; then
             echo 'Running relocatability verification...'
             spack verify libraries slurm || echo 'Warning: Some verification checks failed'

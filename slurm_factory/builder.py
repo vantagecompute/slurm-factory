@@ -36,7 +36,6 @@ from .constants import (
     SLURM_VERSIONS,
     SPACK_BUILD_CACHE_SCRIPT,
     SPACK_BOOTSTRAPPED_INSTALL_SCRIPT,
-    SPACK_PROJECT_SETUP_SCRIPT,
     SPACK_REPO_PATH,
     SPACK_SETUP_SCRIPT,
     SlurmVersion,
@@ -660,23 +659,33 @@ def build(
 
     console.print(f"[bold cyan]Generated dynamic Spack configuration for Slurm {slurm_version} ({build_desc})[/bold cyan]")
 
-    # Create the spack project directory in the container and write the configuration
+    # Create the spack project directory and push spack.yaml directly using LXD API
     logger.debug("Creating spack project directory and configuration in container")
 
-    script_content = SPACK_PROJECT_SETUP_SCRIPT.substitute(
-        project_dir=CONTAINER_SPACK_PROJECT_DIR, spack_config=spack_yaml_content
-    )
-
-    # Push the setup script to container and execute it
-    script_path = _push_script_to_container(
-        lxd_instance, script_content, "spack_setup.sh", verbose=verbose
-    )
-    
-    setup_commands = BASH_HEADER + [script_path]
-
+    # Create the project directory first
+    mkdir_commands = BASH_HEADER + [f"mkdir -p {CONTAINER_SPACK_PROJECT_DIR}"]
     _stream_exec_output(
-        lxd_instance, setup_commands, "Setting up dynamic Spack configuration in container", verbose=verbose
+        lxd_instance, mkdir_commands, "Creating spack project directory", verbose=verbose
     )
+
+    # Push spack.yaml directly using LXD file API
+    from io import BytesIO
+    from pathlib import PurePath
+    
+    spack_yaml_path = f"{CONTAINER_SPACK_PROJECT_DIR}/spack.yaml"
+    
+    try:
+        lxd_instance.push_file_io(
+            content=BytesIO(spack_yaml_content.encode('utf-8')),
+            destination=PurePath(spack_yaml_path),
+            file_mode="644",
+        )
+        logger.info(f"Pushed spack.yaml directly to container at {spack_yaml_path}")
+        if verbose:
+            console.print(f"[green]✓[/green] Created dynamic spack.yaml configuration in container")
+    except Exception as e:
+        logger.error(f"Failed to push spack.yaml to container: {e}")
+        raise
 
     # Copy the global patches into the container
     _copy_patches_to_container(lxd_instance, verbose=verbose)

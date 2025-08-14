@@ -29,7 +29,6 @@ from slurm_factory.constants import (
     BASH_PREAMBLE,
     CACHE_SETUP_SCRIPT,
     PATCH_COPY_SCRIPT,
-    SPACK_PROJECT_SETUP_SCRIPT,
     SPACK_BUILD_CACHE_SCRIPT,
     SPACK_INSTALL_SCRIPT,
     PACKAGE_CREATION_SCRIPT,
@@ -214,7 +213,6 @@ class TestTemplates:
         templates = [
             CACHE_SETUP_SCRIPT,
             PATCH_COPY_SCRIPT,
-            SPACK_PROJECT_SETUP_SCRIPT,
             SPACK_BUILD_CACHE_SCRIPT,
             SPACK_INSTALL_SCRIPT,
             PACKAGE_CREATION_SCRIPT,
