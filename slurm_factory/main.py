@@ -178,6 +178,9 @@ def build(
     minimal: Annotated[
         bool, typer.Option("--minimal", help="Build minimal Slurm only (no OpenMPI, smaller size)")
     ] = False,
+    verify: Annotated[
+        bool, typer.Option("--verify", help="Enable relocatability verification (for CI/testing)")
+    ] = False,
 ):
     """
     Build a specific Slurm version.
@@ -188,9 +191,14 @@ def build(
     - Default: ~2-5GB, CPU-only with OpenMPI and standard features
     - --gpu: ~15-25GB, includes CUDA/ROCm support for GPU workloads  
     - --minimal: ~1-2GB, basic Slurm only without OpenMPI or extra features
+    - --verify: Enable relocatability verification for CI/testing
 
     Each version includes:
-    - Dynamic Spack configuration
+    - Dynamic Spack configuration with relocatability features
+    - Explicit compiler toolchains (toolchains)
+    - Short install paths (install_tree.padded_length: 0)
+    - System linkage validation (shared_linking.missing_library_policy: error)
+    - Optional verification checks (--verify for CI)
     - Global patches (shared across versions)
     - Redistributable Lmod modules
 
@@ -199,7 +207,7 @@ def build(
         slurm-factory build --slurm-version 24.11             # Build specific version
         slurm-factory build --gpu                             # Build with GPU support
         slurm-factory build --minimal                         # Build minimal version
-
+        slurm-factory build --verify                          # Build with verification (CI)
     """
     # Validate that gpu and minimal are not both specified
     if gpu and minimal:
@@ -207,7 +215,7 @@ def build(
         console.print("[bold red]Error: --gpu and --minimal cannot be used together[/bold red]")
         raise typer.Exit(1)
     
-    builder_build(ctx, slurm_version, gpu, minimal)
+    builder_build(ctx, slurm_version, gpu, minimal, verify)
 
 
 if __name__ == "__main__":

@@ -36,7 +36,7 @@ from .constants import (
     TEMPLATE_COPY_SCRIPT,
     SLURM_VERSIONS,
     SPACK_BUILD_CACHE_SCRIPT,
-    SPACK_INSTALL_SCRIPT,
+    SPACK_BOOTSTRAPPED_INSTALL_SCRIPT,
     SPACK_PROJECT_SETUP_SCRIPT,
     SPACK_REPO_PATH,
     SPACK_SETUP_SCRIPT,
@@ -372,10 +372,10 @@ def _copy_templates_to_container(
         logger.warning(f"Templates directory not found at {templates_source}")
 
 
-def _setup_base_instance_buildcache(lxd_instance: lxd.LXDInstance, version: str, gpu_support: bool = False, minimal: bool = False):
+def _setup_base_instance_buildcache(lxd_instance: lxd.LXDInstance, version: str, gpu_support: bool = False, minimal: bool = False, verify: bool = False):
     """Set up build cache in the base instance with ALL dependencies from dynamic spack configuration."""
-    # Generate dynamic Spack configuration
-    spack_config_yaml = generate_yaml_string(slurm_version=version, gpu_support=gpu_support, minimal=minimal)
+    # Generate dynamic Spack configuration (with verification if requested)
+    spack_config_yaml = generate_yaml_string(slurm_version=version, gpu_support=gpu_support, minimal=minimal, enable_verification=verify)
 
     # Copy patches to container
     _copy_patches_to_container(lxd_instance, verbose=False, target_description="base instance")
@@ -403,7 +403,7 @@ def _setup_base_instance_buildcache(lxd_instance: lxd.LXDInstance, version: str,
     )
 
 
-def _create_base_instance(lxc: lxd.LXC, project_name: str, version: str = "25.05", gpu_support: bool = False, minimal: bool = False) -> str:
+def _create_base_instance(lxc: lxd.LXC, project_name: str, version: str = "25.05", gpu_support: bool = False, minimal: bool = False, verify: bool = False) -> str:
     """Create a base instance with cloud-init completed and build cache set up."""
     console = Console()
     base_instance_name = _get_base_instance_name(project_name, gpu_support, minimal)
@@ -438,7 +438,7 @@ def _create_base_instance(lxc: lxd.LXC, project_name: str, version: str = "25.05
         # Set up build cache in the base instance
         console.print("[bold blue]Setting up build cache in base instance...[/bold blue]")
         _setup_base_instance_buildcache(
-            lxd_instance, version, gpu_support=gpu_support, minimal=minimal
+            lxd_instance, version, gpu_support=gpu_support, minimal=minimal, verify=verify
         )  # Use the actual configuration requested
 
         # Stop the instance to save it as a base
@@ -463,7 +463,7 @@ def _create_base_instance(lxc: lxd.LXC, project_name: str, version: str = "25.05
 
 
 def _launch_from_base_instance(
-    lxc: lxd.LXC, instance_name: str, project_name: str, version: str = "25.05", gpu_support: bool = False, minimal: bool = False
+    lxc: lxd.LXC, instance_name: str, project_name: str, version: str = "25.05", gpu_support: bool = False, minimal: bool = False, verify: bool = False
 ) -> str:
     """Launch an instance from the base instance if available, otherwise create it."""
     console = Console()
@@ -490,7 +490,7 @@ def _launch_from_base_instance(
         return base_instance_name
     else:
         # Create base instance first with build cache
-        _create_base_instance(lxc, project_name, version, gpu_support, minimal)
+        _create_base_instance(lxc, project_name, version, gpu_support, minimal, verify)
 
         # Now copy from the newly created base instance
         logger.debug(f"Copying from newly created base instance '{base_instance_name}'")
@@ -519,6 +519,7 @@ def build(
     ] = SlurmVersion.v25_05,
     gpu: bool = False,
     minimal: bool = False,
+    verify: bool = False,
 ):
     """
     Build a specific Slurm version.
@@ -573,7 +574,7 @@ def build(
     console.print(f"[bold blue]Launching build instance:[/bold blue] {instance_name}")
 
     # Use base instance if available, otherwise create it with build cache
-    used_instance = _launch_from_base_instance(lxc, instance_name, project_name, version, gpu, minimal)
+    used_instance = _launch_from_base_instance(lxc, instance_name, project_name, version, gpu, minimal, verify)
 
     # Mount needed directories into the instance
     lxd_instance = lxd.LXDInstance(name=instance_name, project=project_name)
@@ -592,7 +593,7 @@ def build(
     )
 
     # Generate the dynamic configuration YAML string
-    spack_yaml_content = generate_yaml_string(slurm_version, gpu, minimal)
+    spack_yaml_content = generate_yaml_string(slurm_version, gpu, minimal, verify)
 
     console.print(f"[bold cyan]Generated dynamic Spack configuration for Slurm {slurm_version} ({build_desc})[/bold cyan]")
 
@@ -647,13 +648,15 @@ def build(
 
     # Execute the Spack build using the cached base instance (Spack already configured via LXD profile)
     logger.debug(f"Starting Slurm build process using cached dependencies for Slurm {slurm_version}")
-    console.print(f"[bold green]Building Slurm {slurm_version} with cached dependencies[/bold green]")
+    console.print(f"[bold green]Building Slurm {slurm_version} with bootstrapped compiler workflow[/bold green]")
 
-    # Step 1: Install from cache (everything should already be cached in base instance)
-    logger.debug("Step 1: Installing Slurm from cached base instance")
+    # Step 1: Multi-stage bootstrapped compiler build for true relocatability
+    logger.debug("Step 1: Installing Slurm with bootstrapped compiler workflow")
 
-    script_content = SPACK_INSTALL_SCRIPT.substitute(
-        project_dir=CONTAINER_SPACK_PROJECT_DIR, spack_setup=SPACK_SETUP_SCRIPT
+    script_content = SPACK_BOOTSTRAPPED_INSTALL_SCRIPT.substitute(
+        project_dir=CONTAINER_SPACK_PROJECT_DIR, 
+        spack_setup=SPACK_SETUP_SCRIPT,
+        verify=str(verify)  # Pass verification flag to script
     )
 
     build_commands = BASH_HEADER + [script_content]
@@ -661,7 +664,7 @@ def build(
     _stream_exec_output(
         lxd_instance,
         build_commands,
-        f"Installing Slurm {version} from build cache (ultra-fast)",
+        f"Installing Slurm {version} with bootstrapped compiler (truly relocatable)",
         verbose=verbose,
         cwd=Path(CONTAINER_SPACK_PROJECT_DIR),
     )

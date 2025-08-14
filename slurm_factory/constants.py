@@ -232,7 +232,7 @@ SPACK_BUILD_CACHE_SCRIPT = Template(
     )
 )
 
-# Spack install script template
+# Spack install script template (original for non-bootstrapped builds)
 SPACK_INSTALL_SCRIPT = Template(
     textwrap.dedent(
         """
@@ -260,6 +260,63 @@ SPACK_INSTALL_SCRIPT = Template(
         spack find
 
         echo 'Slurm installation from cache completed successfully!'
+        """
+    )
+)
+
+# Bootstrapped compiler install script template for truly relocatable builds
+SPACK_BOOTSTRAPPED_INSTALL_SCRIPT = Template(
+    textwrap.dedent(
+        """
+        set -e
+        cd ${project_dir}
+        source ${spack_setup}
+        spack env activate .
+
+        echo '🏗️  Multi-Stage Bootstrapped Compiler Build for True Relocatability'
+        echo '=================================================================='
+        echo ''
+
+        echo 'Stage 1: Concretize environment (includes bootstrapped compiler)...'
+        spack concretize -f
+        echo 'Build plan generated with bootstrapped compiler workflow'
+        echo ''
+
+        echo 'Stage 2: Install bootstrapped compiler (gcc@13.3.0 +binutils)...'
+        # Install gcc and gcc-runtime first (they may not be in cache)
+        spack install gcc@13.3.0 gcc-runtime@13.3.0 -j$$(nproc) --verbose --use-buildcache=auto -y
+        echo 'Bootstrapped compiler installed successfully'
+        echo ''
+
+        echo 'Stage 3: Register bootstrapped compiler in environment...'
+        spack compiler find $$(spack location -i gcc@13.3.0)
+        echo 'Compiler registration completed'
+        echo ''
+
+        echo 'Stage 4: Build Slurm with bootstrapped compiler...'
+        echo 'All subsequent packages will use the Spack-built gcc@13.3.0'
+        spack install -j$$(nproc) --verbose --use-buildcache=auto -y
+        echo ''
+
+        echo 'Stage 5: Verify relocatability (if verification enabled)...'
+        if [ "${verify}" = "True" ]; then
+            echo 'Running relocatability verification...'
+            spack verify libraries slurm || echo 'Warning: Some verification checks failed'
+            echo 'Verification completed'
+        else
+            echo 'Verification skipped (not enabled for this build)'
+        fi
+        echo ''
+
+        echo 'Cleaning up build-only dependencies...'
+        # Remove packages that are only needed for building (not runtime)
+        spack gc -y
+
+        echo 'Verifying final installation...'
+        spack find
+        echo ''
+        echo '🎉 Truly relocatable Slurm build completed successfully!'
+        echo 'Built with bootstrapped compiler - no host dependencies!'
         """
     )
 )

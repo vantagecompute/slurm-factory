@@ -19,7 +19,7 @@
 
 </div>
 
-A modern Python CLI tool that automates building **relocatable**, **optimized** Slurm workload manager packages using LXD containers and the Spack package manager. Built for rapid deployment across diverse HPC environments with intelligent caching and portable modules.
+A modern Python CLI tool that automates building **truly relocatable**, **optimized** Slurm workload manager packages using LXD containers and the Spack package manager. Built for rapid deployment across diverse HPC environments with intelligent caching, portable modules, and bootstrapped compiler workflows.
 
 ## 🚀 Quick Start
 
@@ -70,13 +70,14 @@ slurm-factory automatically manages build dependencies within containers:
 
 ## ✨ Key Features
 
-- **🔄 Relocatable Modules**: Deploy the same package to different filesystem paths using runtime environment variables
+- **🎯 Truly Relocatable**: Bootstrapped compiler workflow with no host dependencies, proper RPATH configuration, and Spack-built runtime libraries
+- **🔄 Portable Modules**: Deploy the same package to different filesystem paths using runtime environment variables (no LD_LIBRARY_PATH pollution)
 - **⚡ Optimized Build Pipeline**: Intelligent caching with base images, build-cache reuse, and parallel compilation
 - **📦 Smart Packaging**: Runtime libraries built fresh, build tools as externals for minimal footprint
 - **🖥️ Multi-Architecture**: CPU-specific optimizations and optional GPU support (CUDA/ROCm)
 - **🏗️ Container Isolation**: Reproducible builds in clean LXD container environments
 - **🚀 Ultra-Fast Rebuilds**: Persistent build-cache and source-cache for subsequent builds (>10x speedup)
-- **🎯 Production Ready**: Self-contained packages with minimal external dependencies
+- **✅ CI/CD Integration**: Optional verification mode with `--verify` flag for automated testing
 
 ## 📋 Supported Versions
 
@@ -103,7 +104,7 @@ Visit our comprehensive documentation site:
 ### Building Packages
 
 ```bash
-# Build latest Slurm (CPU-optimized)
+# Build latest Slurm (CPU-optimized, truly relocatable)
 uv run slurm-factory build
 
 # Build specific version with GPU support
@@ -112,11 +113,14 @@ uv run slurm-factory build --slurm-version 24.11 --gpu
 # Build minimal Slurm (no OpenMPI, smaller size)
 uv run slurm-factory build --minimal
 
+# Build with CI verification (for testing relocatability)
+uv run slurm-factory build --minimal --verify
+
 # Build with verbose output
 uv run slurm-factory --verbose build
 ```
 
-**Note**: All builds now automatically generate self-contained Lmod modules that include proper environment variables for dependencies, eliminating the need for separate dependency modules.
+**Note**: All builds now use a bootstrapped compiler workflow (gcc@13.3.0 +binutils) and generate self-contained Lmod modules with proper RPATH configuration, eliminating any host dependencies for true relocatability.
 
 ### Deploying Packages
 
