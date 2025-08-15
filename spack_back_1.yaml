@@ -5,42 +5,27 @@ spack:
     - gcc-runtime@13.3.0
     - perl %gcc@13.3.0
     - munge %gcc@13.3.0
-    - slurm@25-05-1-1 +readline ~hwloc ~pmix ~restd ~nvml ~rsmi ~cgroup sysconfdir=/etc/slurm %gcc@13.3.0
+    - slurm@25-05-1-1 +readline +hwloc +pam ~gtk ~cgroup ~pmix ~restd ~nvml ~rsmi ~mariadb ~hdf5 sysconfdir=/etc/slurm %gcc@13.3.0
+    - json-c@0.18 %gcc@13.3.0
   concretizer:
-    unify: true
-    reuse: true
+    unify: when_possible
+    reuse: false
   develop: {}
   view:
     default:
-      root: /opt/slurm/view
+      root: /opt/slurm2/view
       link_type: hardlink
       select:
         - slurm
         - munge
-        - json-c
-        - curl
-        - openssl
-        - readline
-        - ncurses
-        - lz4
-        - zlib-ng
-        - numactl
         - gcc-runtime
-        - gcc
-        - linux-pam
-        - libevent
-        - jansson
-        - libyaml
-        - bzip2
-        - xz
-        - zstd
   config:
     install_tree:
-      root: /opt/slurm/software
+      root: /opt/slurm2/software
       padded_length: 0
-    build_stage: /tmp/spack-stage
-    misc_cache: /opt/slurm-factory-cache/spack-sourcecache
-    binary_index_root: /opt/slurm-factory-cache/binary_index
+    build_stage: /tmp/spack-stage2
+    misc_cache: /opt/slurm-factory-cache2/spack-sourcecache
+    binary_index_root: /opt/slurm-factory-cache2/binary_index
     checksum: true
     deprecated: true
     build_jobs: 4
@@ -52,13 +37,13 @@ spack:
       missing_library_policy: error
   mirrors:
     local-buildcache:
-      url: file:///opt/slurm-factory-cache/spack-buildcache
+      url: file:///opt/slurm-factory-cache2/spack-buildcache
       signed: false
     spack-public:
       url: https://mirror.spack.io
       signed: true
     binary-mirror:
-      url: file:///opt/slurm-factory-cache/binary_index
+      url: file:///opt/slurm-factory-cache2/binary_index
       signed: false
   compilers:
     - compiler:
@@ -74,6 +59,17 @@ spack:
         environment: {}
         extra_rpaths: []
   packages:
+    gcc:
+      externals:
+        - spec: gcc@13.3.0 languages:='c,c++,fortran'
+          prefix: /usr
+          extra_attributes:
+            compilers:
+              c: /usr/bin/gcc
+              cxx: /usr/bin/g++
+              fortran: /usr/bin/gfortran
+            environment: {}
+            extra_rpaths: []
     cmake:
       externals:
         - spec: cmake@3.28.3
@@ -170,6 +166,7 @@ spack:
       buildable: true
     json-c:
       buildable: true
+      version: ['0.18']
     curl:
       buildable: true
     openssl:
@@ -192,10 +189,7 @@ spack:
     numactl:
       buildable: true
     dbus:
-      externals:
-        - spec: dbus@1.14.10
-          prefix: /usr
-      buildable: false
+      buildable: true
       variants: system-socket=/var/run/dbus/system_bus_socket
     glib:
       externals:
@@ -211,11 +205,10 @@ spack:
       buildable: true
     berkeley-db:
       buildable: true
+      version:
+        - 18.1.40
     perl:
-      require:
-        - ^bzip2
-        - ^gdbm
-        - ^berkeley-db
+      buildable: true
     libgcrypt:
       buildable: true
     libgpg-error:
@@ -248,14 +241,11 @@ spack:
       buildable: true
       version:
         - 13.3.0
-    gcc:
-      buildable: true
-      externals: []
     slurm:
       version:
         - 25-05-1-1
       buildable: true
-      variants: +shared ~static
+      variants: +shared ~static +readline +hwloc +pam ~gtk ~cgroup ~pmix ~restd ~nvml ~rsmi ~mariadb ~hdf5
     all:
       target:
         - x86_64
@@ -267,3 +257,4 @@ spack:
       permissions:
         read: world
         write: user
+

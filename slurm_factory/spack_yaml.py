@@ -343,11 +343,7 @@ def generate_spack_config(
                     "buildable": True, 
                     "version": ["13.3.0"]
                 },
-                "gcc": {
-                    "buildable": True,
-                    "externals": [],   # hard override: do NOT use host GCC
-                    "version": ["13.3.0"]
-                },
+
                 
                 # Slurm itself - enhanced for relocatability
                 "slurm": {
