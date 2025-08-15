@@ -38,8 +38,8 @@ build: lock
 # Apply coding style standards to code
 [group("lint")]
 fmt: lock
-    {{uv_run}} ruff format {{src_dir}} {{tests_dir}} --exclude=data
-    {{uv_run}} ruff check --fix {{src_dir}} {{tests_dir}} --exclude=data
+    {{uv_run}} ruff format {{src_dir}} --exclude=data
+    {{uv_run}} ruff check --fix {{src_dir}} --exclude=data
 
 # Check code against coding style standards
 [group("lint")]

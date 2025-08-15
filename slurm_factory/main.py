@@ -27,9 +27,7 @@ def main(
             help="The LXD project in which resources are going to be created",
         ),
     ] = "slurm-factory",
-    verbose: Annotated[
-        bool, typer.Option("--verbose", "-v", help="Enable verbose output")
-    ] = False,
+    verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose output")] = False,
 ):
     """Handle global options for the application."""
     # Configure logging level based on verbose flag
@@ -62,9 +60,7 @@ def main(
 @app.command("clean")
 def clean(
     ctx: typer.Context,
-    all_instances: Annotated[
-        bool, typer.Option("--all", help="Delete base instances too")
-    ] = False,
+    all_instances: Annotated[bool, typer.Option("--all", help="Delete base instances too")] = False,
 ):
     """
     Clean up LXD instances from the project.
@@ -189,7 +185,7 @@ def build(
 
     Build types:
     - Default: ~2-5GB, CPU-only with OpenMPI and standard features
-    - --gpu: ~15-25GB, includes CUDA/ROCm support for GPU workloads  
+    - --gpu: ~15-25GB, includes CUDA/ROCm support for GPU workloads
     - --minimal: ~1-2GB, basic Slurm only without OpenMPI or extra features
     - --verify: Enable relocatability verification for CI/testing
 
@@ -208,13 +204,14 @@ def build(
         slurm-factory build --gpu                             # Build with GPU support
         slurm-factory build --minimal                         # Build minimal version
         slurm-factory build --verify                          # Build with verification (CI)
+
     """
     # Validate that gpu and minimal are not both specified
     if gpu and minimal:
         console = Console()
         console.print("[bold red]Error: --gpu and --minimal cannot be used together[/bold red]")
         raise typer.Exit(1)
-    
+
     builder_build(ctx, slurm_version, gpu, minimal, verify)
 
 

@@ -58,9 +58,13 @@ config:
           fi
         '
       - |
-        mkdir -p /root/spack-project
-        mkdir -p /srv/global-patches
-        mkdir -p /opt/slurm-factory-cache/{spack-buildcache,spack-sourcecache,builds}
+        for dir in /root/spack-project \
+                   /srv/global-patches \
+                   /opt/slurm-factory-cache/spack-buildcache \
+                   /opt/slurm-factory-cache/spack-sourcecache \
+                   /opt/slurm-factory-cache/builds; do
+          mkdir -p "$dir"
+        done
         chmod -R 777 /opt/slurm-factory-cache/* 2>/dev/null || true
 
 devices:

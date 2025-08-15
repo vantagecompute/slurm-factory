@@ -1,4 +1,4 @@
-"""Constants used throughout the slurm-factory package."""
+"""Constants of slurm-factory."""
 
 import textwrap
 from enum import Enum
@@ -24,7 +24,7 @@ class SlurmVersion(str, Enum):
 
 class BuildType(str, Enum):
     """Build type options for Slurm."""
-    
+
     cpu = "cpu"
     gpu = "gpu"
     minimal = "minimal"
@@ -69,7 +69,22 @@ BASH_PREAMBLE = textwrap.dedent("""
 """).strip()
 
 
+# Spack build cache setup script template
+SPACK_BASE_INSTANCE_CONCRETIZE_SCRIPT = Template(
+    textwrap.dedent(
+        f"""
+        set -e
+        source {SPACK_SETUP_SCRIPT}
+        spack env activate .
 
+        mkdir -p {SPACK_REPO_PATH}
+        cp {CONTAINER_PATCHES_DIR}/slurm_prefix.patch {SPACK_REPO_PATH}
+        cp {CONTAINER_PATCHES_DIR}/package.py {SPACK_REPO_PATH}
+
+        spack concretize -j $$(nproc) -f
+        """
+    )
+)
 
 # Spack build cache setup script template
 SPACK_BUILD_CACHE_SCRIPT = Template(
@@ -114,16 +129,16 @@ SPACK_BUILD_CACHE_SCRIPT = Template(
         echo 'Creating build cache entries for ALL remaining packages...'
         # Use a simpler, more reliable approach for buildcache creation
         echo 'Attempting to push all installed packages to buildcache...'
-        
+
         # First, check what packages are actually installed
         echo "Currently installed packages:"
         spack find
-        
+
         # Try to push all packages at once, but handle failures gracefully
         echo "Pushing all packages to buildcache (errors will be ignored)..."
         spack buildcache push local-buildcache --force 2>/dev/null || {
             echo "Bulk push failed, trying individual package approach..."
-            
+
             # Fallback: try to push each package individually with error handling
             spack find --format '{name}@{version}' | while read -r pkg; do
                 if [ -n "$$pkg" ]; then
@@ -134,7 +149,7 @@ SPACK_BUILD_CACHE_SCRIPT = Template(
                 fi
             done
         }
-        
+
         # Always update the buildcache index, even if some packages failed
         echo 'Updating buildcache index...'
         mkdir -p /opt/slurm-factory-cache/spack-buildcache/build_cache
@@ -244,17 +259,17 @@ PACKAGE_CREATION_SCRIPT = Template(
         echo "Generating modules with custom relocatable template..."
         spack module lmod refresh --delete-tree -y
         spack module lmod refresh -y
-        
+
         # Find the generated module using Spack's module system
         echo "Finding Spack-generated module..."
         MODULE_FILE=$$(spack module lmod find slurm 2>/dev/null || echo "")
-        
+
         if [ -n "$$MODULE_FILE" ]; then
             echo "Found Spack module: $$MODULE_FILE"
             # Find the actual file path for this module
             SPACK_ROOT=$$(spack location -r)
             MODULE_PATH=$$(find "$$SPACK_ROOT" -name "*.lua" -path "*$$MODULE_FILE*" 2>/dev/null | head -1)
-            
+
             if [ -n "$$MODULE_PATH" ] && [ -f "$$MODULE_PATH" ]; then
                 echo "Copying module file from: $$MODULE_PATH"
                 cp "$$MODULE_PATH" ${slurm_dir}/modules/
@@ -271,7 +286,7 @@ PACKAGE_CREATION_SCRIPT = Template(
         # Create the proper directory structure for module deployment
         echo 'Structuring module files for deployment...'
         mkdir -p ${slurm_dir}/module-package/slurm
-        
+
         # Copy the module files
         if [ -d "${slurm_dir}/modules" ] && [ "$$(ls -A ${slurm_dir}/modules 2>/dev/null)" ]; then
             echo "Copying module files to package structure..."
