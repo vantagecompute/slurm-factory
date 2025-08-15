@@ -17,16 +17,12 @@ from .constants import (
     BASE_INSTANCE_EXPIRY_DAYS,
     BASE_INSTANCE_PREFIX,
     BASH_HEADER,
-    CACHE_SETUP_SCRIPT,
-    CACHE_SUBDIRS,
     CLOUD_INIT_TIMEOUT,
     CONTAINER_BUILD_OUTPUT_DIR,
-    CONTAINER_CACHE_DIR,
     CONTAINER_PATCHES_DIR,
     CONTAINER_SPACK_TEMPLATES_DIR,
     CONTAINER_ROOT_DIR,
     CONTAINER_SLURM_DIR,
-    CONTAINER_SPACK_CACHE_DIR,
     CONTAINER_SPACK_PROJECT_DIR,
     COPY_OUTPUT_SCRIPT,
     INSTANCE_NAME_PREFIX,
@@ -39,7 +35,6 @@ from .constants import (
     SPACK_REPO_PATH,
     SPACK_SETUP_SCRIPT,
     SlurmVersion,
-    get_mkdir_commands,
 )
 from .spack_yaml import generate_yaml_string
 
@@ -102,12 +97,12 @@ def _get_data_file(filename: str) -> Path:
         pass
 
     # Last fallback: Development mode (files in current directory)
-    dev_path = Path("data") / filename
+    dev_path = Path.cwd() / "data" / filename
     if dev_path.exists():
         return dev_path.resolve()
 
     # If nothing found, return the development path anyway (will cause an error if file doesn't exist)
-    return dev_path.resolve()
+    raise FileNotFoundError(f"Data file '{filename}' not found in any expected location")
 
 
 def _set_profile(profile_name: str, project_name: str, settings: Settings):
@@ -309,23 +304,6 @@ def _pre_build_base_instance_setup(lxd_instance: lxd.LXDInstance):
     """Set up permissions and basic configuration before build cache setup."""
     logger.debug("Setting up base instance permissions and configuration")
 
-    # Create cache directory commands
-    cache_dirs = get_mkdir_commands(CONTAINER_CACHE_DIR, CACHE_SUBDIRS)
-
-    script_content = CACHE_SETUP_SCRIPT.substitute(
-        cache_dir=CONTAINER_CACHE_DIR, create_cache_dirs=cache_dirs
-    )
-
-    setup_commands = BASH_HEADER + [script_content]
-
-    _stream_exec_output(
-        lxd_instance,
-        setup_commands,
-        "Setting up base instance permissions and cache directories",
-        verbose=True,  # Always verbose for setup
-        cwd=Path(CONTAINER_ROOT_DIR),
-    )
-
     # Clear any previous Spack state that might have leftover failure marks
     logger.debug("Clearing any previous Spack state")
     clean_commands = BASH_HEADER + [
@@ -351,15 +329,6 @@ def _copy_patches_to_container(
 
     if patches_source.exists():
         logger.debug(f"Copying global patches from {patches_source} into {target_description}")
-
-        # Create the patches directory in the container first
-        mkdir_commands = BASH_HEADER + [f"mkdir -p {CONTAINER_PATCHES_DIR}"]
-        _stream_exec_output(
-            lxd_instance,
-            mkdir_commands,
-            f"Creating patches directory in {target_description}",
-            verbose=verbose,
-        )
 
         # Copy each patch file directly using LXD file operations
         for patch_file in patches_source.glob("*"):
@@ -662,12 +631,6 @@ def build(
     # Create the spack project directory and push spack.yaml directly using LXD API
     logger.debug("Creating spack project directory and configuration in container")
 
-    # Create the project directory first
-    mkdir_commands = BASH_HEADER + [f"mkdir -p {CONTAINER_SPACK_PROJECT_DIR}"]
-    _stream_exec_output(
-        lxd_instance, mkdir_commands, "Creating spack project directory", verbose=verbose
-    )
-
     # Push spack.yaml directly using LXD file API
     from io import BytesIO
     from pathlib import PurePath
@@ -700,109 +663,111 @@ def build(
     #lxd_instance.mount(host_source=settings.builds_dir, target=Path(CONTAINER_BUILD_OUTPUT_DIR))
 
     # If you already have a spack cache in your home, mount it to speed things up
-    spack_cache = Path.home() / ".spack" / "cache"
-    if spack_cache.exists():
-        logger.debug("Mounting existing Spack cache to accelerate builds")
-        lxd_instance.mount(host_source=spack_cache, target=Path(CONTAINER_SPACK_CACHE_DIR))
+    #spack_cache = Path.home() / ".spack" / "cache"
+    #if spack_cache.exists():
+    #    logger.debug("Mounting existing Spack cache to accelerate builds")
+    #    lxd_instance.mount(host_source=spack_cache, target=Path(CONTAINER_SPACK_CACHE_DIR))
 
     # Check if we're using the base instance (cloud-init already completed) or need to wait
-    if used_instance and used_instance.startswith(BASE_INSTANCE_PREFIX):
-        logger.debug("Using base instance with cloud-init already completed, skipping wait")
-        console.print(
-            "[bold green]Using base instance - cloud-init already completed, "
-            "proceeding directly to build[/bold green]"
-        )
-    else:
-        # Wait for cloud-init to finish, then execute the build command in the container
-        logger.debug("Starting cloud-init wait process")
-        console.print("[bold yellow]Waiting for cloud-init to finish and showing progress...[/bold yellow]")
-        _wait_for_cloud_init_with_output(lxd_instance)
+    #if used_instance and used_instance.startswith(BASE_INSTANCE_PREFIX):
+    #    logger.debug("Using base instance with cloud-init already completed, skipping wait")
+    #    console.print(
+    #        "[bold green]Using base instance - cloud-init already completed, "
+    #        "proceeding directly to build[/bold green]"
+    #    )
+    #else:
+    #    # Wait for cloud-init to finish, then execute the build command in the container
+    #    logger.debug("Starting cloud-init wait process")
+    #    console.print("[bold yellow]Waiting for cloud-init to finish and showing progress...[/bold yellow]")
+    _wait_for_cloud_init_with_output(lxd_instance)
+    #import sys
+    #sys.exit()
 
-    logger.debug(f"Initializing Spack build environment for Slurm {slurm_version}")
-    console.print(
-        f"[bold cyan]Building Slurm {slurm_version} using cached base instance with build cache[/bold cyan]"
-    )
+    #logger.debug(f"Initializing Spack build environment for Slurm {slurm_version}")
+    #console.print(
+    #    f"[bold cyan]Building Slurm {slurm_version} using cached base instance with build cache[/bold cyan]"
+    #)
 
     # Execute the Spack build using the cached base instance (Spack already configured via LXD profile)
-    logger.debug(f"Starting Slurm build process using cached dependencies for Slurm {slurm_version}")
-    console.print(f"[bold green]Building Slurm {slurm_version} with bootstrapped compiler workflow[/bold green]")
+    #logger.debug(f"Starting Slurm build process using cached dependencies for Slurm {slurm_version}")
+    #console.print(f"[bold green]Building Slurm {slurm_version} with bootstrapped compiler workflow[/bold green]")
 
     # Step 1: Multi-stage bootstrapped compiler build for true relocatability
-    logger.debug("Step 1: Installing Slurm with bootstrapped compiler workflow")
+    #logger.debug("Step 1: Installing Slurm with bootstrapped compiler workflow")
 
-    script_content = SPACK_BOOTSTRAPPED_INSTALL_SCRIPT.substitute(
-        project_dir=CONTAINER_SPACK_PROJECT_DIR, 
-        spack_setup=SPACK_SETUP_SCRIPT,
-        verify=str(verify)  # Pass verification flag to script
-    )
+    #script_content = SPACK_BOOTSTRAPPED_INSTALL_SCRIPT.substitute(
+    #    project_dir=CONTAINER_SPACK_PROJECT_DIR, 
+    #    spack_setup=SPACK_SETUP_SCRIPT,
+    #    verify=str(verify)  # Pass verification flag to script
+    #)
 
-    build_commands = BASH_HEADER + [script_content]
+    #build_commands = BASH_HEADER + [script_content]
 
-    _stream_exec_output(
-        lxd_instance,
-        build_commands,
-        f"Installing Slurm {version} with bootstrapped compiler (truly relocatable)",
-        verbose=verbose,
-        cwd=Path(CONTAINER_SPACK_PROJECT_DIR),
-    )
+    #_stream_exec_output(
+    #    lxd_instance,
+    #    build_commands,
+    #    f"Installing Slurm {version} with bootstrapped compiler (truly relocatable)",
+    #    verbose=verbose,
+    #    cwd=Path(CONTAINER_SPACK_PROJECT_DIR),
+    #)
 
     # Create redistributable packages from the Spack view and auto-generated modules
-    logger.debug("Creating redistributable packages from Spack installation")
-    console.print(f"[bold magenta]Creating redistributable packages for Slurm {version}[/bold magenta]")
+    #logger.debug("Creating redistributable packages from Spack installation")
+    #console.print(f"[bold magenta]Creating redistributable packages for Slurm {version}[/bold magenta]")
 
-    script_content = PACKAGE_CREATION_SCRIPT.substitute(
-        project_dir=CONTAINER_SPACK_PROJECT_DIR,
-        spack_setup=SPACK_SETUP_SCRIPT,
-        slurm_dir=CONTAINER_SLURM_DIR,
-        version=version,
-        slurm_spec_version=SLURM_VERSIONS[version],
-    )
+    #script_content = PACKAGE_CREATION_SCRIPT.substitute(
+    #    project_dir=CONTAINER_SPACK_PROJECT_DIR,
+    #    spack_setup=SPACK_SETUP_SCRIPT,
+    #    slurm_dir=CONTAINER_SLURM_DIR,
+    #    version=version,
+    #    slurm_spec_version=SLURM_VERSIONS[version],
+    #)
 
     # Push the package creation script to container and execute it
-    script_path = _push_script_to_container(
-        lxd_instance, script_content, "package_creation.sh", verbose=verbose
-    )
+    #script_path = _push_script_to_container(
+    #    lxd_instance, script_content, "package_creation.sh", verbose=verbose
+    #)
     
-    package_commands = BASH_HEADER + [script_path]
+    #package_commands = BASH_HEADER + [script_path]
 
-    _stream_exec_output(
-        lxd_instance,
-        package_commands,
-        f"Creating redistributable packages for Slurm {version}",
-        verbose=verbose,
-        cwd=Path(CONTAINER_ROOT_DIR),
-    )
+    #_stream_exec_output(
+    #    lxd_instance,
+    #    package_commands,
+    #    f"Creating redistributable packages for Slurm {version}",
+    #    verbose=verbose,
+    #    cwd=Path(CONTAINER_ROOT_DIR),
+    #)
 
     # Copy redistributable files out of the container before destroying it
-    logger.debug("Extracting redistributable packages from container")
-    console.print(f"[bold cyan]Extracting redistributable packages for Slurm {version}[/bold cyan]")
+    #logger.debug("Extracting redistributable packages from container")
+    #console.print(f"[bold cyan]Extracting redistributable packages for Slurm {version}[/bold cyan]")
 
     # Copy the module and software packages directly to the mounted build output directory
-    script_content = COPY_OUTPUT_SCRIPT.substitute(
-        slurm_dir=CONTAINER_SLURM_DIR, version=version, output_dir=CONTAINER_BUILD_OUTPUT_DIR
-    )
+    #script_content = COPY_OUTPUT_SCRIPT.substitute(
+    #    slurm_dir=CONTAINER_SLURM_DIR, version=version, output_dir=CONTAINER_BUILD_OUTPUT_DIR
+    #)
 
-    copy_commands = BASH_HEADER + [script_content]
+    #copy_commands = BASH_HEADER + [script_content]
 
-    _stream_exec_output(
-        lxd_instance,
-        copy_commands,
-        "Copying redistributable packages",
-        verbose=verbose,
-        cwd=Path(CONTAINER_ROOT_DIR),
-    )
+    #_stream_exec_output(
+    #    lxd_instance,
+    #    copy_commands,
+    #    "Copying redistributable packages",
+    #    verbose=verbose,
+    #    cwd=Path(CONTAINER_ROOT_DIR),
+    #)
 
-    logger.info(f"Build process completed successfully for Slurm {version}")
-    console.print(
-        f"[bold green]✓ Redistributable packages created in ~/.slurm-factory/builds/[/bold green]"
-    )
-    console.print(f"  • [green]slurm-{version}-module.tar.gz[/green] (Lmod module)")
-    console.print(f"  • [green]slurm-{version}-software.tar.gz[/green] (Compiled software)")
+    #logger.info(f"Build process completed successfully for Slurm {version}")
+    #console.print(
+    #    f"[bold green]✓ Redistributable packages created in ~/.slurm-factory/builds/[/bold green]"
+    #)
+    #console.print(f"  • [green]slurm-{version}-module.tar.gz[/green] (Lmod module)")
+    #console.print(f"  • [green]slurm-{version}-software.tar.gz[/green] (Compiled software)")
 
-    logger.debug("Keeping LXD container for debugging")
-    console.print(f"[bold yellow]Build complete, keeping container [cyan]{instance_name}[/cyan] for debugging.[/bold yellow]")
+    #logger.debug("Keeping LXD container for debugging")
+    #console.print(f"[bold yellow]Build complete, keeping container [cyan]{instance_name}[/cyan] for debugging.[/bold yellow]")
     # lxc.delete(instance_name=instance_name, project=project_name, force=True)
 
-    console.print(
-        f"[bold green]🎉 Build artifacts available in: ~/.slurm-factory/builds/[/bold green]"
-    )
+    #console.print(
+    #    f"[bold green]🎉 Build artifacts available in: ~/.slurm-factory/builds/[/bold green]"
+    #)

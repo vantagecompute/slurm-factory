@@ -40,17 +40,6 @@ CONTAINER_BUILD_OUTPUT_DIR = f"{CONTAINER_CACHE_DIR}/builds"
 CONTAINER_ROOT_DIR = "/root"
 CONTAINER_SPACK_CACHE_DIR = "/root/.cache/spack"
 
-# Cache subdirectories
-CACHE_SUBDIRS = ["spack-buildcache", "spack-sourcecache", "builds"]
-
-
-def get_mkdir_commands(base_dir: str, subdirs: list[str]) -> str:
-    """Generate mkdir commands for creating cache subdirectories."""
-    commands: list[str] = []
-    for subdir in subdirs:
-        commands.append(f"mkdir -p {base_dir}/{subdir}")
-    return "\n".join(commands)
-
 
 # LXD image configuration
 LXD_IMAGE = "24.04"
@@ -79,26 +68,6 @@ BASH_PREAMBLE = textwrap.dedent("""
     set -e
 """).strip()
 
-# Cache setup script template
-CACHE_SETUP_SCRIPT = Template(
-    textwrap.dedent(
-        """
-        set -e
-
-        echo 'Setting up cache directory permissions...'
-
-        # Create subdirectories with proper permissions
-        ${create_cache_dirs}
-
-        # Set permissions on files/dirs that the container can write to
-        # Make everything world-writable so container can create subdirectories
-        chmod -R 777 ${cache_dir}/ 2>/dev/null || true
-
-        echo 'Cache directory setup completed'
-        ls -la ${cache_dir}/
-        """
-    )
-)
 
 
 

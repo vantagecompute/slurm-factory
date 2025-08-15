@@ -35,27 +35,6 @@ config:
       # Module system
       - lmod
       
-      # System libraries used as externals by Spack (not built, just linked)
-      # These reduce build time while maintaining functionality
-      - libbz2-dev           # bzip2 external
-      - liblzma-dev          # xz external
-      - libzstd-dev          # zstd external
-      - libdbus-1-dev        # dbus external
-      - libpam0g-dev         # linux-pam external
-      - libyaml-dev          # libyaml external
-      - libglib2.0-dev       # glib external
-      - libxml2-dev          # libxml2 external
-      - libevent-dev         # libevent external
-      - libgdbm-dev          # gdbm external
-      - libdb-dev            # berkeley-db external
-      - libjansson-dev       # jansson external
-      - libgcrypt20-dev      # libgcrypt external
-      - libgpg-error-dev     # libgpg-error external
-      - libsigsegv-dev       # libsigsegv external
-      - libhdf5-dev          # hdf5 external
-      
-      # Note: Runtime dependencies (munge, json-c, curl, openssl, readline, ncurses, lz4, zlib, hwloc, numactl)
-      # are built by Spack to ensure consistent versions and proper linking with Slurm.
     
     write_files:
       - path: /etc/profile.d/spack.sh
@@ -66,30 +45,23 @@ config:
           if [ -f /opt/spack/share/spack/setup-env.sh ]; then
             . /opt/spack/share/spack/setup-env.sh
           fi
-    
+
     runcmd:
-      # Create symlinks for multiarch library compatibility (needed for autotools detection)
-      - |
-        # Fix common library detection issues in Ubuntu multiarch layout
-        cd /usr/lib/x86_64-linux-gnu
-        for lib in libevent libevent_core libglib-2.0 libbz2 liblzma libzstd libxml2 \
-                   libgdbm libdb libjansson libgcrypt libgpg-error libsigsegv; do
-          for ext in so so.* a; do
-            if [ -f "${lib}.${ext}" ] && [ ! -f "/usr/lib/${lib}.${ext}" ]; then
-              ln -sf "/usr/lib/x86_64-linux-gnu/${lib}.${ext}" "/usr/lib/${lib}.${ext}" || true
-            fi
-          done
-        done
       # Install Spack v1.0.0 into /opt/spack (idempotent)
       - |
         bash -lc '
           set -euo pipefail
           if [ ! -d /opt/spack ]; then
-            git clone --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
+            git clone --branch v1.0.1 https://github.com/spack/spack.git /opt/spack
             chown -R root:root /opt/spack
             chmod -R a+rX /opt/spack
           fi
         '
+      - |
+        mkdir -p /root/spack-project
+        mkdir -p /srv/global-patches
+        mkdir -p /opt/slurm-factory-cache/{spack-buildcache,spack-sourcecache,builds}
+        chmod -R 777 /opt/slurm-factory-cache/* 2>/dev/null || true
 
 devices:
   eth0:
