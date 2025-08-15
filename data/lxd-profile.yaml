@@ -52,7 +52,7 @@ config:
         bash -lc '
           set -euo pipefail
           if [ ! -d /opt/spack ]; then
-            git clone --branch v1.0.1 https://github.com/spack/spack.git /opt/spack
+            git clone --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
             chown -R root:root /opt/spack
             chmod -R a+rX /opt/spack
           fi

@@ -20,6 +20,7 @@ from .constants import (
     CONTAINER_ROOT_DIR,
     CONTAINER_SPACK_PROJECT_DIR,
     CONTAINER_SPACK_TEMPLATES_DIR,
+    SPACK_BASE_INSTANCE_CONCRETIZE_SCRIPT,
     LXD_IMAGE,
     LXD_IMAGE_REMOTE,
 )
@@ -149,6 +150,7 @@ def _setup_base_instance_spack_project(
     gpu_support: bool = False,
     minimal: bool = False,
     verify: bool = False,
+    verbose: bool = False
 ) -> lxd.LXDInstance:
     """Set up the base instance with ALL components of the spack project."""
     # Generate dynamic Spack configuration and copy to container
@@ -160,6 +162,19 @@ def _setup_base_instance_spack_project(
     _copy_patches_to_container(lxd_instance, verbose=False, target_description="base instance")
     # Copy templates to container
     _copy_templates_to_container(lxd_instance, verbose=False, target_description="base instance")
+
+    try:
+        _stream_exec_output(
+            lxd_instance,
+             BASH_HEADER + [SPACK_BASE_INSTANCE_CONCRETIZE_SCRIPT],
+            f"Concretizing base environment for Slurm {version}",
+            verbose=verbose,
+        )
+    except SlurmFactoryStreamExecError as e:
+        msg = f"Command execution failed: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{msg}[/bold red]")
+        raise SlurmFactoryError(msg)
 
 
 def _create_base_instance(

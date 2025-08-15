@@ -70,20 +70,16 @@ BASH_PREAMBLE = textwrap.dedent("""
 
 
 # Spack build cache setup script template
-SPACK_BASE_INSTANCE_CONCRETIZE_SCRIPT = Template(
-    textwrap.dedent(
-        f"""
-        set -e
-        source {SPACK_SETUP_SCRIPT}
-        spack env activate .
+SPACK_BASE_INSTANCE_CONCRETIZE_SCRIPT = textwrap.dedent(
+    f"""
+    set -e
+    mkdir -p {SPACK_REPO_PATH}
+    cp {CONTAINER_PATCHES_DIR}/slurm_prefix.patch {SPACK_REPO_PATH}
+    cp {CONTAINER_PATCHES_DIR}/package.py {SPACK_REPO_PATH}
+    source {SPACK_SETUP_SCRIPT}
 
-        mkdir -p {SPACK_REPO_PATH}
-        cp {CONTAINER_PATCHES_DIR}/slurm_prefix.patch {SPACK_REPO_PATH}
-        cp {CONTAINER_PATCHES_DIR}/package.py {SPACK_REPO_PATH}
-
-        spack concretize -j $$(nproc) -f
-        """
-    )
+    cd /root/spack-project && spack env activate . && spack concretize -j $(nproc) -f
+    """
 )
 
 # Spack build cache setup script template
