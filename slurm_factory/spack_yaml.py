@@ -162,8 +162,6 @@ def generate_spack_config(
             "gcc-runtime@13.3.0",
             "perl %gcc@13.3.0",
             "munge %gcc@13.3.0",
-            "linux-headers %gcc@13.3.0",
-            "glibc",
             f"slurm@{slurm_package_version} +readline ~hwloc ~pmix ~restd "
             f"{gpu_flags} ~cgroup sysconfdir=/etc/slurm %gcc@13.3.0",
         ]
@@ -199,8 +197,6 @@ def generate_spack_config(
         "bzip2",
         "xz",
         "zstd",
-        "glibc",
-        "linux-headers",
     ]
 
     # Add conditional packages based on build type
@@ -360,8 +356,7 @@ def generate_spack_config(
                     "buildable": False,
                     "variants": "system-socket=/var/run/dbus/system_bus_socket",
                 },
-                #"glib": {"externals": [{"spec": "glib@2.80.0", "prefix": "/usr"}], "buildable": False},
-                "glib": {"externals": [], "buildable": True},
+                "glib": {"externals": [{"spec": "glib@2.80.0", "prefix": "/usr"}], "buildable": False},
                 "libxml2": {"externals": [{"spec": "libxml2@2.9.14", "prefix": "/usr"}], "buildable": False},
                 # Build these inside Spack to avoid Perl XS module linking to external system libraries
                 "gdbm": {"buildable": True},
