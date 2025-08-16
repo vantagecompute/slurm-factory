@@ -78,7 +78,7 @@ SPACK_BASE_INSTANCE_CONCRETIZE_SCRIPT = textwrap.dedent(
     cp {CONTAINER_PATCHES_DIR}/package.py {SPACK_REPO_PATH}
     source {SPACK_SETUP_SCRIPT}
 
-    cd /root/spack-project && spack env activate . && spack concretize -j $(nproc) -f
+    cd /root/spack-project && spack env activate . && spack concretize -j $(nproc) -f && spack install -j $(nproc) -f
     """
 )
 

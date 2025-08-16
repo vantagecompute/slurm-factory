@@ -157,30 +157,23 @@ def generate_spack_config(
     gpu_flags = "+nvml +rsmi" if gpu_support else "~nvml ~rsmi"
 
     if minimal:
-        # Minimal build: bootstrapped compiler + basic Slurm for true relocatability
         specs = [
             # Build a bootstrapped compiler first (in-DAG)
             "gcc@13.3.0 +binutils",
             "gcc-runtime@13.3.0",
-            # Build Perl inside Spack to avoid system XS module linkage issues
             "perl %gcc@13.3.0",
-            # Build Munge with the same toolchain (Slurm links against it)
             "munge %gcc@13.3.0",
-            # Build Slurm with the Spack-built gcc (after registration)
+            "linux-headers %gcc@13.3.0",
+            "glibc",
             f"slurm@{slurm_package_version} +readline ~hwloc ~pmix ~restd "
             f"{gpu_flags} ~cgroup sysconfdir=/etc/slurm %gcc@13.3.0",
         ]
     else:
-        # Full build: bootstrapped compiler + Slurm with OpenMPI for true relocatability
         specs = [
-            # Build a bootstrapped compiler first (in-DAG)
             "gcc@13.3.0 +binutils",
             "gcc-runtime@13.3.0",
-            # Build Perl inside Spack to avoid system XS module linkage issues
             "perl %gcc@13.3.0",
-            # Build Munge with the same toolchain (Slurm links against it)
             "munge %gcc@13.3.0",
-            # Build OpenMPI and Slurm with the Spack-built gcc (after registration)
             "openmpi@5.0.3 schedulers=slurm fabrics=auto ^hwloc ^libevent ^pmix~munge~python %gcc@13.3.0",
             f"slurm@{slurm_package_version} +readline +hwloc +pmix +restd "
             f"{gpu_flags} +cgroup sysconfdir=/etc/slurm %gcc@13.3.0",
@@ -199,7 +192,7 @@ def generate_spack_config(
         "zlib-ng",
         "numactl",
         "gcc-runtime",
-        "gcc",
+        # Core system libraries for true relocatability (no system dependencies)
         # Additional runtime-linked packages for true relocatability
         "linux-pam",
         "libevent",
@@ -208,6 +201,8 @@ def generate_spack_config(
         "bzip2",
         "xz",
         "zstd",
+        "glibc",
+        "linux-headers",
     ]
 
     # Add conditional packages based on build type
@@ -232,12 +227,16 @@ def generate_spack_config(
                     "root": view_root,
                     "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
                     "select": view_packages,  # Only include essential runtime dependencies in view
+                    "exclude": ["^cmake", "^autoconf", "^automake", "^libtool", "^bison", "^flex"],
                 }
             },
             "config": {
                 "install_tree": {
                     "root": install_tree_root,
                     "padded_length": 0,  # Short, portable install paths for relocatability
+                    "projections": {
+                        "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
+                    }
                 },
                 "build_stage": "/tmp/spack-stage",
                 "misc_cache": sourcecache_root,
@@ -254,6 +253,7 @@ def generate_spack_config(
                 "shared_linking": {
                     "missing_library_policy": "error"  # Fail on missing system libraries
                 },
+                "relocate_binaries": True,  # Enable automatic RPATH fixing
             },
             "mirrors": {
                 "local-buildcache": {"url": f"file://{buildcache_root}", "signed": False},
@@ -279,11 +279,6 @@ def generate_spack_config(
                         "extra_rpaths": [],  # Additional runtime library paths
                     }
                 }
-                # Note: Bootstrapped compiler workflow (for truly relocatable builds):
-                # 1. spack -e . concretize        # build plan includes gcc & gcc-runtime
-                # 2. spack -e . install gcc       # install bootstrapped compiler
-                # 3. spack -e . compiler find     # register installed gcc into this env's compilers.yaml
-                # 4. spack -e . install           # now installs slurm etc with the bootstrapped gcc
             ],
             "packages": {
                 # Keep build tools as externals (not needed at runtime)
@@ -367,7 +362,8 @@ def generate_spack_config(
                     "buildable": False,
                     "variants": "system-socket=/var/run/dbus/system_bus_socket",
                 },
-                "glib": {"externals": [{"spec": "glib@2.80.0", "prefix": "/usr"}], "buildable": False},
+                #"glib": {"externals": [{"spec": "glib@2.80.0", "prefix": "/usr"}], "buildable": False},
+                "glib": {"externals": [], "buildable": True},
                 "libxml2": {"externals": [{"spec": "libxml2@2.9.14", "prefix": "/usr"}], "buildable": False},
                 # Build these inside Spack to avoid Perl XS module linking to external system libraries
                 "gdbm": {"buildable": True},
@@ -383,6 +379,7 @@ def generate_spack_config(
                 "hdf5": {"externals": [{"spec": "hdf5@1.10.10", "prefix": "/usr"}], "buildable": False},
                 # Runtime-linked libraries: build with Spack for true relocatability
                 # These may be linked by Slurm or its dependencies at runtime
+                "linux-headers": {"buildable": True}, # Linux kernel headers
                 "linux-pam": {"buildable": True},  # Slurm PAM authentication
                 "libevent": {"buildable": True},  # Used by PMIx and OpenMPI
                 "jansson": {"buildable": True},  # JSON parsing for some Slurm features
@@ -393,18 +390,15 @@ def generate_spack_config(
                 # GCC runtime (needed for dynamic linking)
                 # GCC runtime for relocatable binaries (Spack 1.x approach)
                 "gcc-runtime": {"buildable": True, "version": ["13.3.0"]},
-                # Slurm itself - enhanced for relocatability
                 "slurm": {
                     "version": [slurm_package_version],
                     "buildable": True,
-                    # Enable relocatable builds with appropriate RPATH handling
-                    "variants": "+shared ~static",  # Ensure shared libraries for relocatability
                 },
                 # Global preferences with Spack 1.x enhancements
                 "all": {
                     "target": ["x86_64"],
-                    "prefer": ["%gcc@13.3.0", "+shared", "~static"],  # More specific preferences
-                    "variants": "+shared ~static",  # Consistent shared library preference
+                    "prefer": ["%gcc@13.3.0", "+shared", "~static", "+pic"],  # More specific preferences
+                    "variants": "+shared ~static +pic",  # Consistent shared library preference
                     "permissions": {"read": "world", "write": "user"},
                 },
             },

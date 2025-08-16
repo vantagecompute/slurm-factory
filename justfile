@@ -100,3 +100,7 @@ show-config-verify:
 [group("config")]
 show-versions:
     {{uv_run}} python -c "from slurm_factory.constants import SLURM_VERSIONS; print('Available Slurm versions:'); [print(f'  {k}: {v}') for k, v in SLURM_VERSIONS.items()]"
+
+[group("cleanup")]
+cleanup:
+    sudo rm -rf ~/.slurm-factory dist .venv && lxc image delete 5199328c409d --project slurm-factory && lxc delete slurm-factory-base-202508 --project slurm-factory --force && lxc project delete slurm-factory && uv venv && uv build --wheel && uv pip install dist/slurm_factory-0.1.8-py3-none-any.whl
