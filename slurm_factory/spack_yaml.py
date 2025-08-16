@@ -245,7 +245,7 @@ def generate_spack_config(
                 "deprecated": True,
                 # Spack 1.x performance enhancements
                 "build_jobs": 4,  # Parallel build jobs
-                "ccache": False,  # Disable ccache if not present
+                "ccache": True,  # Disable ccache if not present
                 "connect_timeout": 30,  # Network timeout for downloads
                 "verify_ssl": True,  # Security setting
                 "suppress_gpg_warnings": False,  # Show GPG warnings
