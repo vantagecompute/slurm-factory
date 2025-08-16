@@ -159,7 +159,6 @@ def generate_spack_config(
     if minimal:
         specs = [
             # Build a bootstrapped compiler first (in-DAG)
-            "gcc@13.3.0 +binutils",
             "gcc-runtime@13.3.0",
             "perl %gcc@13.3.0",
             "munge %gcc@13.3.0",
@@ -170,7 +169,6 @@ def generate_spack_config(
         ]
     else:
         specs = [
-            "gcc@13.3.0 +binutils",
             "gcc-runtime@13.3.0",
             "perl %gcc@13.3.0",
             "munge %gcc@13.3.0",
