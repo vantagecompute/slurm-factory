@@ -34,7 +34,8 @@ all sizes. This is a relocatable module that allows installation at
 any prefix by setting SLURM_INSTALL_PREFIX environment variable.
 
 Relocatability Features:
-- Binaries use RPATH for library discovery (no LD_LIBRARY_PATH needed)
+- Binaries prefer RPATH for library discovery when properly relocated
+- Falls back to LD_LIBRARY_PATH for incomplete RPATH relocation scenarios  
 - Can be relocated by setting SLURM_INSTALL_PREFIX before loading module
 - Self-contained installation with all runtime dependencies included
 - Compatible with containerized and distributed deployments
@@ -42,6 +43,9 @@ Relocatability Features:
 Usage:
   module load slurm                    # Use default installation path
   export SLURM_INSTALL_PREFIX=/new/path && module load slurm  # Use custom path
+
+Note: For optimal performance, ensure binaries were installed via Spack build cache
+for proper RPATH relocation. Manual copying may require LD_LIBRARY_PATH fallback.
 ]])
 
 -- Relocatable prefix logic with validation
@@ -72,8 +76,21 @@ prepend_path("CPATH", pathJoin(slurm_prefix, "include"))
 prepend_path("PKG_CONFIG_PATH", pathJoin(slurm_prefix, "lib/pkgconfig"))
 prepend_path("CMAKE_PREFIX_PATH", slurm_prefix)
 
--- NOTE: No LD_LIBRARY_PATH - relocatable binaries use RPATH for library discovery
--- This ensures proper relocatability and avoids library path conflicts
+-- Library path handling with fallback for incomplete RPATH relocation
+-- Relocatable binaries should use RPATH, but provide LD_LIBRARY_PATH fallback
+-- This ensures compatibility when RPATH relocation fails or is incomplete
+local lib_paths = {
+    pathJoin(slurm_prefix, "lib"),
+    pathJoin(slurm_prefix, "lib64"), 
+    pathJoin(slurm_prefix, "lib/slurm")
+}
+
+-- Only add library paths that actually exist to avoid cluttering environment
+for _, lib_path in ipairs(lib_paths) do
+    if isDir(lib_path) then
+        prepend_path("LD_LIBRARY_PATH", lib_path)
+    end
+end
 
 -- Set important Slurm-specific environment variables
 setenv("SLURM_INSTALL_PREFIX", slurm_prefix)
