@@ -202,7 +202,7 @@ def generate_spack_config(
             "config": {
                 "install_tree": {
                     "root": install_tree_root,
-                    "padded_length": 0,  # Short, portable install paths for relocatability
+                    "padded_length": 128,  # Enable padding for proper relocation (Spack 1.x requirement)
                     "projections": {
                         "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
                     },
@@ -218,11 +218,11 @@ def generate_spack_config(
                 "connect_timeout": 30,  # Network timeout for downloads
                 "verify_ssl": True,  # Security setting
                 "suppress_gpg_warnings": False,  # Show GPG warnings
-                # Relocatability enhancement: catch non-relocatable system linkage
                 "shared_linking": {
-                    "missing_library_policy": "ignore"  # Fail on missing system libraries
+                    "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
+                    "bind": False,    # Don't bind absolute paths - allow relocation
+                    "missing_library_policy": "ignore"  # Don't fail on missing system libraries
                 },
-                "relocate_binaries": True,  # Enable automatic RPATH fixing
             },
             "mirrors": {
                 "local-buildcache": {"url": f"file://{buildcache_root}", "signed": False},
