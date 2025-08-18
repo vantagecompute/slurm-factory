@@ -21,7 +21,7 @@ permalink: /
   <div style="display: flex; justify-content: center; align-items: center; gap: 4rem; margin-bottom: 2rem; flex-wrap: wrap;">
     <div style="display: flex; flex-direction: column; align-items: center; transform: scale(1.1);">
       <div style="background: #FFFFFF; padding: 20px; border-radius: 16px; box-shadow: 0 8px 25px rgba(107, 70, 193, 0.3); margin-bottom: 1rem; border: 2px solid #E5E7EB;">
-        <span style="font-size: 60px; color: #6B46C1;">🖥️</span>
+        <img src="https://slurm.schedmd.com/slurm_logo.png" alt="Slurm Logo" style="width: 60px; height: 60px; object-fit: contain;">
       </div>
       <span style="font-size: 1rem; color: #6B7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Slurm HPC</span>
     </div>
@@ -32,9 +32,9 @@ permalink: /
     </div>
     <div style="display: flex; flex-direction: column; align-items: center; transform: scale(1.1);">
       <div style="background: #FFFFFF; padding: 20px; border-radius: 16px; box-shadow: 0 8px 25px rgba(168, 85, 247, 0.3); margin-bottom: 1rem; border: 2px solid #E5E7EB;">
-        <span style="font-size: 60px; color: #A855F7;">📦</span>
+        <img src="https://raw.githubusercontent.com/spack/spack/develop/share/spack/logo/spack-logo.svg" alt="Spack Logo" style="width: 60px; height: 60px; object-fit: contain;">
       </div>
-      <span style="font-size: 1rem; color: #6B7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Packages</span>
+      <span style="font-size: 1rem; color: #6B7280; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em;">Spack Packages</span>
     </div>
   </div>
   <h2 style="margin: 0; color: #111827; font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; background: linear-gradient(135deg, #6B46C1, #9333EA, #A855F7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Slurm Factory Documentation</h2>
@@ -291,3 +291,4 @@ module load slurm/25.05
   color: #228B22;
 }
 </style>
+

@@ -25,6 +25,7 @@ dev = [
     "ruff",
     "mypy",
     "black",
+    "codespell",
     "types-pyyaml",
     "pytest",
     "pytest-cov",
