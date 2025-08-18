@@ -9,12 +9,13 @@ from rich.console import Console
 from typing_extensions import Annotated
 
 from .constants import INSTANCE_NAME_PREFIX, SlurmVersion
-from .exceptions import SlurmFactoryError
+from .exceptions import SlurmFactoryError, SlurmFactoryInstanceCreationError
 from .utils import (
-    create_buildcache_from_base_instance,
+    create_base_instance,
     create_slurm_package,
     get_base_instance,
     get_base_instance_name,
+    initialize_base_instance_buildcache,
     set_profile,
 )
 
@@ -51,24 +52,30 @@ def build(
         )
     else:
         console.print(f"Project [bold]{project_name}[/bold] already exists. Using it for the build.")
-    # Get verbose setting from context
+
     # verbose = ctx.obj["verbose"]
+    version = slurm_version.value
+    console.print(f"Starting Slurm build process for version {version}")
 
     base_instance_name = get_base_instance_name()
     base_instance = get_base_instance(base_instance_name, project_name)
 
-    # Use the enum value as a string
-    version = slurm_version.value
-    console.print(f"Starting Slurm build process for version {version}")
-    console.print("[bold blue]Creating base instance....[/bold blue]")
+    if base_instance is None:
+        console.print("[bold blue]Creating base instance....[/bold blue]")
+        try:
+            base_instance = create_base_instance(base_instance_name, project_name)
+        except SlurmFactoryInstanceCreationError as e:
+            logger.error(f"Failed to create base instance: {e}")
+            return typer.Exit(1)
 
-    try:
-        create_buildcache_from_base_instance(base_instance, project_name, version, gpu, minimal, verify)
-    except SlurmFactoryError as e:
-        logger.error(f"Failed to create base instance: {e}")
-        return typer.Exit(1)
+        try:
+            initialize_base_instance_buildcache(base_instance, project_name, version, gpu, minimal, verify)
+        except SlurmFactoryError as e:
+            logger.error(f"Failed to initialize buildcache: {e}")
+            return typer.Exit(1)
 
-    lxc.stop(instance_name=base_instance.instance_name, project=project_name, force=True)
+        # Stop the base instance
+        lxc.stop(instance_name=base_instance.instance_name, project=project_name, force=True)
 
     logger.info(f"Base instance {base_instance.instance_name} created successfully")
     if base_only:

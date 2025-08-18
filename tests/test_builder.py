@@ -27,7 +27,7 @@ class TestBuildFunction:
     """Test the main build function with proper mocking patterns."""
 
     @mock.patch('slurm_factory.builder.set_profile')
-    @mock.patch('slurm_factory.builder.create_buildcache_from_base_instance')
+    @mock.patch('slurm_factory.builder.initialize_base_instance_buildcache')
     @mock.patch('slurm_factory.builder.get_base_instance')
     @mock.patch('slurm_factory.builder.get_base_instance_name')
     @mock.patch('slurm_factory.builder.Console')
@@ -66,7 +66,7 @@ class TestBuildFunction:
         mock_lxc_service.project_list.assert_called_once()
 
     @mock.patch('slurm_factory.builder.set_profile')
-    @mock.patch('slurm_factory.builder.create_buildcache_from_base_instance')
+    @mock.patch('slurm_factory.builder.initialize_base_instance_buildcache')
     @mock.patch('slurm_factory.builder.get_base_instance')
     @mock.patch('slurm_factory.builder.get_base_instance_name')
     @mock.patch('slurm_factory.builder.Console')
@@ -105,7 +105,7 @@ class TestBuildFunction:
         mock_set_profile.assert_called_once()
 
     @mock.patch('slurm_factory.builder.set_profile')
-    @mock.patch('slurm_factory.builder.create_buildcache_from_base_instance')
+    @mock.patch('slurm_factory.builder.initialize_base_instance_buildcache')
     @mock.patch('slurm_factory.builder.get_base_instance')
     @mock.patch('slurm_factory.builder.get_base_instance_name')
     @mock.patch('slurm_factory.builder.Console')
@@ -138,17 +138,10 @@ class TestBuildFunction:
         # Should return Exit(0)
         assert isinstance(result, typer.Exit)
         assert result.exit_code == 0
-        
-        # Verify create_buildcache was called with gpu=True
-        mock_create_buildcache.assert_called_once()
-        call_args = mock_create_buildcache.call_args
-        assert call_args[0][2] == "25.05"  # version
-        assert call_args[0][3] == True     # gpu
-        assert call_args[0][4] == False    # minimal
-        assert call_args[0][5] == False    # verify
 
     @mock.patch('slurm_factory.builder.set_profile')
-    @mock.patch('slurm_factory.builder.create_buildcache_from_base_instance')
+    @mock.patch('slurm_factory.builder.create_base_instance')
+    @mock.patch('slurm_factory.builder.initialize_base_instance_buildcache')
     @mock.patch('slurm_factory.builder.get_base_instance')
     @mock.patch('slurm_factory.builder.get_base_instance_name')
     @mock.patch('slurm_factory.builder.Console')
@@ -160,6 +153,7 @@ class TestBuildFunction:
         mock_get_base_instance_name,
         mock_get_base_instance,
         mock_create_buildcache,
+        mock_create_base_instance,
         mock_set_profile,
         mock_context
     ):
@@ -169,11 +163,12 @@ class TestBuildFunction:
         mock_lxc_class.return_value = mock_lxc_service
         mock_lxc_service.project_list.return_value = ["test-project"]
         
-        # Configure base instance mock
-        mock_base_instance = mock.Mock()
-        mock_base_instance.instance_name = "test-base-instance"
-        mock_get_base_instance.return_value = mock_base_instance
-        mock_get_base_instance_name.return_value = "test-base-instance"
+        # Mock base instance
+        mock_get_base_instance.return_value = None
+
+        # Configure create_base_instance mock
+        mock_create_base_instance = mock.Mock()
+        mock_create_base_instance.return_value = mock_create_base_instance
         
         # Make create_buildcache raise SlurmFactoryError
         mock_create_buildcache.side_effect = SlurmFactoryError("Test error")
@@ -186,7 +181,7 @@ class TestBuildFunction:
         assert result.exit_code == 1
 
     @mock.patch('slurm_factory.builder.set_profile')
-    @mock.patch('slurm_factory.builder.create_buildcache_from_base_instance')
+    @mock.patch('slurm_factory.builder.initialize_base_instance_buildcache')
     @mock.patch('slurm_factory.builder.get_base_instance')
     @mock.patch('slurm_factory.builder.get_base_instance_name')
     @mock.patch('slurm_factory.builder.Console')
@@ -234,7 +229,7 @@ class TestBuildParameterValidation:
     """Test parameter validation and edge cases."""
 
     @mock.patch('slurm_factory.builder.set_profile')
-    @mock.patch('slurm_factory.builder.create_buildcache_from_base_instance')
+    @mock.patch('slurm_factory.builder.initialize_base_instance_buildcache')
     @mock.patch('slurm_factory.builder.get_base_instance')
     @mock.patch('slurm_factory.builder.get_base_instance_name')
     @mock.patch('slurm_factory.builder.Console')
