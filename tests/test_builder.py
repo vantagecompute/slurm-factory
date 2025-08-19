@@ -163,7 +163,7 @@ class TestBuildFunction:
         mock_lxc_class.return_value = mock_lxc_service
         mock_lxc_service.project_list.return_value = ["test-project"]
         
-        # Mock base instance
+        # Mock base instance return None
         mock_get_base_instance.return_value = None
 
         # Configure create_base_instance mock
