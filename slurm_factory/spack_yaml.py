@@ -220,8 +220,8 @@ def generate_spack_config(
                 "suppress_gpg_warnings": False,  # Show GPG warnings
                 "shared_linking": {
                     "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
-                    "bind": False,    # Don't bind absolute paths - allow relocation
-                    "missing_library_policy": "ignore"  # Don't fail on missing system libraries
+                    "bind": False,  # Don't bind absolute paths - allow relocation
+                    "missing_library_policy": "ignore",  # Don't fail on missing system libraries
                 },
             },
             "mirrors": {

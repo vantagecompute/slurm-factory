@@ -7,6 +7,7 @@ import sys
 from datetime import datetime
 from pathlib import Path, PurePath
 from textwrap import dedent
+from typing import Optional
 
 import yaml
 from craft_providers import lxd
@@ -160,7 +161,7 @@ def _setup_spack_project(
         raise SlurmFactoryError(msg)
 
 
-def _create_base_instance(
+def create_base_instance(
     base_instance_name: str,
     project_name: str,
 ) -> lxd.LXDInstance:
@@ -199,7 +200,7 @@ def _create_base_instance(
     return lxd_base_instance
 
 
-def create_buildcache_from_base_instance(
+def initialize_base_instance_buildcache(
     base_instance: lxd.LXDInstance,
     project_name: str,
     version: str = "25.05",
@@ -222,8 +223,8 @@ def create_buildcache_from_base_instance(
         raise SlurmFactoryError("Failed to create slurm package")
 
 
-def get_base_instance(base_instance_name: str, project_name: str) -> lxd.LXDInstance:
-    """Initialize and return the base instance, otherwise return pre-existing base_instance."""
+def get_base_instance(base_instance_name: str, project_name: str) -> Optional[lxd.LXDInstance]:
+    """Return the base instance if it exists, otherwise return None."""
     console = Console()
     base_instance = None
 
@@ -236,14 +237,6 @@ def get_base_instance(base_instance_name: str, project_name: str) -> lxd.LXDInst
                 f"[bold green]Using cached base instance with build cache:[/bold green] {base_instance_name}"
             )
             base_instance = lxd.LXDInstance(name=base_instance_name, project=project_name, remote="local")
-
-    if base_instance is None:
-        try:
-            base_instance = _create_base_instance(base_instance_name, project_name)
-        except SlurmFactoryInstanceCreationError as e:
-            logger.error(f"Failed to create base instance: {e}")
-            raise SlurmFactoryError("Failed to create base instance")
-
     return base_instance
 
 
