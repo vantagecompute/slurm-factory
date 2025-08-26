@@ -17,7 +17,8 @@ def mock_context():
     ctx = mock.Mock()
     ctx.obj = {
         "settings": mock.Mock(),
-        "project_name": "test-project"
+        "project_name": "test-project",
+        "verbose": False
     }
     ctx.obj["settings"].home_cache_dir = "/tmp/test-cache"
     return ctx

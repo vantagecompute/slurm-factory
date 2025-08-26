@@ -47,7 +47,7 @@ lint: lock
 # Run static type checker on code
 [group("lint")]
 typecheck: lock
-    {{uv_run}} pyright {{src_dir}} --exclude=data
+    {{uv_run}} pyright {{src_dir}}
 
 # Run unit tests only
 [group("test")]

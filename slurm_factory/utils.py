@@ -6,7 +6,6 @@ import site
 import sys
 from datetime import datetime
 from pathlib import Path, PurePath
-from textwrap import dedent
 from typing import Optional
 
 import yaml
@@ -17,7 +16,6 @@ from .constants import (
     BASE_INSTANCE_PREFIX,
     BASH_HEADER,
     CLOUD_INIT_TIMEOUT,
-    CONTAINER_PATCHES_DIR,
     CONTAINER_SPACK_PROJECT_DIR,
     CONTAINER_SPACK_TEMPLATES_DIR,
     LXD_IMAGE,
@@ -37,21 +35,31 @@ def _stream_exec_output(
     instance: lxd.LXDInstance, command: list[str], description: str, verbose: bool = False, **kwargs
 ):
     """Execute a command in the instance and stream its output in real-time."""
+    # Enable debug logging when verbose is True
+    if verbose:
+        logger.setLevel(logging.DEBUG)
+        logger.debug(f"Executing command: {' '.join(command)}")
+        logger.debug(f"Command description: {description}")
+
     if verbose:
         # In verbose mode, show output in real-time without status spinner
         console.print(f"[bold blue]{description}[/bold blue]")
+        logger.debug("Starting command execution in verbose mode")
 
         # Use execute_run for simpler real-time output
         try:
             result = instance.execute_run(command=command, **kwargs)
+            logger.debug(f"Command execution completed with return code: {result.returncode}")
 
-            # Print output
+            # Print output with debug logging
             if result.stdout:
+                logger.debug(f"Command stdout ({len(result.stdout)} chars): {result.stdout[:500]}...")
                 for line in result.stdout.split("\n"):
                     if line.strip():
                         console.print(f"  {line}")
 
             if result.stderr:
+                logger.debug(f"Command stderr ({len(result.stderr)} chars): {result.stderr[:500]}...")
                 for line in result.stderr.split("\n"):
                     if line.strip():
                         console.print(f"[yellow]  {line}[/yellow]")
@@ -59,9 +67,11 @@ def _stream_exec_output(
             if result.returncode != 0:
                 msg = f"Command failed with exit code {result.returncode}"
                 logger.error(msg)
+                logger.debug(f"Failed command was: {' '.join(command)}")
                 console.print(f"[bold red]{msg}[/bold red]")
                 raise SlurmFactoryStreamExecError(msg)
 
+            logger.debug("Command completed successfully")
             return (
                 result.returncode,
                 result.stdout.split("\n") if result.stdout else [],
@@ -71,13 +81,16 @@ def _stream_exec_output(
         except Exception as e:
             msg = f"Command execution failed: {e}"
             logger.error(msg)
+            logger.debug(f"Exception details: {type(e).__name__}: {e}")
             console.print(f"[bold red]{msg}[/bold red]")
             raise SlurmFactoryStreamExecError(msg)
     else:
         # In non-verbose mode, use status spinner and show minimal output
+        logger.debug("Starting command execution in non-verbose mode")
         with console.status(f"[bold blue]{description}[/bold blue]"):
             try:
                 result = instance.execute_run(command=command, **kwargs)
+                logger.debug(f"Command completed with return code: {result.returncode}")
 
                 # Show only important lines in non-verbose mode
                 if result.stdout:
@@ -86,10 +99,13 @@ def _stream_exec_output(
                         for line in result.stdout.split("\n")
                         if line.strip() and ("error" in line.lower() or "warning" in line.lower())
                     ]
+                    if important_lines:
+                        logger.debug(f"Found {len(important_lines)} important output lines")
                     for line in important_lines:
                         console.print(f"[dim]  {line}[/dim]")
 
                 if result.stderr:
+                    logger.debug(f"Command had stderr output: {len(result.stderr)} chars")
                     for line in result.stderr.split("\n"):
                         if line.strip():
                             console.print(f"[red]  {line}[/red]")
@@ -97,6 +113,7 @@ def _stream_exec_output(
                 if result.returncode != 0:
                     msg = f"Command failed with exit code {result.returncode}"
                     logger.error(msg)
+                    logger.debug(f"Failed command was: {' '.join(command)}")
                     console.print(f"[bold red]{msg}[/bold red]")
                     raise SlurmFactoryStreamExecError(msg)
 
@@ -109,6 +126,7 @@ def _stream_exec_output(
             except Exception as e:
                 msg = f"Command execution failed: {e}"
                 logger.error(msg)
+                logger.debug(f"Exception details: {type(e).__name__}: {e}")
                 console.print(f"[bold red]{msg}[/bold red]")
                 raise SlurmFactoryStreamExecError(msg)
 
@@ -124,39 +142,55 @@ def _setup_spack_project(
     lxd_instance: lxd.LXDInstance,
     version: str,
     gpu_support: bool = False,
+    additional_variants: str = "",
     minimal: bool = False,
     verify: bool = False,
     verbose: bool = False,
     base: bool = False,
 ) -> None:
     """Set up the base instance with ALL components of the spack project."""
-    # Generate dynamic Spack configuration and copy to container
-    spack_yaml = generate_yaml_string(
-        slurm_version=version, gpu_support=gpu_support, minimal=minimal, enable_verification=verify
+    logger.debug(
+        (
+            f"Setting up Spack project: version={version}, "
+            f"gpu_support={gpu_support}, minimal={minimal}, verify={verify}, base={base}"
+        )
     )
+
+    # Generate dynamic Spack configuration and copy to container
+    logger.debug("Generating dynamic Spack YAML configuration")
+    spack_yaml = generate_yaml_string(
+        slurm_version=version,
+        gpu_support=gpu_support,
+        minimal=minimal,
+        additional_variants=additional_variants,
+        enable_verification=verify,
+    )
+    logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
+
     _copy_spack_yaml_to_container(lxd_instance, spack_yaml, target_description="base instance")
 
     if base is True:
-        # Copy patches to container
-        _copy_patches_to_container(lxd_instance, verbose=False, target_description="base instance")
-        # Copy templates to container
-        _copy_templates_to_container(lxd_instance, verbose=False, target_description="base instance")
-        # Copy repo.yaml to container
-        _copy_repo_yaml_to_container(lxd_instance, target_description="base instance")
+        logger.debug("Setting up base instance with slurm lmod templates...")
+        _copy_templates_to_container(lxd_instance, verbose=verbose, target_description="base instance")
 
+    script_type = "build cache setup" if base else "package creation"
     try:
         exec_script = (
             get_spack_build_cache_script() if base is True else get_package_creation_script(version=version)
         )
+        logger.debug(f"Executing {script_type} script ({len(exec_script)} chars)")
+
         _stream_exec_output(
             lxd_instance,
             BASH_HEADER + [exec_script],
-            f"Setting up build cache for Slurm {version}",
+            f"Executing {script_type} script for Slurm {version}",
             verbose=verbose,
         )
+        logger.debug(f"Successfully completed {script_type} script")
     except SlurmFactoryStreamExecError as e:
         msg = f"Command execution failed: {e}"
         logger.error(msg)
+        logger.debug(f"Failed during {script_type} script execution")
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
 
@@ -205,6 +239,7 @@ def initialize_base_instance_buildcache(
     project_name: str,
     version: str = "25.05",
     gpu_support: bool = False,
+    additional_variants: str = "",
     minimal: bool = False,
     verify: bool = False,
 ) -> None:
@@ -214,6 +249,7 @@ def initialize_base_instance_buildcache(
             lxd_instance=base_instance,
             version=version,
             gpu_support=gpu_support,
+            additional_variants=additional_variants,
             minimal=minimal,
             verify=verify,
             base=True,
@@ -332,35 +368,6 @@ def _wait_for_cloud_init_with_output(instance: lxd.LXDInstance):
         raise SlurmFactoryError("Error waiting for cloud-init, see logs for details")
 
 
-def _copy_patches_to_container(
-    lxd_instance: lxd.LXDInstance, verbose: bool = False, target_description: str = "container"
-):
-    """Copy global patches into the container."""
-    patches_source = _get_data_file("patches")
-
-    if patches_source.exists():
-        logger.debug(f"Copying global patches from {patches_source} into {target_description}")
-
-        # Copy each patch file directly using LXD file operations
-        for patch_file in patches_source.glob("*"):
-            if patch_file.is_file():
-                with open(patch_file, "rb") as f:
-                    patch_content = f.read()
-
-                # Use LXD's push_file_io to copy the file directly
-                content_io = io.BytesIO(patch_content)
-                target_path = Path(f"{CONTAINER_PATCHES_DIR}/{patch_file.name}")
-
-                lxd_instance.push_file_io(destination=target_path, content=content_io, file_mode="0644")
-
-                if verbose:
-                    logger.info(f"Copied {patch_file.name} to container")
-
-        logger.debug(f"Copied patch files to {target_description}")
-    else:
-        logger.warning(f"Patches directory not found at {patches_source}")
-
-
 def _copy_templates_to_container(
     lxd_instance: lxd.LXDInstance, verbose: bool = False, target_description: str = "container"
 ):
@@ -425,33 +432,6 @@ def _copy_spack_yaml_to_container(
     logger.debug(f"Copied spack.yaml to {destination_path}")
 
 
-def _copy_repo_yaml_to_container(
-    lxd_instance: lxd.LXDInstance,
-    target_description: str = "container",
-) -> None:
-    """Copy Spack YAML configuration into the container."""
-    destination_path = f"{CONTAINER_SPACK_PROJECT_DIR}/repo.yaml"
-
-    logger.debug(f"Copying repo YAML configuration to {target_description} at {destination_path}")
-    repo_yaml = dedent(
-        """
-        repo:
-          namespace: builtin
-        """
-    )
-    try:
-        lxd_instance.push_file_io(
-            content=io.BytesIO(repo_yaml.encode("utf-8")),
-            destination=PurePath(destination_path),
-            file_mode="644",
-        )
-    except Exception as e:
-        logger.error(f"Failed to copy repo.yaml to container: {e}")
-        raise
-
-    logger.debug(f"Copied repo.yaml to {destination_path}")
-
-
 def create_slurm_package(
     lxd_instance: lxd.LXDInstance,
     version: str = "25.05",
@@ -461,7 +441,6 @@ def create_slurm_package(
 ) -> None:
     """Create slurm package."""
     console = Console()
-
     console.print("[bold blue]Creating slurm package...[/bold blue]")
 
     try:

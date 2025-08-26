@@ -123,6 +123,17 @@ setenv("SLURM_BUILD_TARGET", "{{ spec.target }}")
 {% endif -%}
 setenv("SLURM_BUILD_TYPE", "relocatable")
 
+-- SSL certificate handling for relocatable OpenSSL
+local ssl_cert_dir = pathJoin(slurm_prefix, "etc/ssl/certs")
+local ssl_cert_file = pathJoin(slurm_prefix, "etc/ssl/cert.pem")
+
+if isDir(ssl_cert_dir) then
+    setenv("SSL_CERT_DIR", ssl_cert_dir)
+end
+if isFile(ssl_cert_file) then
+    setenv("SSL_CERT_FILE", ssl_cert_file)
+end
+
 -- Module identification and conflict resolution
 {% if spec and spec.name and spec.version -%}
 local version = "{{ spec.version }}"
