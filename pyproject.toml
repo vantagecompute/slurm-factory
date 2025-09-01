@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "slurm-factory"
-version = "0.1.12"
+version = "0.1.13"
 description = "Slurm builder project by Vantage Compute"
 readme = "README.md"
 authors = [
