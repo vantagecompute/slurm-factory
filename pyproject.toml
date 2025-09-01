@@ -55,7 +55,8 @@ packages = ["slurm_factory"]
 exclude = [
     "git-cliff-*",
     "justfile",
-    "docs"
+    "docs",
+    "tests",
 ]
 
 [tool.hatch.build.targets.wheel.shared-data]
@@ -68,7 +69,8 @@ exclude = [
 exclude = [
     "git-cliff-*",
     "justfile",
-    "docs"
+    "docs",
+    "tests",
 ]
 
 # ===== Development Tools =====
