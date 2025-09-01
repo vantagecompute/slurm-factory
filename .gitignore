@@ -1,5 +1,5 @@
 # Build outputs
-slurm-23.11-software.tar.gz
+*.tar.gz
 tmp/
 _build/
 
@@ -45,6 +45,3 @@ venv.bak/
 # OS
 .DS_Store
 Thumbs.db
-
-# UV
-uv.lock
