@@ -1,4 +1,6 @@
 # Build outputs
+slurm-23.11-software.tar.gz
+tmp/
 _build/
 
 # Python

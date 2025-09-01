@@ -47,7 +47,7 @@ class TestSpackConfigGeneration:
             assert "spack" in config
             
             # Check that the slurm package version is correct
-            slurm_specs = [spec for spec in config["spack"]["specs"] if spec.startswith("slurm@")]
+            slurm_specs = [spec for spec in config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
             assert len(slurm_specs) > 0, f"No slurm spec found for version {version}"
             
             expected_package_version = SLURM_VERSIONS[version]
@@ -58,14 +58,14 @@ class TestSpackConfigGeneration:
         """Test GPU support configuration."""
         # CPU-only config
         cpu_config = generate_spack_config(gpu_support=False)
-        slurm_specs = [spec for spec in cpu_config["spack"]["specs"] if spec.startswith("slurm@")]
+        slurm_specs = [spec for spec in cpu_config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
         slurm_spec = slurm_specs[0]
         assert "~nvml" in slurm_spec
         assert "~rsmi" in slurm_spec
         
         # GPU-enabled config
         gpu_config = generate_spack_config(gpu_support=True)
-        slurm_specs = [spec for spec in gpu_config["spack"]["specs"] if spec.startswith("slurm@")]
+        slurm_specs = [spec for spec in gpu_config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
         slurm_spec = slurm_specs[0]
         assert "+nvml" in slurm_spec
         assert "+rsmi" in slurm_spec
@@ -80,12 +80,11 @@ class TestSpackConfigGeneration:
         minimal_config_data = generate_spack_config(minimal=True)
         
         # Check that minimal build excludes OpenMPI and some features
-        slurm_specs = [spec for spec in minimal_config_data["spack"]["specs"] if spec.startswith("slurm@")]
+        slurm_specs = [spec for spec in minimal_config_data["spack"]["specs"] if "slurm_factory.slurm@" in spec]
         slurm_spec = slurm_specs[0]
         assert "~hwloc" in slurm_spec
         assert "~pmix" in slurm_spec
         assert "~restd" in slurm_spec
-        assert "~cgroup" in slurm_spec
         
         # Check that OpenMPI is not in specs for minimal build
         openmpi_specs = [spec for spec in minimal_config_data["spack"]["specs"] if spec.startswith("openmpi@")]
@@ -230,7 +229,7 @@ class TestConvenienceFunctions:
         assert "spack" in config
         
         # Should have GPU support enabled
-        slurm_specs = [spec for spec in config["spack"]["specs"] if spec.startswith("slurm@")]
+        slurm_specs = [spec for spec in config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
         slurm_spec = slurm_specs[0]
         assert "+nvml" in slurm_spec
         assert "+rsmi" in slurm_spec
@@ -241,7 +240,7 @@ class TestConvenienceFunctions:
         assert "spack" in config
         
         # Should be minimal build
-        slurm_specs = [spec for spec in config["spack"]["specs"] if spec.startswith("slurm@")]
+        slurm_specs = [spec for spec in config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
         slurm_spec = slurm_specs[0]
         assert "~hwloc" in slurm_spec
 

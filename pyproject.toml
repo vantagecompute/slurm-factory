@@ -27,6 +27,7 @@ dev = [
     "black",
     "codespell",
     "types-pyyaml",
+    "pyright",
     "pytest",
     "pytest-cov",
 ]
@@ -44,9 +45,9 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.wheel.shared-data]
-"data/patches" = "share/slurm-factory/patches"
 "data/lxd-profile.yaml" = "share/slurm-factory/lxd-profile.yaml"
 "data/templates" = "share/slurm-factory/templates"
+"data/spack-repo" = "share/slurm-factory/spack-repo"
 
 
 [tool.hatch.build.targets.sdist]

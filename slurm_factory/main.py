@@ -1,6 +1,7 @@
 """Main typer app for slurm-build-factory."""
 
 import logging
+import sys
 
 import typer
 from craft_providers import lxd
@@ -12,9 +13,32 @@ from slurm_factory.builder import build as builder_build
 from slurm_factory.config import Settings
 
 # Configure logging following craft-providers pattern
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
-
 app = typer.Typer(name="Slurm Factory", add_completion=True)
+
+
+def setup_logging(verbose: bool = False):
+    """Configure logging based on verbosity level."""
+    if verbose:
+        level = logging.DEBUG
+        format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    else:
+        level = logging.INFO
+        format_string = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+    logging.basicConfig(
+        level=level,
+        format=format_string,
+        stream=sys.stderr,
+        force=True,  # Override any existing logging config
+    )
+
+    # Set specific loggers to appropriate levels
+    if verbose:
+        logging.getLogger("slurm_factory").setLevel(logging.DEBUG)
+        logging.getLogger("craft_providers").setLevel(logging.DEBUG)
+    else:
+        logging.getLogger("slurm_factory").setLevel(logging.INFO)
+        logging.getLogger("craft_providers").setLevel(logging.WARNING)
 
 
 @app.callback()
@@ -31,10 +55,7 @@ def main(
     verbose: Annotated[bool, typer.Option("--verbose", "-v", help="Enable verbose output")] = False,
 ):
     """Handle global options for the application."""
-    # Configure logging level based on verbose flag
-    if verbose:
-        logging.getLogger().setLevel(logging.DEBUG)
-        logging.getLogger("slurm_factory").setLevel(logging.DEBUG)
+    setup_logging(verbose=verbose)
 
     settings = Settings(project_name=project_name)
 
@@ -135,7 +156,7 @@ def clean(
 
         if full_cleanup:
             for image in lxc.image_list(project=project_name):
-                lxc.image_delete(image=image["name"], project=project_name)
+                lxc.image_delete(image=image["fingerprint"], project=project_name)
             lxc.project_delete(project=project_name)
 
         console.print(
@@ -163,6 +184,9 @@ def build(
     gpu: Annotated[
         bool, typer.Option("--gpu", help="Enable GPU support (CUDA/ROCm) - creates larger packages")
     ] = False,
+    additional_variants: Annotated[
+        str, typer.Option("--additional-variants", help="Additional Spack variants to include")
+    ] = "",
     minimal: Annotated[
         bool, typer.Option("--minimal", help="Build minimal Slurm only (no OpenMPI, smaller size)")
     ] = False,
@@ -201,13 +225,25 @@ def build(
         slurm-factory build --verify                          # Build with verification (CI)
 
     """
-    # Validate that gpu and minimal are not both specified
+    console = Console()
+
+    if additional_variants is not None:
+        console.print(
+            f"[bold yellow]Including additional Spack variants: {additional_variants}[/bold yellow]"
+        )
+        console.print("[bold yellow]⚠️  Note: This may increase build time and image size.[/bold yellow]")
+        if "+mcs" in additional_variants and slurm_version != SlurmVersion.v25_05:
+            console.print("[bold error] 'mcs' variant is only supported in slurm > 25.05.[/bold error]")
+
     if gpu and minimal:
-        console = Console()
         console.print("[bold red]Error: --gpu and --minimal cannot be used together[/bold red]")
         raise typer.Exit(1)
 
-    builder_build(ctx, slurm_version, gpu, minimal, verify, base_only)
+    console.print(
+        f"[bold green]Starting build for Slurm {slurm_version} "
+        f"with additional variants: {additional_variants}[/bold green]"
+    )
+    builder_build(ctx, slurm_version, gpu, additional_variants, minimal, verify, base_only)
 
 
 if __name__ == "__main__":

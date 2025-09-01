@@ -28,8 +28,9 @@ jobs:
         run: npm install -D @commitlint/cli @commitlint/config-conventional
       - name: Validate PR commits with commitlint
         run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
-  lint:
-    name: Lint
+
+  ci-tests:
+    name: CI-Tests
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout
@@ -40,16 +41,7 @@ jobs:
         run: sudo snap install astral-uv --classic
       - name: Run linters
         run: just lint
-
-  unit:
-    name: Unit Tests
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install `just`
-        run: sudo snap install just --classic
-      - name: Install `uv`
-        run: sudo snap install astral-uv --classic
+      - name: Run Typecheck
+        run: just typecheck
       - name: Run unit tests
         run: just unit

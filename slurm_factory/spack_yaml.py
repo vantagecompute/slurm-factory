@@ -53,7 +53,7 @@ def generate_module_config(
                 "core_compilers": ["gcc@13.3.0"],  # Mark gcc as core for relocatable binaries
                 "hierarchy": [],  # Flat hierarchy for simpler deployment
                 "include": (
-                    ["slurm", "openmpi"] if not minimal else ["slurm"]
+                    ["slurm", "openmpi", "mysql"] if not minimal else ["slurm"]
                 ),  # Include OpenMPI for full builds
                 "slurm": {
                     "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
@@ -113,6 +113,7 @@ def generate_spack_config(
     buildcache_root: str = "/opt/slurm-factory-cache/spack-buildcache",
     sourcecache_root: str = "/opt/slurm-factory-cache/spack-sourcecache",
     binary_index_root: str = "/opt/slurm-factory-cache/binary_index",
+    additional_variants: str = "",
     enable_verification: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -127,6 +128,7 @@ def generate_spack_config(
         buildcache_root: Directory for binary build cache
         sourcecache_root: Directory for source cache
         binary_index_root: Directory for binary index
+        additional_variants: Additional Spack variants to add to the Slurm spec
         enable_verification: Whether to enable relocatability verification checks
 
     Returns:
@@ -143,26 +145,37 @@ def generate_spack_config(
     # Build Slurm spec with conditional features
     gpu_flags = "+nvml +rsmi" if gpu_support else "~nvml ~rsmi"
 
+    gcc_spec = "gcc-runtime@13.3.0 %gcc@13.3.0"
+    curl_spec = (
+        "curl@8.15.0+nghttp2+libssh2+libssh+gssapi+librtmp+libidn2 "
+        "libs=shared,static tls=openssl ^openssl@3: %gcc@13.3.0"
+    )
     specs = [
         # Build a bootstrapped compiler first (in-DAG)
-        "gcc-runtime@13.3.0 %gcc@13.3.0",
+        gcc_spec,
+        curl_spec,
     ]
     if minimal:
         specs.append(
-            f"slurm@{slurm_package_version} +readline ~hwloc ~pmix ~restd "
-            f"{gpu_flags} ~cgroup sysconfdir=/etc/slurm %gcc@13.3.0"
+            f"slurm_factory.slurm@{slurm_package_version} +readline ~hwloc ~pmix ~restd "
+            f"{gpu_flags} ~cgroup sysconfdir=/etc/slurm ^curl %gcc@13.3.0"
         )
     else:
         specs.append("openmpi@5.0.3 schedulers=slurm fabrics=auto %gcc@13.3.0")
+        specs.append("pmix@5.0.8 ~munge ~python %gcc@13.3.0")
+        specs.append("mysql@8.0.35+client_only %gcc@13.3.0")
+        specs.append("hdf5@1.14.6 +hl +cxx %gcc@13.3.0")
         specs.append(
-            f"slurm@{slurm_package_version} +readline +hwloc +pmix +restd "
-            f"{gpu_flags} +cgroup sysconfdir=/etc/slurm %gcc@13.3.0"
+            f"slurm_factory.slurm@{slurm_package_version} {additional_variants} "
+            "+influxdb +readline +hwloc +pmix +hdf5 +kafka +restd +cgroup +pam "
+            f"{gpu_flags} sysconfdir=/etc/slurm ^curl %gcc@13.3.0"
         )
 
     # Base view packages (runtime dependencies + toolchain for relocatability)
     view_packages = [
         "slurm",
         "readline",
+        "pkgconf",  # Modern pkg-config implementation
         "hwloc",
         "libpciaccess",
         "xz",
@@ -172,12 +185,17 @@ def generate_spack_config(
         "numactl",
         "gcc-runtime",
         "http-parser",
+        "ca-certificates-mozilla",  # Self-contained SSL certificates for relocatability
+        "curl",
+        "librdkafka",
+        "rapidjson",
+        "cyrus-sasl",
     ]
 
     # Add conditional packages based on build type
     if not minimal:
-        # Full builds include hwloc, openmpi, and pmix
-        view_packages.extend(["hwloc", "openmpi", "pmix", "libevent"])
+        # Full builds include openmpi, pmix, and mysql
+        view_packages.extend(["openmpi", "pmix", "libevent", "mysql"])
 
     if gpu_support:
         view_packages.extend(["cuda", "rocm"])
@@ -186,6 +204,11 @@ def generate_spack_config(
     config: Dict[str, Any] = {
         "spack": {
             "specs": specs,
+            "repos": {
+                "slurm_factory": {
+                    "git": "https://github.com/vantagecompute/slurm-factory-spack-repo.git",
+                },
+            },
             "concretizer": {
                 "unify": True,  # Ensures only one package per spec in the environment
                 "reuse": True,  # Reuse packages when possible to reduce redundancy
@@ -202,7 +225,7 @@ def generate_spack_config(
             "config": {
                 "install_tree": {
                     "root": install_tree_root,
-                    "padded_length": 128,  # Enable padding for proper relocation (Spack 1.x requirement)
+                    "padded_length": 0,  # Short, portable install paths for relocatability
                     "projections": {
                         "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
                     },
@@ -221,7 +244,7 @@ def generate_spack_config(
                 "shared_linking": {
                     "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
                     "bind": False,  # Don't bind absolute paths - allow relocation
-                    "missing_library_policy": "ignore",  # Don't fail on missing system libraries
+                    "missing_library_policy": "warn",  # Ignore on missing system
                 },
             },
             "mirrors": {
@@ -289,8 +312,21 @@ def generate_spack_config(
                 "munge": {"buildable": True},  # Authentication - let Spack pick latest available
                 "json-c": {"buildable": True},  # JSON parsing - linked at runtime
                 "libpciaccess": {"buildable": True},  # PCI access library
-                "curl": {"buildable": True},  # HTTP client for REST API
-                "openssl": {"buildable": True, "version": ["3:"], "variants": "~docs"},
+                "cyrus-sasl": {
+                    "buildable": True,
+                },
+                "rapidjson": {"buildable": True},
+                "curl": {
+                    "buildable": True,
+                    "version": ["8.15.0"],
+                },
+                "openssl": {
+                    "buildable": True,
+                    "version": ["3:"],
+                    "variants": "~docs +shared ~static",  # Remove system cert dependencies
+                    "require": ["^ca-certificates-mozilla"],  # Force use of Spack certs
+                },
+                "ca-certificates-mozilla": {"buildable": True},  # Self-contained SSL certificates
                 "readline": {"buildable": True},  # Interactive command line
                 "ncurses": {"buildable": True},  # Terminal control for readline
                 "lz4": {"buildable": True},  # Fast compression - linked at runtime
@@ -323,6 +359,11 @@ def generate_spack_config(
                         "^jansson",
                     ],  # Ensure it uses Spack-built OpenSSL 3.x and jansson
                 },  # JWT token support - essential for Slurm REST API
+                # MySQL client library for Slurm accounting storage
+                "mysql": {"buildable": True, "variants": "+client_only"},
+                "librdkafka": {
+                    "buildable": True,
+                },
                 # PMIx configuration for consistent version
                 "pmix": {
                     "buildable": True,
@@ -365,6 +406,7 @@ def generate_spack_config(
                     "version": [slurm_package_version],
                     "buildable": True,
                     "variants": "+shared ~static +pic",  # Consistent shared library preference
+                    "prefer": ["slurm_factory.slurm"],  # Prefer our custom namespace
                 },
                 # OpenMPI configuration for consistent build
                 "openmpi": {
@@ -375,7 +417,12 @@ def generate_spack_config(
                 # Global preferences with Spack 1.x enhancements
                 "all": {
                     "target": ["x86_64"],
-                    "prefer": ["%gcc@13.3.0", "+shared", "~static", "+pic"],  # More specific preferences
+                    "prefer": [
+                        "%gcc@13.3.0",
+                        "+shared",
+                        "~static",
+                        "+pic",
+                    ],
                     "variants": "+shared ~static +pic",  # Consistent shared library preference
                     "permissions": {"read": "world", "write": "user"},
                 },
@@ -414,6 +461,7 @@ def generate_yaml_string(
     slurm_version: str = "25.05",
     gpu_support: bool = False,
     minimal: bool = False,
+    additional_variants: str = "",
     enable_verification: bool = False,
 ) -> str:
     """
@@ -423,6 +471,7 @@ def generate_yaml_string(
         slurm_version: Slurm version to build
         gpu_support: Whether to include GPU support
         minimal: Whether to build minimal Slurm
+        additional_variants: Additional Spack variants to include
         enable_verification: Whether to enable relocatability verification checks
 
     Returns:
@@ -435,6 +484,7 @@ def generate_yaml_string(
         slurm_version=slurm_version,
         gpu_support=gpu_support,
         minimal=minimal,
+        additional_variants=additional_variants,
         enable_verification=enable_verification,
     )
     header = get_comment_header(slurm_version, gpu_support, minimal)
@@ -483,7 +533,7 @@ if __name__ == "__main__":
     print(generate_yaml_string("25.05", True, False))
 
     print("\n=== Minimal Slurm 25.05 ===")
-    print(generate_yaml_string("25.05", False, True))
+    print(generate_yaml_string("25.05", gpu_support=False, minimal=True))
 
     print("\n=== CPU-only Slurm 25.05 with Verification (CI) ===")
-    print(generate_yaml_string("25.05", False, False, True))
+    print(generate_yaml_string("25.05", gpu_support=False, minimal=False, enable_verification=True))

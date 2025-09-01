@@ -7,7 +7,6 @@ from slurm_factory.constants import (
     BuildType,
     SlurmVersion,
     CONTAINER_CACHE_DIR,
-    CONTAINER_PATCHES_DIR,
     CONTAINER_SPACK_TEMPLATES_DIR,
     CONTAINER_SPACK_PROJECT_DIR,
     CONTAINER_SLURM_DIR,
@@ -21,7 +20,10 @@ from slurm_factory.constants import (
     INSTANCE_NAME_PREFIX,
     CLOUD_INIT_TIMEOUT,
     SPACK_SETUP_SCRIPT,
+    SLURM_PATCH_FILES,
+    BASH_HEADER,
     get_spack_build_cache_script,
+    get_package_creation_script,
 )
 
 
@@ -92,7 +94,6 @@ class TestContainerPaths:
         """Test that container path constants exist and are strings."""
         paths = [
             CONTAINER_CACHE_DIR,
-            CONTAINER_PATCHES_DIR,
             CONTAINER_SPACK_TEMPLATES_DIR,
             CONTAINER_SPACK_PROJECT_DIR,
             CONTAINER_SLURM_DIR,
@@ -108,7 +109,6 @@ class TestContainerPaths:
     def test_specific_container_paths(self):
         """Test specific container path values."""
         assert CONTAINER_CACHE_DIR == "/opt/slurm-factory-cache"
-        assert CONTAINER_PATCHES_DIR == "/srv/global-patches"
         assert CONTAINER_SLURM_DIR == "/opt/slurm"
         assert CONTAINER_ROOT_DIR == "/root"
 
@@ -176,6 +176,31 @@ class TestScriptTemplates:
         lines = script.strip().split('\n')
         assert len(lines) > 5  # Should be a substantial script
 
+    def test_get_package_creation_script(self):
+        """Test package creation script generation."""
+        version = "25.05"
+        script = get_package_creation_script(version)
+        
+        # Test that it returns a string
+        assert isinstance(script, str)
+        assert len(script) > 0
+        
+        # Test that it contains expected elements
+        assert "spack env activate" in script
+        assert "spack concretize" in script
+        assert "spack install" in script
+        assert "set -e" in script
+        assert version in script
+        
+        # Test that it references container paths
+        assert CONTAINER_SPACK_PROJECT_DIR in script
+        assert SPACK_SETUP_SCRIPT in script
+        assert CONTAINER_SLURM_DIR in script
+        
+        # Test that it's properly formatted shell script
+        lines = script.strip().split('\n')
+        assert len(lines) > 5  # Should be a substantial script
+
 
 class TestConstantTypes:
     """Test that constants have correct types."""
@@ -189,7 +214,6 @@ class TestConstantTypes:
         """Test string constant types."""
         string_constants = [
             CONTAINER_CACHE_DIR,
-            CONTAINER_PATCHES_DIR,
             LXD_IMAGE,
             LXD_IMAGE_REMOTE,
             BASE_INSTANCE_PREFIX,
@@ -213,7 +237,6 @@ class TestConstantValidation:
         """Test that all path constants are absolute paths."""
         path_constants = [
             CONTAINER_CACHE_DIR,
-            CONTAINER_PATCHES_DIR,
             CONTAINER_SPACK_TEMPLATES_DIR,
             CONTAINER_SPACK_PROJECT_DIR,
             CONTAINER_SLURM_DIR,
@@ -236,7 +259,6 @@ class TestConstantValidation:
         """Test that paths don't have trailing slashes."""
         path_constants = [
             CONTAINER_CACHE_DIR,
-            CONTAINER_PATCHES_DIR,
             CONTAINER_SPACK_TEMPLATES_DIR,
             CONTAINER_SPACK_PROJECT_DIR,
             CONTAINER_SLURM_DIR,
