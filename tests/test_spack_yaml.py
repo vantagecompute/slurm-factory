@@ -365,21 +365,19 @@ class TestConfigurationValidation:
         concretizer = config["spack"]["concretizer"]
         
         assert concretizer["unify"] is True
-        assert concretizer["reuse"] is True
+        assert concretizer["reuse"] is False  # Build from source, don't reuse
 
     def test_mirror_configuration(self):
         """Test mirror configuration."""
         config = generate_spack_config()
         mirrors = config["spack"]["mirrors"]
         
-        # Should have multiple mirrors configured
-        assert "local-buildcache" in mirrors
+        # Should have spack-public mirror for source downloads
         assert "spack-public" in mirrors
-        assert "binary-mirror" in mirrors
         
         # Test mirror properties
-        assert mirrors["local-buildcache"]["signed"] is False
-        assert mirrors["spack-public"]["signed"] is True
+        assert mirrors["spack-public"]["url"] == "https://mirror.spack.io"
+        assert mirrors["spack-public"]["signed"] is False
 
 
 class TestParameterValidation:

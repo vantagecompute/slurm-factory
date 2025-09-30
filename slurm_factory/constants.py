@@ -19,7 +19,7 @@ from enum import Enum
 
 # Mapping of user-facing version strings to Spack package versions
 SLURM_VERSIONS = {
-    "25.05": "25-05-1-1",
+    "25.05": "25-05-3-1",
     "24.11": "24-11-6-1",
     "23.11": "23-11-11-1",
     "23.02": "23-02-7-1",
@@ -47,9 +47,6 @@ class BuildType(str, Enum):
 LXD_IMAGE = "24.04"
 LXD_IMAGE_REMOTE = "ubuntu"
 
-# Base instance configuration
-BASE_INSTANCE_PREFIX = "slurm-factory-base"
-BASE_INSTANCE_EXPIRY_DAYS = 90
 INSTANCE_NAME_PREFIX = "slurm-factory"
 
 # Timeouts
@@ -72,85 +69,6 @@ SLURM_PATCH_FILES = ["slurm_prefix.patch", "package.py"]
 
 # Shell script templates
 BASH_HEADER = ["bash", "-c"]
-
-
-# Spack build cache setup script template
-def get_spack_build_cache_script() -> str:
-    """Return the rendered build cache script."""
-    return textwrap.dedent(
-        f"""
-        set -e
-        set -x  # Enable debug output for all commands
-
-        echo "DEBUG: Starting Spack build cache setup script"
-        echo "DEBUG: Working directory: $(pwd)"
-        echo "DEBUG: Available disk space: $(df -h /opt)"
-
-        # Create spack project directory and write dynamic configuration
-        cd {CONTAINER_SPACK_PROJECT_DIR}
-
-        source {SPACK_SETUP_SCRIPT}
-        spack env activate .
-
-        echo 'Custom Slurm repository created and package files copied successfully'
-        echo "DEBUG: Listing available repositories:"
-        spack repo list
-        echo "DEBUG: Checking Slurm package information:"
-        spack info slurm
-
-        echo 'Setting up Spack environment and build cache...'
-        echo 'Generated dynamic Spack configuration'
-        echo 'Binary cache mirrors configured:'
-        spack mirror list
-
-        echo "DEBUG: Starting concretization process..."
-        echo 'Starting Spack concretization...'
-        spack concretize -j $(nproc) -f
-
-        echo "DEBUG: Concretization completed, starting installation..."
-        echo 'Installing ALL dependencies from dynamic configuration into build cache...'
-        echo 'This will build and cache everything: Slurm, OpenMPI, dependencies, etc.'
-        spack install -j$(nproc) -f --verbose --keep-stage -p 4
-
-        echo "DEBUG: Installation completed, checking installed packages..."
-        echo "Currently installed packages:"
-        spack find
-
-        echo "DEBUG: Starting buildcache push operations..."
-        # Try to push all packages at once, but handle failures gracefully
-        echo "Pushing all packages to buildcache (errors will be ignored)..."
-
-        slurm_hash=$(spack find --format "{{hash:7}}" slurm | grep -E "^[a-z0-9]+" | head -n 1)
-        openmpi_hash=$(spack find --format "{{hash:7}}" openmpi | grep -E "^[a-z0-9]+" | head -n 1)
-        mysql_hash=$(spack find --format "{{hash:7}}" mysql | grep -E "^[a-z0-9]+" | head -n 1)
-        curl_hash=$(spack find --format "{{hash:7}}" curl | grep -E "^[a-z0-9]+" | head -n 1)
-
-        echo "DEBUG: Found package hashes - slurm: $slurm_hash, openmpi: $openmpi_hash"
-        echo "DEBUG: mysql: $mysql_hash, curl: $curl_hash"
-
-        spack buildcache push --only=dependencies --with-build-dependencies \\
-            local-buildcache --update-index --force /$slurm_hash
-        spack buildcache push --only=package --with-build-dependencies \\
-            local-buildcache --update-index --force /$openmpi_hash
-        spack buildcache push --with-build-dependencies \\
-            local-buildcache --update-index --force /$mysql_hash
-        spack buildcache push --with-build-dependencies \\
-            local-buildcache --update-index --force /$curl_hash
-
-        # Always update the buildcache index, even if some packages failed
-        echo 'Updating buildcache index...'
-        mkdir -p /opt/slurm-factory-cache/spack-buildcache/build_cache
-        spack buildcache update-index local-buildcache 2>/dev/null || {{
-            echo "Warning: Could not update buildcache index, but continuing..."
-        }}
-
-        echo "DEBUG: Buildcache operations completed"
-        echo 'Listing cached packages:'
-        spack buildcache list local-buildcache | head -20
-        echo 'Build cache setup completed - ALL packages from dynamic configuration are now cached!'
-        echo "DEBUG: Build cache script completed successfully"
-        """
-    )
 
 
 def get_package_creation_script(version: str) -> str:
@@ -177,13 +95,25 @@ def get_package_creation_script(version: str) -> str:
         spack mirror list
 
         echo "DEBUG: Starting concretization process..."
+        echo 'Removing any stale lock file to ensure fresh concretization...'
+        rm -f spack.lock
         echo 'Starting Spack concretization...'
-        spack concretize -j $(nproc) -f
+        spack concretize -j $(nproc) -f --fresh
 
         echo "DEBUG: Concretization completed, starting installation..."
-        echo 'Installing ALL dependencies from dynamic configuration into build cache...'
-        echo 'This will build and cache everything: Slurm, OpenMPI, dependencies, etc.'
-        spack install -j$(nproc) -f --verbose -p 4
+        echo 'Installing ALL dependencies from dynamic configuration...'
+        echo 'Building everything from source (no binary cache in single-stage builds)...'
+        # Use --only-concrete to ensure we only install what was concretized, without re-concretization
+        spack install -j$(nproc) --only-concrete -f --verbose -p 4 --no-cache
+
+        echo "DEBUG: Verifying Slurm installation..."
+        if ! spack find --format "{{hash:7}}" slurm | grep -qE "^[a-z0-9]{{7}}$"; then
+            echo "ERROR: Slurm package was not installed!"
+            echo "Installed packages:"
+            spack find
+            exit 1
+        fi
+        echo "DEBUG: Slurm installation verified"
 
         echo "DEBUG: Installation completed, running garbage collection..."
         spack gc -y
@@ -192,11 +122,43 @@ def get_package_creation_script(version: str) -> str:
         echo 'Creating redistributable package structure...'
         mkdir -p {CONTAINER_SLURM_DIR}/redistributable
 
-        echo "DEBUG: Starting software packaging process..."
-        echo 'Packaging Spack view (compiled software)...'
-        # Copy the actual files from the view, not just symlinks
-        mkdir -p {CONTAINER_SLURM_DIR}/software
-        echo "Copying Spack view contents (resolving symlinks)..."
+        echo "DEBUG: Verifying view was created successfully..."
+        if [ ! -d "{CONTAINER_SLURM_DIR}/view" ]; then
+            echo "ERROR: Spack view was not created at {CONTAINER_SLURM_DIR}/view"
+            exit 1
+        fi
+        echo "DEBUG: View exists and will be used for packaging"
+
+        # The view already contains everything we need in a FHS-compliant structure
+        # Spack has already created hardlinks and set proper RPATHs
+        # We just need to verify critical libraries are present
+
+        echo "DEBUG: Verifying critical libraries in view..."
+        MISSING_LIBS=""
+
+        # Check for Slurm binaries
+        if [ ! -f "{CONTAINER_SLURM_DIR}/view/bin/slurmctld" ]; then
+            echo "WARNING: slurmctld not found in view"
+            MISSING_LIBS="$MISSING_LIBS slurmctld"
+        fi
+
+        # Check for critical libraries that Slurm needs
+        for lib in libmunge.so libjwt.so libjansson.so; do
+            if ! find {CONTAINER_SLURM_DIR}/view/lib* -name "$lib*" 2>/dev/null | grep -q .; then
+                echo "WARNING: $lib not found in view"
+                MISSING_LIBS="$MISSING_LIBS $lib"
+            fi
+        done
+
+        if [ -n "$MISSING_LIBS" ]; then
+            echo "WARNING: Some expected libraries/binaries are missing: $MISSING_LIBS"
+            echo "Continuing anyway - they may not be required for this configuration"
+        else
+            echo "DEBUG: All critical libraries verified in view"
+        fi
+
+        echo "DEBUG: Merging view into software directory..."
+        echo "Copying Spack view contents to software directory (resolving symlinks)..."
         echo "DEBUG: Copying from {CONTAINER_SLURM_DIR}/view/* to {CONTAINER_SLURM_DIR}/software/"
         cp -rL {CONTAINER_SLURM_DIR}/view/* {CONTAINER_SLURM_DIR}/software/
 
@@ -210,7 +172,7 @@ def get_package_creation_script(version: str) -> str:
             echo "DEBUG: MySQL installation directory: $MYSQL_INSTALL_DIR"
             if [ -d "$MYSQL_INSTALL_DIR/lib" ]; then
                 echo "DEBUG: Copying MySQL libraries from $MYSQL_INSTALL_DIR/lib/"
-                cp -L "$MYSQL_INSTALL_DIR/lib/libmysqlclient.so"* \\
+                cp -L "$MYSQL_INSTALL_DIR/lib/libmysqlclient.so"* \
                     {CONTAINER_SLURM_DIR}/software/lib/ 2>/dev/null || true
                 echo "MySQL client libraries copied successfully"
                 echo "DEBUG: MySQL library copy completed"
@@ -224,7 +186,7 @@ def get_package_creation_script(version: str) -> str:
         fi
 
         echo "DEBUG: Starting software cleanup process..."
-        echo "Performing lightweight cleanup of development files..."
+        echo "Performing lightweight cleanup of development files from software directory..."
         cd {CONTAINER_SLURM_DIR}/software
 
         # Show original size
@@ -238,7 +200,9 @@ def get_package_creation_script(version: str) -> str:
         echo "DEBUG: Removing pkgconfig directories..."
         find . -path "*/lib/pkgconfig" -type d -exec rm -rf {{}} + 2>/dev/null || true
         echo "DEBUG: Removing documentation directories..."
-        rm -rf share/doc share/man share/info 2>/dev/null || true
+        find . -path "*/share/doc" -type d -exec rm -rf {{}} + 2>/dev/null || true
+        find . -path "*/share/man" -type d -exec rm -rf {{}} + 2>/dev/null || true
+        find . -path "*/share/info" -type d -exec rm -rf {{}} + 2>/dev/null || true
         echo "DEBUG: Removing Python cache files..."
         find . -name "__pycache__" -type d -exec rm -rf {{}} + 2>/dev/null || true
         find . -name "*.pyc" -delete 2>/dev/null || true
@@ -250,7 +214,8 @@ def get_package_creation_script(version: str) -> str:
         echo "Cleaned software size: $PRUNED_SIZE (reduced from $ORIGINAL_SIZE)"
         echo "DEBUG: Cleaned software size: $PRUNED_SIZE (reduced from $ORIGINAL_SIZE)"
 
-        echo "DEBUG: Creating software tarball..."
+        echo "DEBUG: Creating software tarball from install tree..."
+        # Package the Spack install tree preserving the software/ directory structure
         tar -czf {CONTAINER_SLURM_DIR}/redistributable/slurm-{version}-software.tar.gz -C \
             {CONTAINER_SLURM_DIR} software/
         echo "Software package created successfully"
@@ -309,6 +274,24 @@ def get_package_creation_script(version: str) -> str:
             echo "Copying module files to package structure..."
             echo "DEBUG: Copying module files to package structure..."
             cp -r {CONTAINER_SLURM_DIR}/modules/* {CONTAINER_SLURM_DIR}/module-package/slurm/
+
+            # Create .modulerc.lua to set default version
+            echo "Creating .modulerc.lua for module default version..."
+            echo "DEBUG: Creating .modulerc.lua for module default version..."
+            MODULE_LUA_FILE=$(ls {CONTAINER_SLURM_DIR}/module-package/slurm/*.lua | head -1)
+            if [ -n "$MODULE_LUA_FILE" ]; then
+                MODULE_VERSION=$(basename "$MODULE_LUA_FILE" .lua)
+                echo "DEBUG: Detected module version: $MODULE_VERSION"
+                cat > {CONTAINER_SLURM_DIR}/module-package/slurm/.modulerc.lua << EOF
+-- Set default version for slurm module using module_version
+module_version("$MODULE_VERSION","default")
+EOF
+                echo "DEBUG: Created .modulerc.lua with default version: $MODULE_VERSION"
+            else
+                echo "Warning: Could not detect module version for .modulerc.lua"
+                echo "DEBUG: Warning: Could not detect module version for .modulerc.lua"
+            fi
+
             echo "DEBUG: Module package contents:"
             ls -la {CONTAINER_SLURM_DIR}/module-package/slurm/
         else

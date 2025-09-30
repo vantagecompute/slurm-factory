@@ -18,24 +18,18 @@ import io
 import logging
 import site
 import sys
-from datetime import datetime
 from pathlib import Path, PurePath
-from typing import Optional
 
 import yaml
 from craft_providers import lxd
 from rich.console import Console
 
 from .constants import (
-    BASE_INSTANCE_PREFIX,
     BASH_HEADER,
     CLOUD_INIT_TIMEOUT,
     CONTAINER_SPACK_PROJECT_DIR,
     CONTAINER_SPACK_TEMPLATES_DIR,
-    LXD_IMAGE,
-    LXD_IMAGE_REMOTE,
     get_package_creation_script,
-    get_spack_build_cache_script,
 )
 from .exceptions import SlurmFactoryError, SlurmFactoryInstanceCreationError, SlurmFactoryStreamExecError
 from .spack_yaml import generate_yaml_string
@@ -145,13 +139,6 @@ def _stream_exec_output(
                 raise SlurmFactoryStreamExecError(msg)
 
 
-def get_base_instance_name() -> str:
-    """Get the base instance name for the project with timestamp and build configuration."""
-    # Use current YEAR/MO for base instance name
-    timestamp_str = datetime.now().strftime("%Y%m")
-    return f"{BASE_INSTANCE_PREFIX}-{timestamp_str}"
-
-
 def _setup_spack_project(
     lxd_instance: lxd.LXDInstance,
     version: str,
@@ -160,13 +147,12 @@ def _setup_spack_project(
     minimal: bool = False,
     verify: bool = False,
     verbose: bool = False,
-    base: bool = False,
 ) -> None:
     """Set up the base instance with ALL components of the spack project."""
     logger.debug(
         (
             f"Setting up Spack project: version={version}, "
-            f"gpu_support={gpu_support}, minimal={minimal}, verify={verify}, base={base}"
+            f"gpu_support={gpu_support}, minimal={minimal}, verify={verify}"
         )
     )
 
@@ -183,111 +169,27 @@ def _setup_spack_project(
 
     _copy_spack_yaml_to_container(lxd_instance, spack_yaml, target_description="base instance")
 
-    if base is True:
-        logger.debug("Setting up base instance with slurm lmod templates...")
-        _copy_templates_to_container(lxd_instance, verbose=verbose, target_description="base instance")
+    # Always copy templates - they're needed for module generation
+    logger.debug("Copying Lmod module templates to container...")
+    _copy_templates_to_container(lxd_instance, verbose=verbose, target_description="base instance")
 
-    script_type = "build cache setup" if base else "package creation"
     try:
-        exec_script = (
-            get_spack_build_cache_script() if base is True else get_package_creation_script(version=version)
-        )
-        logger.debug(f"Executing {script_type} script ({len(exec_script)} chars)")
+        exec_script = get_package_creation_script(version=version)
+        logger.debug(f"Executing package creation script ({len(exec_script)} chars)")
 
         _stream_exec_output(
             lxd_instance,
             BASH_HEADER + [exec_script],
-            f"Executing {script_type} script for Slurm {version}",
+            f"Executing package creation script for Slurm {version}",
             verbose=verbose,
         )
-        logger.debug(f"Successfully completed {script_type} script")
+        logger.debug("Successfully completed package creation script")
     except SlurmFactoryStreamExecError as e:
         msg = f"Command execution failed: {e}"
         logger.error(msg)
-        logger.debug(f"Failed during {script_type} script execution")
+        logger.debug("Failed during package creation script execution")
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
-
-
-def create_base_instance(
-    base_instance_name: str,
-    project_name: str,
-) -> lxd.LXDInstance:
-    """Create a base instance with cloud-init completed."""
-    console = Console()
-
-    lxc = lxd.LXC()
-
-    logger.debug(f"Creating base instance '{base_instance_name}' from  Ubuntu {LXD_IMAGE} ")
-
-    try:
-        # Launch base instance
-        console.print(f"[bold blue]Launching base instance:[/bold blue] {base_instance_name}")
-        lxc.launch(
-            instance_name=base_instance_name,
-            image=LXD_IMAGE,
-            image_remote=LXD_IMAGE_REMOTE,
-            project=project_name,
-        )
-    except Exception as e:
-        logger.error(f"Failed to create base instance: {e}")
-        console.print(f"[bold red]Failed to create base instance:[/bold red] {e}")
-        raise SlurmFactoryInstanceCreationError("Failed to create base instance")
-
-    lxd_base_instance = lxd.LXDInstance(name=base_instance_name, project=project_name, remote="local")
-
-    console.print("[bold blue]Waiting for cloud-init to complete...[/bold blue]")
-    try:
-        _wait_for_cloud_init_with_output(lxd_base_instance)
-    except SlurmFactoryError as e:
-        logger.error(f"Cloud-init failed: {e}")
-        console.print(f"[bold red]Cloud-init failed:[/bold red] {e}")
-        raise
-
-    console.print("[bold green]✓ Cloud-init completed successfully[/bold green]")
-    return lxd_base_instance
-
-
-def initialize_base_instance_buildcache(
-    base_instance: lxd.LXDInstance,
-    project_name: str,
-    version: str = "25.05",
-    gpu_support: bool = False,
-    additional_variants: str = "",
-    minimal: bool = False,
-    verify: bool = False,
-) -> None:
-    """Install spack deps and create the buildcache."""
-    try:
-        _setup_spack_project(
-            lxd_instance=base_instance,
-            version=version,
-            gpu_support=gpu_support,
-            additional_variants=additional_variants,
-            minimal=minimal,
-            verify=verify,
-            base=True,
-        )
-    except SlurmFactoryInstanceCreationError as e:
-        logger.error(f"Failed to create slurm package: {e}")
-        raise SlurmFactoryError("Failed to create slurm package")
-
-
-def get_base_instance(base_instance_name: str, project_name: str) -> Optional[lxd.LXDInstance]:
-    """Return the base instance if it exists, otherwise return None."""
-    console = Console()
-    base_instance = None
-
-    lxc = lxd.LXC()
-
-    instances = lxc.list(project=project_name)
-    for instance in instances:
-        if instance["name"] == base_instance_name:
-            console.print(
-                f"[bold green]Using cached base instance with build cache:[/bold green] {base_instance_name}"
-            )
-            base_instance = lxd.LXDInstance(name=base_instance_name, project=project_name, remote="local")
-    return base_instance
 
 
 def set_profile(profile_name: str, project_name: str, home_cache_dir: str) -> None:
@@ -450,6 +352,7 @@ def create_slurm_package(
     lxd_instance: lxd.LXDInstance,
     version: str = "25.05",
     gpu_support: bool = False,
+    additional_variants: str = "",
     minimal: bool = False,
     verify: bool = False,
 ) -> None:
@@ -462,9 +365,9 @@ def create_slurm_package(
             lxd_instance=lxd_instance,
             version=version,
             gpu_support=gpu_support,
+            additional_variants=additional_variants,
             minimal=minimal,
             verify=verify,
-            base=False,
         )
     except SlurmFactoryInstanceCreationError as e:
         logger.error(f"Failed to create slurm package: {e}")
