@@ -29,14 +29,11 @@ from slurm_factory.constants import (
     CONTAINER_SPACK_CACHE_DIR,
     LXD_IMAGE,
     LXD_IMAGE_REMOTE,
-    BASE_INSTANCE_PREFIX,
-    BASE_INSTANCE_EXPIRY_DAYS,
     INSTANCE_NAME_PREFIX,
     CLOUD_INIT_TIMEOUT,
     SPACK_SETUP_SCRIPT,
     SLURM_PATCH_FILES,
     BASH_HEADER,
-    get_spack_build_cache_script,
     get_package_creation_script,
 )
 
@@ -53,7 +50,7 @@ class TestSlurmVersions:
     def test_slurm_versions_mapping(self):
         """Test that version mappings are correct."""
         # Test known mappings (updated for actual format)
-        assert SLURM_VERSIONS["25.05"] == "25-05-1-1"
+        assert SLURM_VERSIONS["25.05"] == "25-05-3-1"
         assert SLURM_VERSIONS["24.11"] == "24-11-6-1"
         assert SLURM_VERSIONS["23.11"] == "23-11-11-1"
         assert SLURM_VERSIONS["23.02"] == "23-02-7-1"
@@ -139,10 +136,7 @@ class TestLXDConfiguration:
 
     def test_instance_configuration(self):
         """Test instance configuration constants."""
-        assert BASE_INSTANCE_PREFIX == "slurm-factory-base"
         assert INSTANCE_NAME_PREFIX == "slurm-factory"
-        assert isinstance(BASE_INSTANCE_EXPIRY_DAYS, int)
-        assert BASE_INSTANCE_EXPIRY_DAYS > 0
 
 
 class TestTimeouts:
@@ -167,28 +161,6 @@ class TestSpackPaths:
 
 class TestScriptTemplates:
     """Test script template functions."""
-
-    def test_get_spack_build_cache_script(self):
-        """Test Spack build cache script generation."""
-        script = get_spack_build_cache_script()
-        
-        # Test that it returns a string
-        assert isinstance(script, str)
-        assert len(script) > 0
-        
-        # Test that it contains expected elements
-        assert "spack env activate" in script
-        assert "spack concretize" in script
-        assert "spack install" in script
-        assert "set -e" in script
-        
-        # Test that it references container paths
-        assert CONTAINER_SPACK_PROJECT_DIR in script
-        assert SPACK_SETUP_SCRIPT in script
-        
-        # Test that it's properly formatted shell script
-        lines = script.strip().split('\n')
-        assert len(lines) > 5  # Should be a substantial script
 
     def test_get_package_creation_script(self):
         """Test package creation script generation."""
@@ -230,7 +202,6 @@ class TestConstantTypes:
             CONTAINER_CACHE_DIR,
             LXD_IMAGE,
             LXD_IMAGE_REMOTE,
-            BASE_INSTANCE_PREFIX,
             INSTANCE_NAME_PREFIX,
             SPACK_SETUP_SCRIPT,
         ]
@@ -240,7 +211,6 @@ class TestConstantTypes:
 
     def test_integer_constants(self):
         """Test integer constant types."""
-        assert isinstance(BASE_INSTANCE_EXPIRY_DAYS, int)
         assert isinstance(CLOUD_INIT_TIMEOUT, int)
 
 

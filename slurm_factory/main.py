@@ -207,9 +207,6 @@ def build(
     verify: Annotated[
         bool, typer.Option("--verify", help="Enable relocatability verification (for CI/testing)")
     ] = False,
-    base_only: Annotated[
-        bool, typer.Option("--base-only", help="Only build base images (no extra features)")
-    ] = False,
 ):
     """
     Build a specific Slurm version.
@@ -257,7 +254,7 @@ def build(
         f"[bold green]Starting build for Slurm {slurm_version} "
         f"with additional variants: {additional_variants}[/bold green]"
     )
-    builder_build(ctx, slurm_version, gpu, additional_variants, minimal, verify, base_only)
+    builder_build(ctx, slurm_version, gpu, additional_variants, minimal, verify)
 
 
 if __name__ == "__main__":

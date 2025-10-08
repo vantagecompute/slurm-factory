@@ -123,7 +123,7 @@ def generate_spack_config(
     gpu_support: bool = False,
     minimal: bool = False,
     install_tree_root: str = "/opt/slurm/software",
-    view_root: str = "/opt/slurm/view",
+    view_root: str = "/opt/slurm/view",  # Use separate view directory
     buildcache_root: str = "/opt/slurm-factory-cache/spack-buildcache",
     sourcecache_root: str = "/opt/slurm-factory-cache/spack-sourcecache",
     binary_index_root: str = "/opt/slurm-factory-cache/binary_index",
@@ -160,29 +160,33 @@ def generate_spack_config(
     gpu_flags = "+nvml +rsmi" if gpu_support else "~nvml ~rsmi"
 
     gcc_spec = "gcc-runtime@13.3.0 %gcc@13.3.0"
+    openldap_spec = "openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl %gcc@13.3.0"
     curl_spec = (
-        "curl@8.15.0+nghttp2+libssh2+libssh+gssapi+librtmp+libidn2 "
-        "libs=shared,static tls=openssl ^openssl@3: %gcc@13.3.0"
+        "slurm_factory.curl@8.15.0+nghttp2+libssh2+libssh+gssapi+ldap+librtmp+libidn2 "
+        "libs=shared,static tls=openssl %gcc@13.3.0"
     )
     specs = [
         # Build a bootstrapped compiler first (in-DAG)
         gcc_spec,
+        openldap_spec,  # Build openldap before curl since curl+ldap needs it
         curl_spec,
+        "patchelf@0.18.0 %gcc@13.3.0",  # For RPATH fixing during relocatability
     ]
     if minimal:
         specs.append(
             f"slurm_factory.slurm@{slurm_package_version} +readline ~hwloc ~pmix ~restd "
-            f"{gpu_flags} ~cgroup sysconfdir=/etc/slurm ^curl %gcc@13.3.0"
+            f"{gpu_flags} ~cgroup sysconfdir=/etc/slurm %gcc@13.3.0"
         )
     else:
+        specs.append("zlib@1.3.1 %gcc@13.3.0")
         specs.append("openmpi@5.0.3 schedulers=slurm fabrics=auto %gcc@13.3.0")
         specs.append("pmix@5.0.8 ~munge ~python %gcc@13.3.0")
         specs.append("mysql@8.0.35+client_only %gcc@13.3.0")
         specs.append("hdf5@1.14.6 +hl +cxx %gcc@13.3.0")
         specs.append(
             f"slurm_factory.slurm@{slurm_package_version} {additional_variants} "
-            "+influxdb +readline +hwloc +pmix +hdf5 +kafka +restd +cgroup +pam "
-            f"{gpu_flags} sysconfdir=/etc/slurm ^curl %gcc@13.3.0"
+            "+readline +hwloc +pmix +hdf5 +kafka +restd +cgroup +pam "
+            f"{gpu_flags} sysconfdir=/etc/slurm %gcc@13.3.0"
         )
 
     # Base view packages (runtime dependencies + toolchain for relocatability)
@@ -201,9 +205,22 @@ def generate_spack_config(
         "http-parser",
         "ca-certificates-mozilla",  # Self-contained SSL certificates for relocatability
         "curl",
+        "libssh2",  # SSH2 library needed by curl and slurmd
+        "openldap",  # LDAP library needed by curl
+        "openssl",  # SSL/TLS library
+        "munge",  # Authentication library
+        "json-c",  # JSON parsing library
+        "libjwt",  # JWT token library for REST API
+        "jansson",  # JSON library required by libjwt
+        "glib",  # GLib library
+        "zlib",  # Standard zlib compression library (provides libz.so.1)
+        "zlib-ng",  # Compression library
         "librdkafka",
         "rapidjson",
         "cyrus-sasl",
+        "patchelf",  # For RPATH fixing during relocatability
+        "ncurses",  # Terminal library for libtinfow
+        "lua",  # Lua scripting language for Slurm plugin support
     ]
 
     # Add conditional packages based on build type
@@ -221,71 +238,20 @@ def generate_spack_config(
             "repos": {
                 "slurm_factory": {
                     "git": "https://github.com/vantagecompute/slurm-factory-spack-repo.git",
+                    "branch": "main",
                 },
             },
             "concretizer": {
-                "unify": True,  # Ensures only one package per spec in the environment
-                "reuse": True,  # Reuse packages when possible to reduce redundancy
+                "unify": True,  # Unify specs (Spack 1.x feature)
+                "reuse": False,  # Don't reuse installed packages - build from source
             },
-            "develop": {},
-            "view": {
-                "default": {
-                    "root": view_root,
-                    "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
-                    "select": view_packages,  # Only include essential runtime dependencies in view
-                    "exclude": ["^cmake", "^autoconf", "^automake", "^libtool", "^bison", "^flex"],
-                }
-            },
-            "config": {
-                "install_tree": {
-                    "root": install_tree_root,
-                    "padded_length": 0,  # Short, portable install paths for relocatability
-                    "projections": {
-                        "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
-                    },
-                },
-                "build_stage": "/tmp/spack-stage",
-                "misc_cache": sourcecache_root,
-                "binary_index_root": binary_index_root,
-                "checksum": True,
-                "deprecated": True,
-                # Spack 1.x performance enhancements
-                "build_jobs": 4,  # Parallel build jobs
-                "ccache": True,  # Disable ccache if not present
-                "connect_timeout": 30,  # Network timeout for downloads
-                "verify_ssl": True,  # Security setting
-                "suppress_gpg_warnings": False,  # Show GPG warnings
-                "shared_linking": {
-                    "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
-                    "bind": False,  # Don't bind absolute paths - allow relocation
-                    "missing_library_policy": "warn",  # Ignore on missing system
-                },
-            },
-            "mirrors": {
-                "local-buildcache": {"url": f"file://{buildcache_root}", "signed": False},
-                # Add multiple mirror sources for redundancy (Spack 1.x feature)
-                "spack-public": {"url": "https://mirror.spack.io", "signed": True},
-                "binary-mirror": {"url": f"file://{binary_index_root}", "signed": False},
-            },
-            "compilers": [
-                {
-                    "compiler": {
-                        "spec": "gcc@=13.3.0",
-                        "paths": {
-                            "cc": "/usr/bin/gcc",
-                            "cxx": "/usr/bin/g++",
-                            "f77": "/usr/bin/gfortran",
-                            "fc": "/usr/bin/gfortran",
-                        },
-                        "operating_system": "ubuntu24.04",
-                        "target": "x86_64",
-                        "modules": [],
-                        "environment": {},
-                        "extra_rpaths": [],
-                    }
-                }
-            ],
+            # Force all packages to be buildable from source
             "packages": {
+                "all": {
+                    "target": ["x86_64_v3"],
+                    "require": "target=x86_64_v3",
+                    "buildable": True,
+                },
                 "cmake": {
                     "externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}],
                     "buildable": False,
@@ -321,6 +287,9 @@ def generate_spack_config(
                 },
                 "gettext": {"externals": [{"spec": "gettext@0.21", "prefix": "/usr"}], "buildable": False},
                 "tar": {"externals": [{"spec": "tar@1.34", "prefix": "/usr"}], "buildable": False},
+                # Build xz and bzip2 from source to avoid library version conflicts
+                "xz": {"buildable": True},
+                "bzip2": {"buildable": True},
                 # Runtime libraries that must be built for Slurm linking
                 # These are critical dependencies that Slurm links against at runtime
                 "munge": {"buildable": True},  # Authentication - let Spack pick latest available
@@ -330,9 +299,14 @@ def generate_spack_config(
                     "buildable": True,
                 },
                 "rapidjson": {"buildable": True},
+                "openldap": {
+                    "buildable": True,
+                    "version": ["2.6.8"],
+                },
                 "curl": {
                     "buildable": True,
                     "version": ["8.15.0"],
+                    "variants": "libs=shared,static tls=openssl",
                 },
                 "openssl": {
                     "buildable": True,
@@ -392,8 +366,7 @@ def generate_spack_config(
                 "libevent": {"buildable": True},  # Used by PMIx and OpenMPI
                 "jansson": {"buildable": True},  # JSON parsing for some Slurm features (shared is default)
                 "libyaml": {"buildable": True},  # Configuration parsing
-                "bzip2": {"buildable": True},  # Compression support (transitive)
-                "xz": {"buildable": True},  # LZMA compression (transitive)
+                # NOTE: bzip2 and xz are configured as external packages above to avoid library conflicts
                 "zstd": {"buildable": True},  # Fast compression (transitive)
                 # GCC compiler - prevent external detection to avoid multiple compiler hashes
                 "gcc": {
@@ -428,19 +401,64 @@ def generate_spack_config(
                     "version": ["5.0.3"],
                     "variants": "schedulers=slurm fabrics=auto",
                 },
-                # Global preferences with Spack 1.x enhancements
-                "all": {
-                    "target": ["x86_64"],
-                    "prefer": [
-                        "%gcc@13.3.0",
-                        "+shared",
-                        "~static",
-                        "+pic",
-                    ],
-                    "variants": "+shared ~static +pic",  # Consistent shared library preference
-                    "permissions": {"read": "world", "write": "user"},
+            },
+            "develop": {},
+            "view": {
+                "default": {
+                    "root": view_root,
+                    "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
+                    "select": view_packages,  # Only include essential runtime dependencies in view
+                    "exclude": ["^cmake", "^autoconf", "^automake", "^libtool", "^bison", "^flex"],
+                }
+            },
+            "config": {
+                "install_tree": {
+                    "root": install_tree_root,
+                    "padded_length": 0,  # Short, portable install paths for relocatability
+                    "projections": {
+                        "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
+                    },
+                },
+                # "build_stage": "/tmp/spack-stage",
+                # "misc_cache": sourcecache_root,
+                # "binary_index_root": binary_index_root,
+                "checksum": True,
+                "deprecated": True,
+                # Spack 1.x performance enhancements
+                "build_jobs": 4,  # Parallel build jobs
+                "ccache": True,  # Disable ccache if not present
+                "connect_timeout": 30,  # Network timeout for downloads
+                "verify_ssl": True,  # Security setting
+                "suppress_gpg_warnings": False,  # Show GPG warnings
+                "shared_linking": {
+                    "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
+                    "bind": False,  # Don't bind absolute paths - allow relocation
+                    "missing_library_policy": "warn",  # Ignore on missing system
                 },
             },
+            "mirrors": {
+                # Only use spack-public mirror for source downloads, not binaries
+                # In single-stage builds, we build everything from source
+                "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+            },
+            "compilers": [
+                {
+                    "compiler": {
+                        "spec": "gcc@=13.3.0",
+                        "paths": {
+                            "cc": "/usr/bin/gcc",
+                            "cxx": "/usr/bin/g++",
+                            "f77": "/usr/bin/gfortran",
+                            "fc": "/usr/bin/gfortran",
+                        },
+                        "operating_system": "ubuntu24.04",
+                        "target": "x86_64",
+                        "modules": [],
+                        "environment": {},
+                        "extra_rpaths": [],
+                    }
+                }
+            ],
             "modules": generate_module_config(slurm_version, gpu_support, minimal),
         }
     }
