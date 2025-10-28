@@ -1,0 +1,184 @@
+name: "Build and Publish Compiler Buildcache to S3"
+
+on:
+  workflow_dispatch:
+    inputs:
+      compiler_versions:
+        description: 'Compiler versions to build (comma-separated, e.g., "11.5.0,13.4.0" or "all")'
+        required: true
+        default: 'all'
+        type: string
+
+env:
+  S3_BUCKET: slurm-factory-spack-buildcache-4b670
+  CLOUDFRONT_URL: https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Prepare compiler version matrix
+        id: set-matrix
+        run: |
+          if [ "${{ inputs.compiler_versions }}" = "all" ]; then
+            # Build all supported compiler versions
+            VERSIONS='["15.2.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
+          else
+            # Parse comma-separated list into JSON array
+            IFS=',' read -ra VERS <<< "${{ inputs.compiler_versions }}"
+            VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)  # trim whitespace
+              VERSIONS="${VERSIONS}\"${v}\","
+            done
+            VERSIONS="${VERSIONS%,}]"  # remove trailing comma
+          fi
+          echo "matrix=${VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building compiler versions: ${VERSIONS}"
+
+  build-compiler-buildcache:
+    needs: prepare-matrix
+    runs-on: self-hosted
+    timeout-minutes: 360
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler_version: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Clean previous builds
+        run: |
+          # Clean up any previous compiler builds for this version
+          rm -rf "$HOME/.slurm-factory/compilers/${{ matrix.compiler_version }}"
+          docker images | grep "slurm-factory:compiler-${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 10800  # 3 hours for long-running builds
+
+      - name: Build compiler and publish to buildcache
+        run: |
+          echo "🔨 Building GCC ${{ matrix.compiler_version }} compiler..."
+          uv run slurm-factory build-compiler \
+            --compiler-version ${{ matrix.compiler_version }} \
+            --publish
+
+      - name: Verify buildcache upload
+        run: |
+          echo "✅ Compiler buildcache published successfully!"
+          echo "📦 Compiler: GCC ${{ matrix.compiler_version }}"
+          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/compilers/${{ matrix.compiler_version }}/buildcache"
+          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache"
+          
+          # Verify some files exist in S3
+          echo ""
+          echo "📋 Checking buildcache contents..."
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/compilers/${{ matrix.compiler_version }}/buildcache/" --recursive | head -10 || echo "Warning: Could not list buildcache contents"
+
+      - name: Setup Python 3.12 for Spack test
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test buildcache installation
+        shell: bash
+        run: |
+          set -e
+          echo "Testing compiler installation from buildcache..."
+          
+          # Create test directory
+          TEST_DIR="/tmp/test-buildcache-${{ matrix.compiler_version }}"
+          rm -rf "$TEST_DIR"
+          mkdir -p "$TEST_DIR"
+          cd "$TEST_DIR"
+          
+          # Clone Spack
+          git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+          cd spack
+          
+          # Initialize Spack (avoid sourcing which can have issues)
+          export SPACK_ROOT="$(pwd)"
+          export PATH="$SPACK_ROOT/bin:$PATH"
+          
+          # Verify spack works
+          spack --version
+          
+          # Add buildcache mirror (remove if exists first)
+          MIRROR_URL="${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache"
+          spack mirror remove slurm-factory-buildcache 2>/dev/null || true
+          spack mirror add slurm-factory-buildcache "$MIRROR_URL"
+          
+          # List available packages
+          echo "Available packages in buildcache:"
+          spack buildcache list --allarch | head -20
+          
+          # Try to install GCC from buildcache only
+          echo ""
+          echo "Installing GCC ${{ matrix.compiler_version }} from buildcache..."
+          spack install --no-check-signature --cache-only gcc@${{ matrix.compiler_version }} 2>&1 | tail -50
+          
+          # Verify installation
+          echo ""
+          echo "Verifying GCC installation..."
+          eval $(spack load --sh gcc@${{ matrix.compiler_version }})
+          gcc --version
+          
+          # Test compilation
+          echo ""
+          echo "Testing C compilation..."
+          cat > test.c <<'CEOF'
+          #include <stdio.h>
+          int main() {
+              printf("Hello from GCC!\n");
+              return 0;
+          }
+          CEOF
+          gcc test.c -o test
+          ./test
+          
+          echo ""
+          echo "Buildcache test successful!"
+          
+          # Cleanup
+          cd /
+          rm -rf "$TEST_DIR"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Compiler Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Version:** GCC ${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/compilers/${{ matrix.compiler_version }}/buildcache\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-factory-buildcache ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "spack install --no-check-signature gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY

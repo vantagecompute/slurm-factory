@@ -27,14 +27,16 @@ from slurm_factory.constants import (
     CONTAINER_BUILD_OUTPUT_DIR,
     CONTAINER_ROOT_DIR,
     CONTAINER_SPACK_CACHE_DIR,
-    LXD_IMAGE,
-    LXD_IMAGE_REMOTE,
     INSTANCE_NAME_PREFIX,
-    CLOUD_INIT_TIMEOUT,
+    BUILD_TIMEOUT,
+    DOCKER_BUILD_TIMEOUT,
     SPACK_SETUP_SCRIPT,
     SLURM_PATCH_FILES,
     BASH_HEADER,
-    get_package_creation_script,
+    get_package_tarball_script,
+    get_dockerfile,
+    get_compiler_dockerfile,
+    get_spack_build_script,
 )
 
 
@@ -50,7 +52,7 @@ class TestSlurmVersions:
     def test_slurm_versions_mapping(self):
         """Test that version mappings are correct."""
         # Test known mappings (updated for actual format)
-        assert SLURM_VERSIONS["25.05"] == "25-05-3-1"
+        assert SLURM_VERSIONS["25.05"] == "25-05-4-1"
         assert SLURM_VERSIONS["24.11"] == "24-11-6-1"
         assert SLURM_VERSIONS["23.11"] == "23-11-11-1"
         assert SLURM_VERSIONS["23.02"] == "23-02-7-1"
@@ -68,14 +70,12 @@ class TestBuildType:
     def test_build_type_values(self):
         """Test BuildType enum values."""
         assert BuildType.cpu == "cpu"
-        assert BuildType.minimal == "minimal"
         assert BuildType.gpu == "gpu"
 
     def test_build_type_str_conversion(self):
         """Test string conversion of BuildType."""
         # For str Enums, the value should be accessible directly
         assert BuildType.cpu == "cpu"
-        assert BuildType.minimal == "minimal"
         assert BuildType.gpu == "gpu"
 
 
@@ -124,29 +124,24 @@ class TestContainerPaths:
         assert CONTAINER_ROOT_DIR == "/root"
 
 
-class TestLXDConfiguration:
-    """Test LXD configuration constants."""
-
-    def test_lxd_image_constants(self):
-        """Test LXD image configuration."""
-        assert LXD_IMAGE == "24.04"
-        assert LXD_IMAGE_REMOTE == "ubuntu"
-        assert isinstance(LXD_IMAGE, str)
-        assert isinstance(LXD_IMAGE_REMOTE, str)
+class TestDockerConfiguration:
+    """Test Docker configuration constants."""
 
     def test_instance_configuration(self):
         """Test instance configuration constants."""
         assert INSTANCE_NAME_PREFIX == "slurm-factory"
 
+    def test_docker_build_timeout(self):
+        """Test Docker build timeout."""
+        assert isinstance(DOCKER_BUILD_TIMEOUT, int)
+        assert DOCKER_BUILD_TIMEOUT > 0
+        assert DOCKER_BUILD_TIMEOUT == 600
 
-class TestTimeouts:
-    """Test timeout constants."""
-
-    def test_cloud_init_timeout(self):
-        """Test cloud init timeout."""
-        assert isinstance(CLOUD_INIT_TIMEOUT, int)
-        assert CLOUD_INIT_TIMEOUT > 0
-        assert CLOUD_INIT_TIMEOUT == 300
+    def test_build_timeout(self):
+        """Test build timeout."""
+        assert isinstance(BUILD_TIMEOUT, int)
+        assert BUILD_TIMEOUT > 0
+        assert BUILD_TIMEOUT == 3600
 
 
 class TestSpackPaths:
@@ -162,30 +157,134 @@ class TestSpackPaths:
 class TestScriptTemplates:
     """Test script template functions."""
 
-    def test_get_package_creation_script(self):
-        """Test package creation script generation."""
+    def test_get_package_tarball_script(self):
+        """Test package tarball script generation."""
         version = "25.05"
-        script = get_package_creation_script(version)
+        compiler_version = "13.3.0"
+        modulerc_script = "test modulerc script"
+        
+        script = get_package_tarball_script(
+            modulerc_script=modulerc_script,
+            version=version,
+            compiler_version=compiler_version,
+            gpu_support=False,
+        )
         
         # Test that it returns a string
         assert isinstance(script, str)
         assert len(script) > 0
         
         # Test that it contains expected elements
-        assert "spack env activate" in script
-        assert "spack concretize" in script
-        assert "spack install" in script
         assert "set -e" in script
         assert version in script
+        assert compiler_version in script
         
         # Test that it references container paths
-        assert CONTAINER_SPACK_PROJECT_DIR in script
-        assert SPACK_SETUP_SCRIPT in script
         assert CONTAINER_SLURM_DIR in script
         
         # Test that it's properly formatted shell script
         lines = script.strip().split('\n')
         assert len(lines) > 5  # Should be a substantial script
+
+    def test_get_spack_build_script(self):
+        """Test spack build script generation with dedicated compiler environment."""
+        compiler_version = "14.2.0"
+        script = get_spack_build_script(compiler_version)
+        
+        # Test that it returns a string
+        assert isinstance(script, str)
+        assert len(script) > 0
+        
+        # Test that it contains expected elements
+        assert "source /opt/spack/share/spack/setup-env.sh" in script
+        assert compiler_version in script
+        
+        # Test that it creates a dedicated compiler environment
+        assert "Creating temporary environment to install GCC compiler from buildcache" in script
+        assert "mkdir -p /tmp/compiler-install" in script
+        assert "cd /tmp/compiler-install" in script
+        
+        # Test that the compiler environment YAML is properly configured
+        assert "spack.yaml << 'COMPILER_ENV_EOF'" in script
+        assert f"- gcc@{compiler_version}" in script
+        assert "view: /opt/spack-compiler-view" in script
+        assert "type: buildcache" in script
+        assert f"path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache" in script
+        
+        # Test that it installs from buildcache with correct flags
+        assert "spack -e . install --cache-only --no-check-signature" in script
+        
+        # Test that it registers compiler from the view location
+        assert "spack compiler find --scope site /opt/spack-compiler-view" in script
+        
+        # Test that other setup steps are present
+        assert "spack mirror add" in script
+        assert "spack buildcache keys --install --trust" in script
+        
+        # Test that compiler verification steps are present
+        assert "spack compiler list" in script
+        
+        # Test that Slurm build steps are present
+        assert "spack env activate" in script
+        assert "spack concretize" in script
+        assert "spack install" in script
+        
+        # Test that it's properly formatted shell script
+        lines = script.strip().split('\n')
+        assert len(lines) > 50  # Should be a substantial script with compiler env setup
+
+
+    def test_get_dockerfile(self):
+        """Test Dockerfile generation."""
+        spack_yaml_content = "spack:\n  specs:\n    - slurm@25.05"
+        dockerfile = get_dockerfile(spack_yaml_content)
+        
+        # Test that it returns a string
+        assert isinstance(dockerfile, str)
+        assert len(dockerfile) > 0
+        
+        # Test that it contains expected elements
+        assert "FROM ubuntu:24.04" in dockerfile
+        assert "RUN" in dockerfile
+        assert "ENV" in dockerfile
+        assert spack_yaml_content in dockerfile
+        
+        # Test that it installs required packages  
+        assert "git" in dockerfile
+        # Note: build-essential is not installed in the new minimal dependencies approach
+        
+        # Test that it's properly formatted Dockerfile
+        lines = dockerfile.strip().split('\n')
+        assert len(lines) > 10  # Should be a substantial Dockerfile
+
+    def test_get_compiler_dockerfile(self):
+        """Test compiler Dockerfile generation."""
+        dockerfile = get_compiler_dockerfile(compiler_version="13.4.0")
+        
+        # Test that it returns a string
+        assert isinstance(dockerfile, str)
+        assert len(dockerfile) > 0
+        
+        # Test that it contains expected elements
+        assert "FROM ubuntu:24.04" in dockerfile
+        assert "compiler-bootstrap" in dockerfile
+        assert "compiler-packager" in dockerfile
+        assert "gcc@13.4.0" in dockerfile
+        
+        # Test that it has BuildKit syntax
+        assert "syntax=docker/dockerfile:1" in dockerfile
+        
+        # Test that it's properly formatted Dockerfile
+        lines = dockerfile.strip().split('\n')
+        assert len(lines) > 10  # Should be a substantial Dockerfile
+        
+        # Test that compiler registration uses explicit path (fix for issue)
+        assert "spack compiler find --scope site /opt/spack-compiler" in dockerfile
+        # Verify old code is not present
+        assert "spack -e . compiler find --scope site" not in dockerfile
+        
+        # Test that gcc-runtime installation is present
+        assert "spack install gcc-runtime@13.4.0 %gcc@13.4.0" in dockerfile
 
 
 class TestConstantTypes:
@@ -200,8 +299,6 @@ class TestConstantTypes:
         """Test string constant types."""
         string_constants = [
             CONTAINER_CACHE_DIR,
-            LXD_IMAGE,
-            LXD_IMAGE_REMOTE,
             INSTANCE_NAME_PREFIX,
             SPACK_SETUP_SCRIPT,
         ]
@@ -211,7 +308,8 @@ class TestConstantTypes:
 
     def test_integer_constants(self):
         """Test integer constant types."""
-        assert isinstance(CLOUD_INIT_TIMEOUT, int)
+        assert isinstance(BUILD_TIMEOUT, int)
+        assert isinstance(DOCKER_BUILD_TIMEOUT, int)
 
 
 class TestConstantValidation:
@@ -256,8 +354,8 @@ class TestConstantValidation:
                 assert not path.endswith("/"), f"Path has trailing slash: {path}"
 
     def test_build_cache_output_relationship(self):
-        """Test relationship between cache directory and build output."""
-        assert CONTAINER_BUILD_OUTPUT_DIR.startswith(CONTAINER_CACHE_DIR)
+        """Test relationship between SLURM directory and build output."""
+        assert CONTAINER_BUILD_OUTPUT_DIR.startswith(CONTAINER_SLURM_DIR)
 
 
 if __name__ == "__main__":
