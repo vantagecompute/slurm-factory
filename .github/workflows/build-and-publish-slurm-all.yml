@@ -1,0 +1,298 @@
+# Copyright 2025 Vantage Compute Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "Build and Publish Slurm Dependencies for All Compilers"
+
+on:
+  workflow_dispatch:
+    inputs:
+      slurm_versions:
+        description: 'Slurm versions to build (comma-separated, e.g., "25.11,24.11" or "all")'
+        required: true
+        default: 'all'
+        type: string
+      compiler_versions:
+        description: 'Compiler versions to use (comma-separated, e.g., "11.5.0,13.4.0" or "all")'
+        required: true
+        default: 'all'
+        type: string
+
+env:
+  S3_BUCKET: slurm-factory-spack-buildcache-4b670
+  CLOUDFRONT_URL: https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+jobs:
+  prepare-matrix:
+    runs-on: self-hosted
+    outputs:
+      slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
+      compiler_matrix: ${{ steps.set-matrix.outputs.compiler_matrix }}
+    steps:
+      - name: Prepare version matrices
+        id: set-matrix
+        run: |
+          # Prepare Slurm versions matrix
+          if [ "${{ inputs.slurm_versions }}" = "all" ]; then
+            SLURM_VERSIONS='["25.11", "24.11", "23.11"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
+            SLURM_VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              SLURM_VERSIONS="${SLURM_VERSIONS}\"${v}\","
+            done
+            SLURM_VERSIONS="${SLURM_VERSIONS%,}]"
+          fi
+          echo "slurm_matrix=${SLURM_VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building Slurm versions: ${SLURM_VERSIONS}"
+          
+          # Prepare compiler versions matrix
+          if [ "${{ inputs.compiler_versions }}" = "all" ]; then
+            COMPILER_VERSIONS='["15.2.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.compiler_versions }}"
+            COMPILER_VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              COMPILER_VERSIONS="${COMPILER_VERSIONS}\"${v}\","
+            done
+            COMPILER_VERSIONS="${COMPILER_VERSIONS%,}]"
+          fi
+          echo "compiler_matrix=${COMPILER_VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building with compiler versions: ${COMPILER_VERSIONS}"
+
+  build-slurm-deps:
+    needs: prepare-matrix
+    runs-on: self-hosted
+    timeout-minutes: 480
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
+        compiler_version: ${{ fromJson(needs.prepare-matrix.outputs.compiler_matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Clean previous builds
+        run: |
+          # Clean up any previous builds for this version/compiler combo
+          docker images | grep "slurm-factory:${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+          
+          # Clean Spack cache directories to prevent state leakage between runs
+          # This ensures the buildcache test truly validates buildcache installation
+          rm -rf "$HOME/.spack"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 10800  # 3 hours for long-running builds
+
+      - name: Validate GPG secrets
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID secret is not set"
+            exit 1
+          fi
+          echo "✓ GPG secrets are configured"
+          echo "  GPG_KEY_ID: $GPG_KEY_ID"
+
+      - name: Build Slurm dependencies and publish to buildcache
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.compiler_version }}..."
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PASSPHRASE" ]; then
+            echo "Error: GPG_PASSPHRASE is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          echo "Using GPG signing key: $GPG_KEY_ID"
+          uv run slurm-factory build \
+            --slurm-version ${{ matrix.slurm_version }} \
+            --compiler-version ${{ matrix.compiler_version }} \
+            --gpu \
+            --no-cache \
+            --publish=all \
+            --signing-key "$GPG_KEY_ID" \
+            --gpg-private-key "$GPG_PRIVATE_KEY" \
+            --gpg-passphrase "$GPG_PASSPHRASE"
+
+          # Cleanup build cache
+          docker buildx prune -f
+
+      - name: Upload tarball to S3
+        run: |
+          TARBALL_NAME="slurm-${{ inputs.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
+          TARBALL_PATH="$HOME/.slurm-factory/${{ inputs.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
+          
+          echo "📦 Uploading: $TARBALL_NAME"
+          aws s3 cp "$TARBALL_PATH" \
+            "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME"
+
+      - name: Verify buildcache upload
+        run: |
+          echo "✅ Slurm dependencies buildcache published successfully!"
+          echo "📦 Slurm Version: ${{ matrix.slurm_version }}"
+          echo "📦 Compiler: GCC ${{ matrix.compiler_version }}"
+          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/"
+          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/"
+          
+          # Verify files exist in S3
+          echo ""
+          echo "📋 Checking buildcache contents..."
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/" --recursive | head -20 || echo "Warning: Could not list buildcache contents"
+
+          echo ""
+          echo "📋 Checking tarball build existence"
+          TARBALL_NAME="slurm-${{ inputs.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME" | head -20 || echo "Warning: Could not list buildcache contents"
+
+      - name: Test buildcache installation
+        shell: bash
+        run: |
+          set -e
+          echo "Testing full buildcache installation in Docker container..."
+          
+          docker run --rm \
+            -e CLOUDFRONT_URL="${{ env.CLOUDFRONT_URL }}" \
+            -e SLURM_VERSION="${{ matrix.slurm_version }}" \
+            -e COMPILER_VERSION="${{ matrix.compiler_version }}" \
+            ubuntu:24.04 \
+            bash -l -c '
+            set -e
+            # System dependencies
+            apt-get update
+            apt-get install -y --no-install-recommends \
+              build-essential \
+              ca-certificates \
+              curl \
+              gcc \
+              g++ \
+              gfortran \
+              git \
+              gnupg2 \
+              python3 \
+              python3-pip \
+              unzip
+            # Spack install
+            git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
+            export SPACK_ROOT=/opt/spack
+            export PATH=$SPACK_ROOT/bin:$PATH
+            . /opt/spack/share/spack/setup-env.sh
+            # Add mirrors
+            spack mirror add slurm-factory-gcc "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+            spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+            # Trust keys
+            spack buildcache keys --install --trust
+            # Verify GCC in buildcache
+            spack buildcache list --allarch | grep gcc@${COMPILER_VERSION}
+            # Install GCC from buildcache
+            spack install -j $(nproc) --cache-only gcc@${COMPILER_VERSION} languages=c,c++,fortran
+            spack compiler find $(spack location -i gcc@${COMPILER_VERSION})
+            spack compiler list | grep gcc@${COMPILER_VERSION}
+            # Add custom repo for slurm-factory namespace
+            git clone --depth 1 https://github.com/vantagecompute/slurm-factory-spack-repo.git /opt/slurm-factory-spack-repo
+            spack repo add /opt/slurm-factory-spack-repo/spack_repo/slurm_factory
+            spack repo list
+            # Find slurm hash in buildcache
+            SLURM_HASH=$(spack buildcache list --allarch | grep "slurm@${SLURM_VERSION}" | grep "%gcc@${COMPILER_VERSION}" | grep "target=x86_64" | awk '{print $1}' | head -1)
+            if [[ -z "$SLURM_HASH" ]]; then
+              echo "Error: No matching slurm hash found in buildcache for slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION} target=x86_64"
+              exit 1
+            fi
+            echo "Installing Slurm from buildcache with hash: $SLURM_HASH"
+            spack install -j $(nproc) --cache-only /$SLURM_HASH
+            # Verify install
+            spack find slurm
+            SLURM_DIR=$(spack location -i slurm)
+            echo "Slurm installed at: $SLURM_DIR"
+            ls -la "$SLURM_DIR/"
+            find "$SLURM_DIR" -type f -name "slurmctld" -o -name "slurmd"
+            echo "✓ Slurm binaries found"
+            spack find -v
+            echo "✓ Buildcache test completed!"
+            '
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Slurm Dependencies Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Version:** ${{ matrix.slurm_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Version:** GCC ${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** This buildcache contains only Slurm dependencies (excluding Slurm itself)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    needs: build-slurm-deps
+    runs-on: self-hosted
+    if: always()
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Overall Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Slurm dependency buildcaches have been built and published." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Versions:** ${{ inputs.slurm_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Versions:** ${{ inputs.compiler_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
+          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/slurm/" >> $GITHUB_STEP_SUMMARY
