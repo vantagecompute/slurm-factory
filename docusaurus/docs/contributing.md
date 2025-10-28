@@ -16,7 +16,7 @@ We welcome contributions to slurm-factory! This guide covers how to contribute c
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.12+
 - Docker
 - UV package manager (optional)
 - Git

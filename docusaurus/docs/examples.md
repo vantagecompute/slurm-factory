@@ -5,7 +5,7 @@ Practical examples for building and deploying Slurm packages.
 ## Build Examples
 
 ```bash
-# Standard build
+# Standard build (default GCC 13.4.0)
 slurm-factory build --slurm-version 25.05
 
 # GPU support (~15-25GB)
@@ -20,6 +20,33 @@ slurm-factory --verbose build --slurm-version 25.05
 # Custom project name
 slurm-factory --project-name prod build --slurm-version 25.05
 ```
+
+## Compiler Version Examples
+
+Build with different GCC compiler versions for cross-distribution compatibility:
+
+```bash
+# Latest compilers
+slurm-factory build --compiler-version 15.2.0  # Latest GCC 15, glibc 2.39
+slurm-factory build --compiler-version 14.3.0  # Latest GCC 14, glibc 2.39
+
+# Default (Ubuntu 24.04)
+slurm-factory build --compiler-version 13.4.0  # Default, glibc 2.39
+
+# Older distributions
+slurm-factory build --compiler-version 11.5.0  # Ubuntu 22.04, glibc 2.35
+slurm-factory build --compiler-version 10.5.0  # RHEL 8/Ubuntu 20.04, glibc 2.31
+slurm-factory build --compiler-version 7.5.0   # RHEL 7, glibc 2.17
+
+# Combine with GPU support
+slurm-factory build --compiler-version 10.5.0 --gpu  # RHEL 8 with GPU
+```
+
+**Compiler Version Selection Guide:**
+- **15.2.0/14.3.0**: Latest features, Ubuntu 24.04+
+- **13.4.0**: Default, good balance of features and compatibility
+- **11.5.0/10.5.0**: Wide compatibility, Ubuntu 22.04/20.04, RHEL 8
+- **7.5.0**: Maximum compatibility, RHEL 7 and older systems
 
 ## Deployment Examples
 

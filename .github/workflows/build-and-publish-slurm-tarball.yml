@@ -19,7 +19,7 @@ env:
   S3_PREFIX: slurm-factory
 
 jobs:
-  build-slurm-tarballs:
+  build-slurm-tarball:
     runs-on: self-hosted
     environment: release
     permissions:

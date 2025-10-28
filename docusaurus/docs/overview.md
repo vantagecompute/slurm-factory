@@ -53,11 +53,20 @@ Slurm Factory simplifies the complex process of building and packaging Slurm for
 ## CLI Examples
 
 ```bash
-# Build latest Slurm with default settings
+# Build latest Slurm with default settings (GCC 13.4.0)
 slurm-factory build
 
 # Build with GPU support and verbose output
 slurm-factory --verbose build --gpu
+
+# Build for older distributions (RHEL 8)
+slurm-factory build --compiler-version 10.5.0
+
+# Build for maximum compatibility (RHEL 7)
+slurm-factory build --compiler-version 7.5.0
+
+# Build with latest compiler (GCC 15)
+slurm-factory build --compiler-version 15.2.0
 
 # Build specific version with custom project
 slurm-factory --project-name production build --slurm-version 24.11
@@ -65,6 +74,22 @@ slurm-factory --project-name production build --slurm-version 24.11
 # Clean up build artifacts
 slurm-factory clean --full
 ```
+
+## Compiler Toolchains
+
+All GCC compiler versions are built by Spack for maximum relocatability:
+
+| Version | glibc | Target | Description |
+|---------|-------|--------|-------------|
+| 15.2.0  | 2.39  | Latest | Latest GCC 15, newest features |
+| 14.3.0  | 2.39  | Latest | Latest GCC 14, modern features |
+| 13.4.0  | 2.39  | Ubuntu 24.04 | **Default**, good balance |
+| 12.5.0  | 2.35  | Latest | Latest GCC 12 |
+| 11.5.0  | 2.35  | Ubuntu 22.04 | Good compatibility |
+| 10.5.0  | 2.31  | RHEL 8/Ubuntu 20.04 | Wide compatibility |
+| 9.5.0   | 2.28  | Latest | Latest GCC 9 |
+| 8.5.0   | 2.28  | RHEL 8 | Older distributions |
+| 7.5.0   | 2.17  | RHEL 7 | Maximum compatibility |
 
 ## Use Cases
 

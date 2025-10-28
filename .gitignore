@@ -2,6 +2,7 @@
 *.tar.gz
 tmp/
 _build/
+.coverage
 
 # Python
 __pycache__/

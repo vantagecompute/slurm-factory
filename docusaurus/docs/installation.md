@@ -23,7 +23,7 @@ docker run hello-world
 **System Requirements:**
 - **OS**: Ubuntu 20.04+ or equivalent Linux distribution
 - **Docker**: 24.0+ (latest stable version recommended)
-- **Python**: 3.9+ (automatically handled by pip/pipx)
+- **Python**: 3.12+ (required for modern type hints and features)
 - **Memory**: 4GB+ RAM recommended for builds (16GB+ optimal)
 - **Storage**: 50GB+ free space for build cache and packages
 
