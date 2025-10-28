@@ -6,7 +6,7 @@
 # Slurm Factory
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://python.org)
 [![PyPI](https://img.shields.io/pypi/v/slurm-factory.svg)](https://pypi.org/project/slurm-factory/)
 [![Docker](https://img.shields.io/badge/Docker-24.0+-blue.svg)](https://docker.com)
 
@@ -44,7 +44,7 @@ module load slurm/25.05
 ## Requirements
 
 - Docker 24.0+
-- Python 3.10+
+- Python 3.12+
 - 50GB disk space
 - 4+ CPU cores (8+ recommended)
 - 16GB RAM (32GB+ recommended)
@@ -65,19 +65,29 @@ slurm-factory build --slurm-version 25.05 --minimal
 slurm-factory build --compiler-version 10.5.0  # RHEL 8 / Ubuntu 20.04
 slurm-factory build --compiler-version 7.5.0   # RHEL 7
 
+# Latest compilers
+slurm-factory build --compiler-version 15.2.0  # Latest GCC 15
+slurm-factory build --compiler-version 14.3.0  # Latest GCC 14
+
 # Verbose
 slurm-factory --verbose build --slurm-version 25.05
 ```
 
 ## Compiler Toolchains
 
-| Version | Target Distro        | glibc | Description              |
-|---------|----------------------|-------|--------------------------|
-| 13.3.0  | Ubuntu 24.04         | 2.39  | Default, newest features |
-| 11.4.0  | Ubuntu 22.04         | 2.35  | Good compatibility       |
-| 10.5.0  | RHEL 8 / Ubuntu 20.04| 2.31  | Wide compatibility       |
-| 8.5.0   | RHEL 8               | 2.28  | Older distros            |
-| 7.5.0   | RHEL 7               | 2.17  | Maximum compatibility    |
+All compiler toolchains are built by Spack for maximum relocatability and cross-distribution compatibility.
+
+| Version | Target Distro        | glibc | Description                      |
+|---------|----------------------|-------|----------------------------------|
+| 15.2.0  | Latest               | 2.39  | Latest GCC 15, newest features   |
+| 14.3.0  | Latest               | 2.39  | Latest GCC 14, modern features   |
+| 13.4.0  | Ubuntu 24.04         | 2.39  | **Default**, Ubuntu 24.04        |
+| 12.5.0  | Latest               | 2.35  | Latest GCC 12                    |
+| 11.5.0  | Ubuntu 22.04         | 2.35  | Good compatibility               |
+| 10.5.0  | RHEL 8 / Ubuntu 20.04| 2.31  | Wide compatibility               |
+| 9.5.0   | Latest               | 2.28  | Latest GCC 9                     |
+| 8.5.0   | RHEL 8               | 2.28  | Older distros                    |
+| 7.5.0   | RHEL 7               | 2.17  | Maximum compatibility            |
 
 ## Supported Versions
 

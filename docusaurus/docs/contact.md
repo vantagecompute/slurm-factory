@@ -86,7 +86,7 @@ Build fails for Slurm 25.05 with GPU support on Ubuntu 22.04
 
 ## Environment
 - OS: Ubuntu 22.04.3 LTS
-- Python: 3.11.6
+- Python: 3.12.0
 - Docker: 24.0.7
 
 ## Error Log
@@ -122,26 +122,24 @@ For security vulnerabilities:
 4. **Examples**: Similar features in other tools
 
 **Example Feature Request**:
+
 ```markdown
 ## Feature Request: Cross-compilation Support
 
 ### Use Case
 Build Slurm packages for ARM64 clusters from x86_64 build machines
 
-**Proposed Solution
+### Proposed Solution
 Add `--target-arch` option to specify target architecture:
 `slurm-factory build --slurm-version 25.05 --target-arch arm64`
 
-**Alternatives Considered**:
-
+### Alternatives Considered
 - Building directly on ARM64 (slow, expensive)
 - Using emulation (very slow)
 
-**Examples**:
-
+### Examples
 - Docker buildx multi-platform builds
 - Cross-compilation in other package managers
-```
 ```
 
 ## Commercial Support
