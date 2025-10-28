@@ -1,0 +1,110 @@
+name: "Build and Publish Slurm Tarballs to S3"
+
+on:
+  workflow_dispatch:
+    inputs:
+      slurm_version:
+        description: 'Slurm version to build'
+        required: true
+        default: '25.05'
+        type: string
+      gpu_support:
+        description: 'Enable GPU support'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  S3_BUCKET: vantage-public-assets
+  S3_PREFIX: slurm-factory
+
+jobs:
+  build-slurm-tarballs:
+    runs-on: self-hosted
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler_version: ["15.2.0", "14.3.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]
+        include:
+          - compiler_version: '15.2.0'
+            glibc_version: '2.39'
+            distro: 'Latest GCC 15'
+          - compiler_version: '14.3.0'
+            glibc_version: '2.39'
+            distro: 'Latest GCC 14'
+          - compiler_version: '13.4.0'
+            glibc_version: '2.39'
+            distro: 'Ubuntu 24.04'
+          - compiler_version: '12.5.0'
+            glibc_version: '2.35'
+            distro: 'Latest GCC 12'
+          - compiler_version: '11.5.0'
+            glibc_version: '2.35'
+            distro: 'Ubuntu 22.04'
+          - compiler_version: '10.5.0'
+            glibc_version: '2.31'
+            distro: 'RHEL 8 / Ubuntu 20.04'
+          - compiler_version: '9.5.0'
+            glibc_version: '2.28'
+            distro: 'Latest GCC 9'
+          - compiler_version: '8.5.0'
+            glibc_version: '2.28'
+            distro: 'RHEL 8 minimum'
+          - compiler_version: '7.5.0'
+            glibc_version: '2.17'
+            distro: 'RHEL 7'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Clean previous builds
+        run: |
+          uv run slurm-factory clean --full
+
+      - name: Build Slurm tarball (GCC ${{ matrix.compiler_version }})
+        run: |
+          uv run slurm-factory build \
+            --slurm-version ${{ inputs.slurm_version }} \
+            --compiler-version ${{ matrix.compiler_version }} \
+            --gpu
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Upload tarball to S3
+        run: |
+          TARBALL_NAME="slurm-${{ inputs.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
+          TARBALL_PATH="$HOME/.slurm-factory/${{ inputs.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
+          
+          echo "📦 Uploading: $TARBALL_NAME"
+          aws s3 cp "$TARBALL_PATH" \
+            "s3://${{ env.S3_BUCKET }}/${{ env.S3_PREFIX }}/${{ inputs.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME" \
+            --acl public-read
+
+      - name: Verify upload
+        run: |
+          TARBALL_NAME="slurm-${{ inputs.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
+          echo "✅ Tarball uploaded successfully!"
+          echo "📦 Compiler: GCC ${{ matrix.compiler_version }} (glibc ${{ matrix.glibc_version }})"
+          echo "📦 Compatible with: ${{ matrix.distro }}"
+          echo "🔗 S3 URL: https://${{ env.S3_BUCKET }}.s3.amazonaws.com/${{ env.S3_PREFIX }}/${{ inputs.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
+          rm "$HOME/.slurm-factory/${{ inputs.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
