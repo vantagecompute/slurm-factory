@@ -117,8 +117,8 @@ class TestTyperApp:
         assert app.callback is not None
 
     @patch('slurm_factory.main.builder_build')
-    @patch('slurm_factory.main.lxd.LXC')
-    def test_app_can_be_invoked(self, mock_lxc, mock_builder_build):
+    @patch('subprocess.run')
+    def test_app_can_be_invoked(self, mock_subprocess, mock_builder_build):
         """Test that the app can be invoked (basic smoke test)."""
         # This is a basic test to ensure the app structure is correct
         # We don't actually run the app here, just check it's properly configured
@@ -221,7 +221,6 @@ class TestErrorHandling:
         ctx.ensure_object = Mock()
         ctx.obj = {}
         
-        # Should not raise errors even with minimal setup
         try:
             main(ctx)
         except Exception as e:
