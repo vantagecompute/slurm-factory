@@ -45,3 +45,5 @@ jobs:
         run: just typecheck
       - name: Run unit tests
         run: just unit
+      - name: Run integration tests
+        run: just integration

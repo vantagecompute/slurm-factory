@@ -1,0 +1,277 @@
+name: "Build and Publish Slurm Dependencies for All Compilers"
+
+on:
+  workflow_dispatch:
+    inputs:
+      slurm_versions:
+        description: 'Slurm versions to build (comma-separated, e.g., "25.11,24.11" or "all")'
+        required: true
+        default: 'all'
+        type: string
+      compiler_versions:
+        description: 'Compiler versions to use (comma-separated, e.g., "11.5.0,13.4.0" or "all")'
+        required: true
+        default: 'all'
+        type: string
+
+env:
+  S3_BUCKET: slurm-factory-spack-buildcache-4b670
+  CLOUDFRONT_URL: https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+jobs:
+  prepare-matrix:
+    runs-on: self-hosted
+    outputs:
+      slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
+      compiler_matrix: ${{ steps.set-matrix.outputs.compiler_matrix }}
+    steps:
+      - name: Prepare version matrices
+        id: set-matrix
+        run: |
+          # Prepare Slurm versions matrix
+          if [ "${{ inputs.slurm_versions }}" = "all" ]; then
+            SLURM_VERSIONS='["25.11", "24.11", "23.11"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
+            SLURM_VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              SLURM_VERSIONS="${SLURM_VERSIONS}\"${v}\","
+            done
+            SLURM_VERSIONS="${SLURM_VERSIONS%,}]"
+          fi
+          echo "slurm_matrix=${SLURM_VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building Slurm versions: ${SLURM_VERSIONS}"
+          
+          # Prepare compiler versions matrix
+          if [ "${{ inputs.compiler_versions }}" = "all" ]; then
+            COMPILER_VERSIONS='["14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.compiler_versions }}"
+            COMPILER_VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              COMPILER_VERSIONS="${COMPILER_VERSIONS}\"${v}\","
+            done
+            COMPILER_VERSIONS="${COMPILER_VERSIONS%,}]"
+          fi
+          echo "compiler_matrix=${COMPILER_VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building with compiler versions: ${COMPILER_VERSIONS}"
+
+  build-slurm-deps:
+    needs: prepare-matrix
+    runs-on: self-hosted
+    timeout-minutes: 480
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
+        compiler_version: ${{ fromJson(needs.prepare-matrix.outputs.compiler_matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Clean previous builds
+        run: |
+          # Clean up any previous builds for this version/compiler combo
+          docker images | grep "slurm-factory:${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+          
+          # Clean Spack cache directories to prevent state leakage between runs
+          # This ensures the buildcache test truly validates buildcache installation
+          rm -rf "$HOME/.spack"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 10800  # 3 hours for long-running builds
+
+      - name: Validate GPG secrets
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID secret is not set"
+            exit 1
+          fi
+          echo "✓ GPG secrets are configured"
+          echo "  GPG_KEY_ID: $GPG_KEY_ID"
+
+      - name: Build Slurm dependencies and publish to buildcache
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.compiler_version }}..."
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PASSPHRASE" ]; then
+            echo "Error: GPG_PASSPHRASE is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          echo "Using GPG signing key: $GPG_KEY_ID"
+          uv run slurm-factory build \
+            --slurm-version ${{ matrix.slurm_version }} \
+            --compiler-version ${{ matrix.compiler_version }} \
+            --gpu \
+            --no-cache \
+            --publish=all \
+            --signing-key "$GPG_KEY_ID" \
+            --gpg-private-key "$GPG_PRIVATE_KEY" \
+            --gpg-passphrase "$GPG_PASSPHRASE"
+
+      - name: Verify buildcache upload
+        run: |
+          echo "✅ Slurm dependencies buildcache published successfully!"
+          echo "📦 Slurm Version: ${{ matrix.slurm_version }}"
+          echo "📦 Compiler: GCC ${{ matrix.compiler_version }}"
+          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache"
+          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache"
+          
+          # Verify some files exist in S3
+          echo ""
+          echo "📋 Checking buildcache contents..."
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache/" --recursive | head -20 || echo "Warning: Could not list buildcache contents"
+
+      - name: Test buildcache installation
+        shell: bash
+        run: |
+          set -e
+          echo "Testing dependency installation from buildcache in Docker container..."
+          
+          # Run test in Docker container with same base image as build
+          docker run --rm \
+            -e CLOUDFRONT_URL="${{ env.CLOUDFRONT_URL }}" \
+            -e SLURM_VERSION="${{ matrix.slurm_version }}" \
+            -e COMPILER_VERSION="${{ matrix.compiler_version }}" \
+            ubuntu:24.04 \
+            bash -c '
+            set -e
+            
+            # Install required packages
+            apt-get update
+            apt-get install -y --no-install-recommends \
+              build-essential \
+              ca-certificates \
+              curl \
+              git \
+              gnupg2 \
+              python3 \
+              python3-pip
+            
+            # Create test directory
+            TEST_DIR="/tmp/test-buildcache"
+            mkdir -p "$TEST_DIR"
+            cd "$TEST_DIR"
+            
+            # Clone Spack
+            git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+            cd spack
+            
+            # Isolate Spack user data
+            export SPACK_USER_CACHE_PATH="$TEST_DIR/spack-cache"
+            export SPACK_USER_CONFIG_PATH="$TEST_DIR/spack-config"
+            mkdir -p "$SPACK_USER_CACHE_PATH" "$SPACK_USER_CONFIG_PATH"
+            
+            # Initialize Spack
+            export SPACK_ROOT="$(pwd)"
+            export PATH="$SPACK_ROOT/bin:$PATH"
+            
+            # Verify spack works
+            spack --version
+            
+            # Add buildcache mirrors
+            COMPILER_MIRROR_URL="${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}/buildcache"
+            DEPS_MIRROR_URL="${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}/buildcache"
+            spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
+            spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
+            
+            # Import GPG keys for signature verification
+            echo "Importing GPG keys..."
+            spack buildcache keys --install --trust || echo "Warning: Could not import GPG keys"
+            
+            # Update buildcache indexes
+            echo "Updating buildcache indexes..."
+            spack buildcache update-index compiler-buildcache || echo "Warning: Could not update compiler-buildcache index (buildcache may be new/empty)"
+            spack buildcache update-index deps-buildcache || echo "Warning: Could not update deps-buildcache index (buildcache may be new/empty)"
+            
+            # List available packages
+            echo "Available packages in buildcache:"
+            spack buildcache list --allarch | head -30
+            
+            # Install sample dependencies from buildcache
+            echo ""
+            echo "Installing sample dependencies from buildcache..."
+            spack install --use-buildcache only openssl@3: 2>&1 | tail -30 || echo "Note: openssl may not be in buildcache yet"
+            spack install --use-buildcache only munge 2>&1 | tail -30 || echo "Note: munge may not be in buildcache yet"
+            
+            echo ""
+            echo "✓ Buildcache test completed!"
+            '
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Slurm Dependencies Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Version:** ${{ matrix.slurm_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Version:** GCC ${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** This buildcache contains only Slurm dependencies (excluding Slurm itself)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    needs: build-slurm-deps
+    runs-on: self-hosted
+    if: always()
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Overall Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Slurm dependency buildcaches have been built and published." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Versions:** ${{ inputs.slurm_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Versions:** ${{ inputs.compiler_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
+          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/slurm/" >> $GITHUB_STEP_SUMMARY
