@@ -14,24 +14,17 @@
 
 """Utils used throughout the slurm-factory package."""
 
-import io
 import logging
-import site
-import sys
-from pathlib import Path, PurePath
+import subprocess
+from pathlib import Path
 
-import yaml
-from craft_providers import lxd
 from rich.console import Console
+from rich.markup import escape
 
 from .constants import (
-    BASH_HEADER,
-    CLOUD_INIT_TIMEOUT,
-    CONTAINER_SPACK_PROJECT_DIR,
-    CONTAINER_SPACK_TEMPLATES_DIR,
-    get_package_creation_script,
+    get_dockerfile,
 )
-from .exceptions import SlurmFactoryError, SlurmFactoryInstanceCreationError, SlurmFactoryStreamExecError
+from .exceptions import SlurmFactoryError, SlurmFactoryStreamExecError
 from .spack_yaml import generate_yaml_string
 
 # Set up logging following craft-providers pattern
@@ -39,336 +32,428 @@ logger = logging.getLogger(__name__)
 console = Console()
 
 
-def _stream_exec_output(
-    instance: lxd.LXDInstance, command: list[str], description: str, verbose: bool = False, **kwargs
-):
-    """Execute a command in the instance and stream its output in real-time."""
-    # Enable debug logging when verbose is True
-    if verbose:
-        logger.setLevel(logging.DEBUG)
-        logger.debug(f"Executing command: {' '.join(command)}")
-        logger.debug(f"Command description: {description}")
-
-    if verbose:
-        # In verbose mode, show output in real-time without status spinner
-        console.print(f"[bold blue]{description}[/bold blue]")
-        logger.debug("Starting command execution in verbose mode")
-
-        # Use execute_run for simpler real-time output
-        try:
-            result = instance.execute_run(command=command, **kwargs)
-            logger.debug(f"Command execution completed with return code: {result.returncode}")
-
-            # Print output with debug logging
-            if result.stdout:
-                logger.debug(f"Command stdout ({len(result.stdout)} chars): {result.stdout[:500]}...")
-                for line in result.stdout.split("\n"):
-                    if line.strip():
-                        console.print(f"  {line}")
-
-            if result.stderr:
-                logger.debug(f"Command stderr ({len(result.stderr)} chars): {result.stderr[:500]}...")
-                for line in result.stderr.split("\n"):
-                    if line.strip():
-                        console.print(f"[yellow]  {line}[/yellow]")
-
-            if result.returncode != 0:
-                msg = f"Command failed with exit code {result.returncode}"
-                logger.error(msg)
-                logger.debug(f"Failed command was: {' '.join(command)}")
-                console.print(f"[bold red]{msg}[/bold red]")
-                raise SlurmFactoryStreamExecError(msg)
-
-            logger.debug("Command completed successfully")
-            return (
-                result.returncode,
-                result.stdout.split("\n") if result.stdout else [],
-                result.stderr.split("\n") if result.stderr else [],
-            )
-
-        except Exception as e:
-            msg = f"Command execution failed: {e}"
-            logger.error(msg)
-            logger.debug(f"Exception details: {type(e).__name__}: {e}")
-            console.print(f"[bold red]{msg}[/bold red]")
-            raise SlurmFactoryStreamExecError(msg)
-    else:
-        # In non-verbose mode, use status spinner and show minimal output
-        logger.debug("Starting command execution in non-verbose mode")
-        with console.status(f"[bold blue]{description}[/bold blue]"):
-            try:
-                result = instance.execute_run(command=command, **kwargs)
-                logger.debug(f"Command completed with return code: {result.returncode}")
-
-                # Show only important lines in non-verbose mode
-                if result.stdout:
-                    important_lines = [
-                        line
-                        for line in result.stdout.split("\n")
-                        if line.strip() and ("error" in line.lower() or "warning" in line.lower())
-                    ]
-                    if important_lines:
-                        logger.debug(f"Found {len(important_lines)} important output lines")
-                    for line in important_lines:
-                        console.print(f"[dim]  {line}[/dim]")
-
-                if result.stderr:
-                    logger.debug(f"Command had stderr output: {len(result.stderr)} chars")
-                    for line in result.stderr.split("\n"):
-                        if line.strip():
-                            console.print(f"[red]  {line}[/red]")
-
-                if result.returncode != 0:
-                    msg = f"Command failed with exit code {result.returncode}"
-                    logger.error(msg)
-                    logger.debug(f"Failed command was: {' '.join(command)}")
-                    console.print(f"[bold red]{msg}[/bold red]")
-                    raise SlurmFactoryStreamExecError(msg)
-
-                return (
-                    result.returncode,
-                    result.stdout.split("\n") if result.stdout else [],
-                    result.stderr.split("\n") if result.stderr else [],
-                )
-
-            except Exception as e:
-                msg = f"Command execution failed: {e}"
-                logger.error(msg)
-                logger.debug(f"Exception details: {type(e).__name__}: {e}")
-                console.print(f"[bold red]{msg}[/bold red]")
-                raise SlurmFactoryStreamExecError(msg)
-
-
-def _setup_spack_project(
-    lxd_instance: lxd.LXDInstance,
-    version: str,
-    gpu_support: bool = False,
-    additional_variants: str = "",
-    minimal: bool = False,
-    verify: bool = False,
+def _build_docker_image(
+    image_tag: str,
+    dockerfile_content: str,
+    cache_dir: str,
     verbose: bool = False,
+    no_cache: bool = False,
+    target: str = "",
 ) -> None:
-    """Set up the base instance with ALL components of the spack project."""
-    logger.debug(
-        (
-            f"Setting up Spack project: version={version}, "
-            f"gpu_support={gpu_support}, minimal={minimal}, verify={verify}"
-        )
-    )
+    """
+    Build a Docker image from a Dockerfile string.
 
-    # Generate dynamic Spack configuration and copy to container
-    logger.debug("Generating dynamic Spack YAML configuration")
-    spack_yaml = generate_yaml_string(
-        slurm_version=version,
-        gpu_support=gpu_support,
-        minimal=minimal,
-        additional_variants=additional_variants,
-        enable_verification=verify,
-    )
-    logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
+    Args:
+        image_tag: Tag for the Docker image
+        dockerfile_content: Complete Dockerfile as a string
+        cache_dir: Host directory for cache mounts
+        verbose: Whether to show detailed output
+        no_cache: Force a fresh build without using Docker cache
+        target: Build target stage in multi-stage builds (e.g., "builder")
 
-    _copy_spack_yaml_to_container(lxd_instance, spack_yaml, target_description="base instance")
+    """
+    console.print(f"[bold blue]Building Docker image {image_tag}...[/bold blue]")
+    logger.debug(f"Building Docker image: {image_tag}")
+    logger.debug(f"Dockerfile size: {len(dockerfile_content)} characters")
 
-    # Always copy templates - they're needed for module generation
-    logger.debug("Copying Lmod module templates to container...")
-    _copy_templates_to_container(lxd_instance, verbose=verbose, target_description="base instance")
+    if no_cache:
+        logger.debug("Building with --no-cache flag")
+        console.print("[bold yellow]Building without cache (this may take longer)[/bold yellow]")
 
+    if target:
+        logger.debug(f"Building target stage: {target}")
+        console.print(f"[dim]Building target stage: {target}[/dim]")
+
+    process = None
     try:
-        exec_script = get_package_creation_script(version=version)
-        logger.debug(f"Executing package creation script ({len(exec_script)} chars)")
+        # Find the repository root (where pyproject.toml is located)
+        from pathlib import Path
 
-        _stream_exec_output(
-            lxd_instance,
-            BASH_HEADER + [exec_script],
-            f"Executing package creation script for Slurm {version}",
-            verbose=verbose,
+        # Start from current directory and search upwards for pyproject.toml
+        current_dir = Path.cwd()
+        repo_root = current_dir
+        while repo_root != repo_root.parent:
+            if (repo_root / "pyproject.toml").exists():
+                break
+            repo_root = repo_root.parent
+
+        # If pyproject.toml not found, fallback to current directory
+        if not (repo_root / "pyproject.toml").exists():
+            repo_root = current_dir
+            logger.warning(f"Could not find repository root, using current directory: {repo_root}")
+        else:
+            logger.debug(f"Using repository root as build context: {repo_root}")
+
+        # Use docker build with stdin for the Dockerfile
+        cmd = [
+            "docker",
+            "build",
+            "-t",
+            image_tag,
+            "-f",
+            "-",  # Read Dockerfile from stdin
+            str(repo_root),  # Build context - use repository root so COPY paths work
+        ]
+
+        # Add --no-cache flag if requested
+        if no_cache:
+            cmd.insert(2, "--no-cache")
+
+        # Add --target flag if specified
+        if target:
+            cmd.extend(["--target", target])
+
+        if verbose:
+            logger.debug(f"Docker build command: {' '.join(cmd)}")
+            console.print(f"[dim]$ {' '.join(cmd)}[/dim]")
+
+        # Stream output to terminal in real-time
+        process = subprocess.Popen(
+            cmd,
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout
+            text=True,
+            bufsize=1,  # Line buffered
         )
-        logger.debug("Successfully completed package creation script")
-    except SlurmFactoryStreamExecError as e:
-        msg = f"Command execution failed: {e}"
+
+        # Write Dockerfile to stdin
+        if process.stdin:
+            process.stdin.write(dockerfile_content)
+            process.stdin.close()
+
+        # Stream output line by line
+        if process.stdout:
+            for line in process.stdout:
+                line = line.rstrip()
+                if line:
+                    console.print(f"  {escape(line)}")
+                    logger.debug(f"Docker build: {line}")
+
+        # Wait for process to complete
+        returncode = process.wait(timeout=600)
+
+        if returncode != 0:
+            msg = f"Docker image build failed with exit code {returncode}"
+            logger.error(msg)
+            console.print(f"[bold red]{msg}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        console.print(f"[bold green]✓ Docker image {image_tag} built successfully[/bold green]")
+        logger.debug("Docker image built successfully")
+
+    except subprocess.TimeoutExpired:
+        msg = "Docker image build timed out"
         logger.error(msg)
-        logger.debug("Failed during package creation script execution")
         console.print(f"[bold red]{msg}[/bold red]")
+        if process:
+            process.kill()
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to build Docker image: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
         raise SlurmFactoryError(msg)
 
 
-def set_profile(profile_name: str, project_name: str, home_cache_dir: str) -> None:
-    """Customize the default profile to include the profile at `lxd-profile.yaml`."""
-    logger.debug(f"Setting up LXD profile '{profile_name}' for project '{project_name}'")
-    lxc = lxd.LXC()
-    profile_file = _get_data_file("lxd-profile.yaml")
-    profile_content = profile_file.read_text()
+def _remove_old_docker_image(image_tag: str, verbose: bool = False) -> None:
+    """
+    Remove an old Docker image if it exists.
 
-    # Replace the placeholder with the actual cache directory path
-    profile_content = profile_content.replace("CACHE_SOURCE_PLACEHOLDER", home_cache_dir)
-    profile_as_dict = yaml.safe_load(profile_content)
+    Args:
+        image_tag: Tag of the image to remove
+        verbose: Whether to show detailed output
 
-    # Verify the cache mount device is properly configured
-    cache_mount_device = profile_as_dict.get("devices", {}).get("slurm-factory-cache", {})
-    if cache_mount_device:
-        logger.debug(
-            f"Cache mount configured: {cache_mount_device['source']} -> {cache_mount_device['path']}"
-        )
-    else:
-        logger.warning("Cache mount device not found in profile configuration")
-
-    lxc.profile_edit(profile=profile_name, config=profile_as_dict, project=project_name)
-    logger.debug(f"Successfully configured LXD profile '{profile_name}'")
-
-
-def _get_data_file(filename: str) -> Path:
-    """Get path to a data file, prioritizing installed package locations over development."""
-    # First priority: Virtual environment (for pip installed packages)
-    if hasattr(sys, "prefix") and sys.prefix != sys.base_prefix:
-        # We're in a virtual environment
-        venv_path = Path(sys.prefix) / "share" / "slurm-factory" / filename
-        if venv_path.exists():
-            return venv_path.resolve()
-
-    # Second priority: System-wide installation locations
-    try:
-        # Check each site-packages directory for shared data
-        for site_dir in site.getsitepackages() + [site.getusersitepackages()]:
-            if site_dir:
-                installed_path = Path(site_dir) / "share" / "slurm-factory" / filename
-                if installed_path.exists():
-                    return installed_path.resolve()
-
-                # Also check the parent directory of site-packages for share
-                parent_share = Path(site_dir).parent / "share" / "slurm-factory" / filename
-                if parent_share.exists():
-                    return parent_share.resolve()
-    except Exception:
-        pass
-
-    # Last fallback: Development mode (files in current directory)
-    dev_path = Path.cwd() / "data" / filename
-    if dev_path.exists():
-        return dev_path.resolve()
-
-    # If nothing found, return the development path anyway (will cause an error if file doesn't exist)
-    raise FileNotFoundError(f"Data file '{filename}' not found in any expected location")
-
-
-def _wait_for_cloud_init_with_output(instance: lxd.LXDInstance):
-    """Wait for cloud-init to finish, showing real-time log output."""
-    console = Console()
+    """
+    logger.debug(f"Checking for existing Docker image: {image_tag}")
 
     try:
-        # This command will block until cloud-init is done
-        console.print("[dim cyan]Running cloud-init status --wait...[/dim cyan]")
-        result = instance.execute_run(
-            command=["cloud-init", "status", "--wait"],
-            timeout=CLOUD_INIT_TIMEOUT,  # 5 minute timeout
+        # Check if image exists
+        result = subprocess.run(
+            ["docker", "images", "-q", image_tag],
+            capture_output=True,
+            text=True,
+            timeout=10,
         )
 
-        if result.returncode != 0:
-            logger.error(f"Cloud-init failed with return code {result.returncode}")
-            console.print(f"[bold red]✗ Cloud-init failed with return code {result.returncode}[/bold red]")
-            # Show the error details
-            try:
-                error_result = instance.execute_run(command=["cat", "/var/log/cloud-init.log"], timeout=30)
-                console.print("[bold red]Cloud-init error log:[/bold red]")
-                if error_result.stdout:
-                    for line in error_result.stdout.split("\n")[-20:]:  # Last 20 lines
-                        if line.strip():
-                            console.print(f"[red]  {line}[/red]")
-                            logger.error(f"Cloud-init error: {line.strip()}")
-            except Exception as log_error:
-                logger.warning(f"Could not retrieve cloud-init error log: {log_error}")
-            raise SlurmFactoryError("Cloud-init failed, see logs for details")
+        if result.stdout.strip():
+            # Image exists, remove it
+            console.print(f"[bold yellow]Removing old Docker image: {image_tag}[/bold yellow]")
+            remove_result = subprocess.run(
+                ["docker", "rmi", "-f", image_tag],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+
+            if remove_result.returncode == 0:
+                console.print("[bold green]✓ Removed old Docker image[/bold green]")
+                logger.debug(f"Removed Docker image: {image_tag}")
+            else:
+                logger.warning(f"Failed to remove Docker image: {remove_result.stderr}")
+        else:
+            logger.debug(f"No existing Docker image found for: {image_tag}")
 
     except Exception as e:
-        logger.error(f"Error waiting for cloud-init: {e}")
-        console.print(f"[bold red]✗ Error waiting for cloud-init: {e}[/bold red]")
-        raise SlurmFactoryError("Error waiting for cloud-init, see logs for details")
+        # Don't fail the build if we can't remove the old image
+        logger.warning(f"Could not remove old Docker image: {e}")
+        if verbose:
+            console.print(f"[dim]Warning: Could not remove old image: {escape(str(e))}[/dim]")
 
 
-def _copy_templates_to_container(
-    lxd_instance: lxd.LXDInstance, verbose: bool = False, target_description: str = "container"
-):
-    """Copy template files into the container."""
-    templates_source = _get_data_file("templates")
+def _clear_cache_directory(cache_dir: str, verbose: bool = False) -> None:
+    """
+    Clear the cache directory to force a completely fresh build.
 
-    if templates_source.exists():
-        logger.debug(f"Copying template files from {templates_source} into {target_description}")
+    Args:
+        cache_dir: Path to the cache directory to clear
+        verbose: Whether to show detailed output
 
-        # Read the template files and copy them into the container
-        # Create the templates directory in the container first
-        create_dir_commands = BASH_HEADER + [f"mkdir -p {CONTAINER_SPACK_TEMPLATES_DIR}"]
-        _stream_exec_output(
-            lxd_instance,
-            create_dir_commands,
-            f"Creating templates directory in {target_description}",
-            verbose=verbose,
-        )
+    """
+    console.print("[bold yellow]Clearing cache directory for fresh build...[/bold yellow]")
+    logger.debug(f"Clearing cache directory: {cache_dir}")
 
-        for template_file in templates_source.glob("*"):
-            if template_file.is_file():
-                # Use LXD's file copying to avoid shell escaping issues
-                destination_path = f"{CONTAINER_SPACK_TEMPLATES_DIR}/{template_file.name}"
+    import shutil
 
-                try:
-                    lxd_instance.push_file_io(
-                        content=io.BytesIO(template_file.read_bytes()),
-                        destination=PurePath(destination_path),
-                        file_mode="644",
-                    )
-                    logger.info(
-                        f"Copied {template_file.name} to container at {CONTAINER_SPACK_TEMPLATES_DIR}"
-                    )
-                except Exception as e:
-                    logger.error(f"Failed to copy template file {template_file.name}: {e}")
-                    raise
+    cache_path = Path(cache_dir)
 
-        logger.debug(f"Copied template files to {target_description}")
-    else:
-        logger.warning(f"Templates directory not found at {templates_source}")
+    if not cache_path.exists():
+        logger.debug(f"Cache directory does not exist: {cache_dir}")
+        return
 
-
-def _copy_spack_yaml_to_container(
-    lxd_instance: lxd.LXDInstance,
-    spack_yaml: str,
-    target_description: str = "container",
-):
-    """Copy Spack YAML configuration into the container."""
-    destination_path = f"{CONTAINER_SPACK_PROJECT_DIR}/spack.yaml"
-
-    logger.debug(f"Copying Spack YAML configuration to {target_description} at {destination_path}")
     try:
-        lxd_instance.push_file_io(
-            content=io.BytesIO(spack_yaml.encode("utf-8")),
-            destination=PurePath(destination_path),
-            file_mode="644",
-        )
-    except Exception as e:
-        logger.error(f"Failed to copy spack.yaml to container: {e}")
-        raise
+        # Remove all contents but keep the directory
+        for item in cache_path.iterdir():
+            if item.is_file():
+                item.unlink()
+                if verbose:
+                    console.print(f"[dim]Removed file: {item.name}[/dim]")
+            elif item.is_dir():
+                shutil.rmtree(item)
+                if verbose:
+                    console.print(f"[dim]Removed directory: {item.name}[/dim]")
 
-    logger.debug(f"Copied spack.yaml to {destination_path}")
+        console.print(f"[bold green]✓ Cleared cache directory: {cache_dir}[/bold green]")
+        logger.debug("Cache directory cleared successfully")
+
+    except Exception as e:
+        msg = f"Failed to clear cache directory: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
 
 
 def create_slurm_package(
-    lxd_instance: lxd.LXDInstance,
+    container_name: str,
+    image_tag: str,
     version: str = "25.05",
+    compiler_version: str = "13.3.0",
     gpu_support: bool = False,
     additional_variants: str = "",
     minimal: bool = False,
     verify: bool = False,
+    cache_dir: str = "",
+    verbose: bool = False,
+    no_cache: bool = False,
 ) -> None:
-    """Create slurm package."""
-    console = Console()
-    console.print("[bold blue]Creating slurm package...[/bold blue]")
+    """Create slurm package in a Docker container using a multi-stage build."""
+    console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
+
+    logger.debug(
+        f"Building Slurm package: version={version}, compiler_version={compiler_version}, "
+        f"gpu={gpu_support}, minimal={minimal}, verify={verify}, no_cache={no_cache}"
+    )
 
     try:
-        _setup_spack_project(
-            lxd_instance=lxd_instance,
-            version=version,
+        # If no_cache is enabled, clean up everything first
+        if no_cache:
+            console.print("[bold yellow]🗑️  Performing fresh build - cleaning all caches...[/bold yellow]")
+
+            # Remove old Docker images
+            _remove_old_docker_image(image_tag, verbose=verbose)
+
+            # Clear Docker build cache
+            console.print("[dim]Pruning Docker build cache...[/dim]")
+            try:
+                subprocess.run(
+                    ["docker", "builder", "prune", "-f"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                logger.debug("Docker build cache cleared")
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Could not clear Docker build cache: {e}")
+                if verbose:
+                    console.print(f"[dim]Warning: Could not clear build cache: {escape(str(e))}[/dim]")
+
+            # Clear the cache directory
+            if cache_dir:
+                _clear_cache_directory(cache_dir, verbose=verbose)
+
+        # Generate dynamic Spack configuration
+        logger.debug("Generating dynamic Spack YAML configuration")
+
+        # Determine if we need to use a Spack-built compiler
+        use_spack_compiler = compiler_version != "13.3.0"
+
+        spack_yaml = generate_yaml_string(
+            slurm_version=version,
+            compiler_version=compiler_version,
+            use_spack_compiler=use_spack_compiler,
             gpu_support=gpu_support,
-            additional_variants=additional_variants,
             minimal=minimal,
-            verify=verify,
+            additional_variants=additional_variants,
+            enable_verification=verify,
         )
-    except SlurmFactoryInstanceCreationError as e:
-        logger.error(f"Failed to create slurm package: {e}")
-        raise SlurmFactoryError("Failed to create slurm package")
+        logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
+
+        # Generate multi-stage Dockerfile with embedded spack.yaml
+        # For custom compilers, this creates 4 stages:
+        # 0. compiler-bootstrap: Build custom GCC toolchain (when use_spack_compiler=True)
+        # 1. init: Ubuntu + deps + Spack (heavily cached)
+        # 2. builder: Spack install + view + modules (cached on spack.yaml changes)
+        # 3. packager: Copy assets + create tarball (invalidates on asset changes)
+        logger.debug("Generating multi-stage Dockerfile")
+        dockerfile_content = get_dockerfile(
+            spack_yaml,
+            version,
+            compiler_version=compiler_version,
+            use_spack_compiler=use_spack_compiler,
+            gpu_support=gpu_support,
+            cache_dir=cache_dir,
+        )
+        logger.debug(f"Generated Dockerfile ({len(dockerfile_content)} chars)")
+
+        # Build all stages up to packager (the final stage)
+        console.print(
+            "[bold cyan]Building multi-stage Docker image (init → builder → packager)...[/bold cyan]"
+        )
+        _build_docker_image(
+            image_tag,
+            dockerfile_content,
+            cache_dir,
+            verbose=verbose,
+            no_cache=no_cache,
+            target="packager",  # Build all stages up to packager
+        )
+
+        console.print("[bold green]✓ Multi-stage build complete[/bold green]")
+
+        # Extract the tarball from the packager image
+        if cache_dir:
+            console.print("[bold cyan]Extracting tarball from image...[/bold cyan]")
+            extract_slurm_package_from_image(
+                image_tag=image_tag,
+                output_dir=cache_dir,
+                version=version,
+                compiler_version=compiler_version,
+                verbose=verbose,
+            )
+
+        console.print("[bold green]✓ Slurm package built successfully[/bold green]")
+
+    except SlurmFactoryStreamExecError as e:
+        msg = f"Build failed: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to create slurm package: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+
+
+def extract_slurm_package_from_image(
+    image_tag: str,
+    output_dir: str,
+    version: str,
+    compiler_version: str = "13.3.0",
+    verbose: bool = False,
+) -> None:
+    """
+    Extract the Slurm package tarball from a packager Docker image.
+
+    Args:
+        image_tag: Tag of the packager Docker image
+        output_dir: Directory to extract the tarball to (will be appended with version/compiler_version)
+        version: Slurm version (for finding the correct tarball)
+        compiler_version: GCC compiler version used for the build
+        verbose: Whether to show detailed output
+
+    """
+    console.print(f"[bold blue]Extracting Slurm package from image {image_tag}...[/bold blue]")
+
+    # Create version-specific output directory: ~/.slurm-factory/version/compiler_version/
+    base_path = Path(output_dir)
+    output_path = base_path / version / compiler_version
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    logger.debug(f"Extracting package from image {image_tag} to {output_path}")
+
+    container_name = f"slurm-factory-extract-{version.replace('.', '-')}"
+
+    # Tarball name always includes compiler version for consistency
+    tarball_name = f"slurm-{version}-gcc{compiler_version}-software.tar.gz"
+
+    container_tarball_path = f"/opt/slurm/build_output/{tarball_name}"
+
+    try:
+        # Create a temporary container from the image
+        logger.debug(f"Creating temporary container {container_name}")
+        result = subprocess.run(
+            ["docker", "create", "--name", container_name, image_tag],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to create container for extraction: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        # Copy the tarball from the container
+        logger.debug(f"Copying {container_tarball_path} from container to {output_path}")
+        console.print(f"[dim]Copying tarball to {output_path}...[/dim]")
+
+        result = subprocess.run(
+            ["docker", "cp", f"{container_name}:{container_tarball_path}", str(output_path)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to copy tarball from container: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        console.print(f"[bold green]✓ Extracted {tarball_name} to {output_path}[/bold green]")
+        logger.debug(f"Successfully extracted package to {output_path}/{tarball_name}")
+
+    except subprocess.TimeoutExpired:
+        msg = "Extraction timed out"
+        logger.error(msg)
+        console.print(f"[bold red]{msg}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to extract package: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+    finally:
+        # Clean up the temporary container
+        try:
+            subprocess.run(
+                ["docker", "rm", container_name],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            logger.debug(f"Removed temporary container {container_name}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temporary container: {e}")

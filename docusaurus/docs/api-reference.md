@@ -1,0 +1,94 @@
+# API Reference
+
+CLI commands and Python API.
+
+## CLI Commands
+
+### build
+
+Build relocatable Slurm packages.
+
+```bash
+slurm-factory build [OPTIONS]
+```
+
+**Options:**
+- `--slurm-version TEXT` - Slurm version (default: 25.05)
+- `--gpu` - Include GPU support (CUDA/ROCm)
+- `--minimal` - Minimal build (no OpenMPI)
+- `--verify` - Verify relocatability
+
+**Examples:**
+```bash
+slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.05 --gpu
+slurm-factory build --slurm-version 25.05 --minimal
+```
+
+### clean
+
+Remove build containers and caches.
+
+```bash
+slurm-factory clean [OPTIONS]
+```
+
+**Options:**
+- `--full` - Remove all containers and caches (slower next build)
+
+**Examples:**
+```bash
+slurm-factory clean              # Keep caches
+slurm-factory clean --full       # Full cleanup
+```
+
+## Global Options
+
+- `--project-name TEXT` - Custom project name for containers
+- `--verbose` - Enable verbose output
+- `--help` - Show help message
+
+**Examples:**
+```bash
+slurm-factory --project-name prod build --slurm-version 25.05
+slurm-factory --verbose build --slurm-version 25.05
+```
+
+## Python API
+
+```python
+from slurm_factory.builder import build
+from slurm_factory.config import Settings
+
+# Basic build
+build(slurm_version="25.05", gpu=False, minimal=False)
+
+# GPU build
+build(slurm_version="25.05", gpu=True, minimal=False)
+
+# Custom settings
+settings = Settings(project_name="custom")
+build(slurm_version="25.05", settings=settings)
+```
+
+## Configuration
+
+**Environment Variables:**
+- `IF_PROJECT_NAME` - Default project name
+- `SPACK_JOBS` - Parallel build jobs
+
+**Cache Directories:**
+```
+~/.slurm-factory/
+├── builds/              # Final packages
+├── spack-buildcache/    # Binary cache
+├── spack-sourcecache/   # Source downloads
+└── binary_index/        # Dependency cache
+```
+
+## Exceptions
+
+- `SlurmFactoryError` - Base exception
+- `DockerError` - Docker operation failures
+- `BuildError` - Build failures
+- `ConfigurationError` - Invalid configuration

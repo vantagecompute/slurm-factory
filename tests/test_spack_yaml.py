@@ -84,10 +84,8 @@ class TestSpackConfigGeneration:
         assert "+nvml" in slurm_spec
         assert "+rsmi" in slurm_spec
         
-        # Check view packages include GPU libraries
-        gpu_view_packages = gpu_config["spack"]["view"]["default"]["select"]
-        assert "cuda" in gpu_view_packages
-        assert "rocm" in gpu_view_packages
+        # Check view configuration uses hardlinks
+        assert gpu_config["spack"]["view"]["default"]["link_type"] == "hardlink"
 
     def test_generate_spack_config_minimal(self):
         """Test minimal configuration."""
@@ -322,42 +320,40 @@ class TestConfigurationValidation:
     """Test configuration validation and consistency."""
 
     def test_view_packages_consistency(self):
-        """Test that view packages are consistent with build configuration."""
+        """Test that view configuration uses hardlinks."""
         # Standard build
         config = generate_spack_config()
-        view_packages = config["spack"]["view"]["default"]["select"]
+        view_config = config["spack"]["view"]["default"]
         
-        # Should include standard packages (based on actual implementation)
-        required_packages = ["slurm", "readline", "hwloc", "gcc-runtime"]
-        for package in required_packages:
-            assert package in view_packages
+        # Should use hardlink for easier copying
+        assert view_config["link_type"] == "hardlink"
         
-        # Should include OpenMPI for full builds
-        assert "openmpi" in view_packages
-        assert "pmix" in view_packages
+        # Should exclude build tools
+        assert "cmake" in view_config["exclude"]
+        assert "autoconf" in view_config["exclude"]
 
     def test_minimal_view_packages(self):
-        """Test view packages for minimal build."""
+        """Test view configuration for minimal build."""
         config = generate_spack_config(minimal=True)
-        view_packages = config["spack"]["view"]["default"]["select"]
+        view_config = config["spack"]["view"]["default"]
         
-        # Should still have essential packages but not OpenMPI
-        assert "slurm" in view_packages
-        assert "readline" in view_packages
-        assert "gcc-runtime" in view_packages
+        # Should use hardlink for easier copying
+        assert view_config["link_type"] == "hardlink"
         
-        # OpenMPI-related packages should be excluded for minimal builds
-        assert "openmpi" not in view_packages
-        assert "pmix" not in view_packages
+        # Build tools should still be excluded
+        assert "cmake" in view_config["exclude"]
 
     def test_gpu_view_packages(self):
-        """Test view packages for GPU build."""
+        """Test view configuration for GPU build."""
         config = generate_spack_config(gpu_support=True)
-        view_packages = config["spack"]["view"]["default"]["select"]
+        view_config = config["spack"]["view"]["default"]
         
-        # Should include GPU packages
-        assert "cuda" in view_packages
-        assert "rocm" in view_packages
+        # Should use hardlink for easier copying
+        assert view_config["link_type"] == "hardlink"
+        
+        # GPU packages should be excluded from view (they'll be copied separately)
+        assert "cuda" in view_config["exclude"]
+        assert "rocm-core" in view_config["exclude"]
 
     def test_concretizer_settings(self):
         """Test concretizer configuration."""
