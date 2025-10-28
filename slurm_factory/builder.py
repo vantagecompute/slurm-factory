@@ -35,7 +35,7 @@ def build(
     slurm_version: Annotated[
         SlurmVersion, typer.Option("--slurm-version", help="Slurm version to build")
     ] = SlurmVersion.v25_05,
-    compiler_version: str = "13.3.0",
+    compiler_version: str = "13.4.0",
     gpu: bool = False,
     additional_variants: str = "",
     minimal: bool = False,

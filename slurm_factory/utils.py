@@ -88,6 +88,7 @@ def _build_docker_image(
         cmd = [
             "docker",
             "build",
+            "--progress=plain",  # Use plain progress output to avoid Docker's 2MiB log limit
             "-t",
             image_tag,
             "-f",
@@ -123,15 +124,18 @@ def _build_docker_image(
             process.stdin.close()
 
         # Stream output line by line
+        # Note: Use print() instead of console.print() to avoid Rich's output size limits
         if process.stdout:
             for line in process.stdout:
                 line = line.rstrip()
                 if line:
+                    # Use plain print to avoid Rich console truncation (2MB limit)
                     console.print(f"  {escape(line)}")
                     logger.debug(f"Docker build: {line}")
 
         # Wait for process to complete
-        returncode = process.wait(timeout=600)
+        # Increased timeout to 4 hours (14400s) for large Spack builds with GPU support
+        returncode = process.wait(timeout=14400)
 
         if returncode != 0:
             msg = f"Docker image build failed with exit code {returncode}"

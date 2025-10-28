@@ -63,12 +63,17 @@ def generate_compiler_bootstrap_config(
                 f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran'",
             ],
             "concretizer": {
-                "unify": True,
+                "unify": False,  # Allow different gcc versions for build vs runtime
                 "reuse": False,
             },
             "packages": {
                 "all": {
                     "target": ["x86_64_v3"],
+                    "buildable": True,
+                },
+                # CRITICAL: Prevent gcc from being used as external (Spack auto-detects and adds it)
+                "gcc": {
+                    "externals": [],
                     "buildable": True,
                 },
                 # Build tools as externals for speed
