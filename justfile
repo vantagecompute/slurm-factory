@@ -1,3 +1,4 @@
+#!/usr/bin/env just --justfile
 # Copyright 2025 Vantage Compute Corporation
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -14,13 +15,64 @@
 
 uv := require("uv")
 
+project_dir := justfile_directory()
+src_dir := project_dir / "slurm_factory"
+tests_dir := project_dir / "tests"
+
 export PY_COLORS := "1"
 export PYTHONBREAKPOINT := "pdb.set_trace"
+export PYTHONPATH := src_dir
 
 uv_run := "uv run --frozen --extra dev"
 
-src_dir := "slurm_factory"
-tests_dir := "tests"
+# Install Docusaurus dependencies
+[group("docusaurus")]
+docs-install:
+    @echo "📦 Installing Docusaurus dependencies..."
+    cd docusaurus && yarn install
+
+# Start Docusaurus development server
+[group("docusaurus")]
+docs-dev: docs-install
+    @echo "🚀 Starting Docusaurus development server..."
+    cd docusaurus && yarn start
+
+# Start Docusaurus development server on specific port
+[group("docusaurus")]
+docs-dev-port port="3000": docs-install
+    @echo "🚀 Starting Docusaurus development server on port {{port}}..."
+    cd docusaurus && yarn start --port {{port}}
+
+# Build Docusaurus for production
+[group("docusaurus")]
+docs-build: docs-install
+    #{{uv_run}} python3 ./scripts/generate_complete_docs.py
+    {{uv_run}} python3 ./scripts/update_docs_version.py
+    @echo "🏗️ Building Docusaurus for production..."
+    cd docusaurus && yarn build
+
+# Serve built Docusaurus site locally
+[group("docusaurus")]
+docs-serve: docs-build
+    @echo "🌐 Serving built Docusaurus site..."
+    cd docusaurus && yarn serve
+
+# Clean Docusaurus build artifacts
+[group("docusaurus")]
+docs-clean:
+    @echo "🧹 Cleaning Docusaurus build artifacts..."
+    cd docusaurus && rm -rf build .docusaurus
+
+# Show available documentation commands
+[group("docusaurus")]
+docs-help:
+    @echo "📚 Docusaurus Commands:"
+    @echo "  docs-install    - Install dependencies"
+    @echo "  docs-dev        - Start development server"
+    @echo "  docs-dev-port   - Start dev server on specific port"
+    @echo "  docs-build      - Build for production"
+    @echo "  docs-serve      - Serve built site"
+    @echo "  docs-clean      - Clean build artifacts"
 
 [private]
 default:
@@ -66,33 +118,28 @@ typecheck: lock
 # Run unit tests only
 [group("test")]
 unit: lock
+    {{uv_run}} pytest {{tests_dir}}/unit -v --tb=short --cov={{src_dir}} --cov-report=term-missing
+
+# Run integration tests only
+[group("test")]
+integration: lock
+    {{uv_run}} pytest {{tests_dir}}/integration -v --tb=short --cov={{src_dir}} --cov-report=term-missing
+
+# Run all tests (unit + integration)
+[group("test")]
+test: lock
     {{uv_run}} pytest {{tests_dir}} -v --tb=short --ignore=data --cov={{src_dir}} --cov-report=term-missing
 
 
 # Print spack.yaml configuration for CPU-only build (standard)
 [group("config")]
 show-config-cpu:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.05', False, False))"
+    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', False))"
 
 # Print spack.yaml configuration for GPU-enabled build
 [group("config")]
 show-config-gpu:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.05', True, False))"
-
-# Print spack.yaml configuration for minimal build (CPU-only, no OpenMPI)
-[group("config")]
-show-config-minimal:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.05', False, True))"
-
-# Print spack.yaml configuration for minimal GPU build (with GPU support, no OpenMPI)
-[group("config")]
-show-config-minimal-gpu:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.05', True, True))"
-
-# Print spack.yaml configuration with verification enabled (for CI/debugging)
-[group("config")]
-show-config-verify:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.05', False, False, True))"
+    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', True))"
 
 # List all available Slurm versions
 [group("config")]

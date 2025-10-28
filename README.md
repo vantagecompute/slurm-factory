@@ -1,336 +1,284 @@
 <div align="center">
 <a href="https://www.vantagecompute.ai/">
-  <img src="https://vantage-compute-public-assets.s3.us-east-1.amazonaws.com/branding/vantage-logo-text-black-horz.png" alt="Vantage Compute Logo" width="100" style="margin-bottom: 0.5em;"/>
+  <img src="https://vantage-compute-public-assets.s3.us-east-1.amazonaws.com/branding/vantage-logo-text-black-horz.png" alt="Vantage Compute Logo" width="100"/>
 </a>
-</div>
-<div align="center">
 
 # Slurm Factory
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
-[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://python.org)
+[![Python](https://img.shields.io/badge/python-3.12+-blue.svg)](https://python.org)
 [![PyPI](https://img.shields.io/pypi/v/slurm-factory.svg)](https://pypi.org/project/slurm-factory/)
-[![LXD](https://img.shields.io/badge/LXD-5.0+-orange.svg)](https://linuxcontainers.org/lxd)
+[![Docker](https://img.shields.io/badge/Docker-24.0+-blue.svg)](https://docker.com)
 
-![Build Status](https://img.shields.io/github/actions/workflow/status/vantagecompute/slurm-factory/ci.yaml?branch=main&label=build&logo=github&style=plastic)
-![GitHub Issues](https://img.shields.io/github/issues/vantagecompute/slurm-factory?label=issues&logo=github&style=plastic)
-![Pull Requests](https://img.shields.io/github/issues-pr/vantagecompute/slurm-factory?label=pull-requests&logo=github&style=plastic)
-![GitHub Contributors](https://img.shields.io/github/contributors/vantagecompute/slurm-factory?logo=github&style=plastic)
+Build relocatable, **GPG-signed** Slurm packages using Docker and Spack.
+
+[Documentation](https://vantagecompute.github.io/slurm-factory) | [Buildcache](https://slurm-factory-spack-binary-cache.vantagecompute.ai)
 
 </div>
 
-A modern Python CLI tool that automates building **truly relocatable**, **optimized** Slurm workload manager packages using LXD containers and the Spack package manager. Built for rapid deployment across diverse HPC environments with intelligent caching, portable modules, and bootstrapped compiler workflows.
+## Quick Start
 
-## 🚀 Quick Start
+### Option 1: Install Pre-built Slurm from Buildcache (Fastest!)
 
-### Option 1: Install from PyPI (Recommended)
+Use Spack to install GPG-signed pre-built binaries (**no slurm-factory tool needed**):
 
 ```bash
-# Install LXD
-sudo snap install lxd && sudo lxd init
+# Install Spack
+git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+source spack/share/spack/setup-env.sh
 
-# Install slurm-factory from PyPI
+# Add buildcache and install Slurm (5-15 min!)
+spack mirror add slurm-factory https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+spack buildcache keys --install --trust
+spack install slurm@25.11%gcc@13.4.0
+```
+
+**→ Full guide:** [Installing Slurm from Buildcache](https://vantagecompute.github.io/slurm-factory/installing-slurm-from-buildcache)
+
+### Option 2: Build Custom Slurm with slurm-factory Tool
+
+Install the slurm-factory tool to build custom packages:
+
+```bash
+# Install Docker and the slurm-factory build tool
 pip install slurm-factory
 
-# Build latest Slurm
-slurm-factory build
+# Build Slurm with default compiler (GCC 13.4.0)
+slurm-factory build --slurm-version 25.11
 ```
 
-### Option 2: Install from Source
+**→ Full guide:** [Installing slurm-factory Tool](https://vantagecompute.github.io/slurm-factory/installation)
+
+## Supported Versions
+
+### Slurm × GCC Matrix
+
+All combinations are **GPG-signed** and available in the public buildcache:
+
+| Slurm Version | Status      | GCC Versions                                                |
+|---------------|-------------|-------------------------------------------------------------|
+| **25.11**     | Latest      | 15.2.0, 14.2.0, **13.4.0**, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0 |
+| **24.11**     | LTS         | 15.2.0, 14.2.0, **13.4.0**, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0 |
+| **23.11**     | Stable      | 15.2.0, 14.2.0, **13.4.0**, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0 |
+
+**Default**: GCC 13.4.0 (recommended for most users)
+
+### GCC Compiler Toolchains
+
+| Version | Target Distribution  | glibc | Use Case                        |
+|---------|---------------------|-------|---------------------------------|
+| 15.2.0  | Latest              | 2.39  | Cutting-edge features           |
+| 14.2.0  | Latest              | 2.39  | Modern features                 |
+| **13.4.0** | **Ubuntu 24.04**  | **2.39** | **Recommended default**      |
+| 12.5.0  | Latest              | 2.35  | Good compatibility              |
+| 11.5.0  | Ubuntu 22.04        | 2.35  | Wide compatibility              |
+| 10.5.0  | RHEL 8/Ubuntu 20.04 | 2.31  | Enterprise Linux 8              |
+| 9.5.0   | Latest              | 2.28  | Older systems                   |
+| 8.5.0   | RHEL 8              | 2.28  | Enterprise Linux 8              |
+| 7.5.0   | RHEL 7              | 2.17  | Maximum backward compatibility  |
+
+## GPG Package Signing
+
+All packages are **cryptographically signed with GPG** for security and integrity.
+
+### Why GPG Signing?
+
+- ✅ **Authenticity**: Verify packages were built by Vantage Compute
+- ✅ **Integrity**: Detect tampering or corruption during download
+- ✅ **Security**: Prevent man-in-the-middle attacks
+- ✅ **Trust Chain**: Establish provenance for production deployments
+
+### GPG Key Information
+
+```text
+Key ID: DFB92630BCA5AB71
+Owner: Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key)
+Email: info@vantagecompute.ai
+```
+
+### Importing GPG Keys
+
+Keys are automatically imported when using the buildcache:
 
 ```bash
-# Install LXD and UV
-sudo snap install lxd && sudo lxd init
-curl -LsSf https://astral.sh/uv/install.sh | sh
+# Automatic import and trust
+spack buildcache keys --install --trust
 
-# Clone and setup
-git clone https://github.com/vantagecompute/slurm-factory.git
-cd slurm-factory && uv sync
-
-# Build latest Slurm
-uv run slurm-factory build
+# Packages are verified during installation
+spack install slurm@25.11%gcc@13.4.0
 ```
 
-Extract and deploy packages on your HPC cluster!
+## Features
 
-## 🔧 Requirements
+- **🔐 GPG-Signed Packages** - All compiler and Slurm packages cryptographically signed
+- **⚡ 10-15x Faster** - Pre-built packages install in 5-15 minutes vs 45-90 minutes
+- **📦 Relocatable** - Deploy to any path, no host dependencies
+- **🌍 CDN Distribution** - CloudFront-distributed buildcache for fast global access
+- **🔧 9 GCC Versions** - From GCC 7.5.0 (RHEL 7) to 15.2.0 (latest)
+- **🎯 3 Slurm Versions** - 25.11, 24.11, 23.11
+- **🚀 Optimized** - Architecture-specific compilation (x86_64_v3)
+- **🐳 Clean Builds** - Docker isolation, no system pollution
 
-- **LXD**: Container runtime for isolated builds
-- **Python 3.10+**: Runtime environment (automatically configured)
-- **50GB+ disk space**: For build caches and package storage
-- **4+ CPU cores**: Recommended for parallel compilation (8+ cores optimal)
-- **16GB+ RAM**: Minimum for large builds (32GB+ recommended)
+## Build Options
 
-### Automatic Dependencies
+### Build from Source with slurm-factory
 
-slurm-factory automatically manages build dependencies within containers:
-- **Spack**: Installed and configured in build containers
-- **Build Toolchain**: GCC, CMake, autotools (containerized)
-- **CUDA/ROCm**: Optional GPU support packages (when building with GPU features)
+```bash
+# Default build (CPU-only, GCC 13.4.0)
+slurm-factory build --slurm-version 25.11
 
-## ✨ Key Features
+# GPU support (CUDA/ROCm)
+slurm-factory build --slurm-version 25.11 --gpu
 
-- **🎯 Truly Relocatable**: Bootstrapped compiler workflow with no host dependencies, proper RPATH configuration, and Spack-built runtime libraries
-- **🔄 Portable Modules**: Deploy the same package to different filesystem paths using runtime environment variables (no LD_LIBRARY_PATH pollution)
-- **⚡ Optimized Build Pipeline**: Intelligent caching with base images, build-cache reuse, and parallel compilation
-- **📦 Smart Packaging**: Runtime libraries built fresh, build tools as externals for minimal footprint
-- **🖥️ Multi-Architecture**: CPU-specific optimizations and optional GPU support (CUDA/ROCm)
-- **🏗️ Container Isolation**: Reproducible builds in clean LXD container environments
-- **🚀 Ultra-Fast Rebuilds**: Persistent build-cache and source-cache for subsequent builds (>10x speedup)
-- **✅ CI/CD Integration**: Optional verification mode with `--verify` flag for automated testing
+# Different compiler version
+slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
 
-## 📋 Supported Versions
+# Build and publish to buildcache with GPG signing
+slurm-factory build --slurm-version 25.11 --publish \
+  --signing-key $GPG_KEY_ID \
+  --gpg-private-key "$GPG_PRIVATE_KEY" \
+  --gpg-passphrase "$GPG_PASSPHRASE"
+```
 
-| Version | Status | Package Size (CPU) | Package Size (GPU) |
-|---------|---------|--------------------|--------------------|
-| 25.05   | ✅ Latest | ~2-5GB | ~15-25GB |
-| 24.11   | ✅ LTS | ~2-5GB | ~15-25GB |
-| 23.11   | ✅ Stable | ~2-5GB | ~15-25GB |
-| 23.02   | ✅ Legacy | ~2-5GB | ~15-25GB |
+### Install Pre-built from Buildcache (Fastest!)
 
-## 📚 Documentation
+```bash
+# Install Spack
+git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+source spack/share/spack/setup-env.sh
 
-Visit our comprehensive documentation site:
+# Add buildcache mirror
+spack mirror add slurm-factory \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+
+# Import GPG signing keys and trust
+spack buildcache keys --install --trust
+
+# Install signed package (5-15 minutes!)
+spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
+
+# Deploy
+spack load slurm@25.11
+```
+
+### Build Compiler Toolchain
+
+Build GCC compiler toolchains separately for reuse:
+
+```bash
+# Build default compiler (GCC 13.4.0)
+slurm-factory build-compiler
+
+# Build specific version
+slurm-factory build-compiler --compiler-version 15.2.0
+
+# Build and publish to buildcache with GPG signing
+slurm-factory build-compiler --compiler-version 13.4.0 \
+  --publish=compiler \
+  --signing-key $GPG_KEY_ID \
+  --gpg-private-key "$GPG_PRIVATE_KEY" \
+  --gpg-passphrase "$GPG_PASSPHRASE"
+```
+
+## Package Structure
+
+All builds produce GPG-signed relocatable tarballs:
+
+```text
+slurm-25.11-gcc13.4.0-software.tar.gz
+├── view/                    # Slurm binaries & libraries
+├── modules/slurm/25.11.lua  # Lmod module (relocatable)
+└── data/slurm_assets/       # Config templates & install script
+```
+
+## Deployment
+
+```bash
+# Extract (from tarball build)
+sudo tar -xzf slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
+
+# Install (creates users, configs, services)
+cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
+
+# Use
+module load slurm/25.11
+```
+
+## Buildcache Structure
+
+The public buildcache is organized by version:## Buildcache Structure
+
+The public buildcache is organized by version:
+
+```text
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/
+├── compilers/
+│   ├── 15.2.0/    # GCC 15.2.0 + dependencies (GPG-signed)
+│   ├── 14.2.0/    # GCC 14.2.0 + dependencies (GPG-signed)
+│   ├── 13.4.0/    # GCC 13.4.0 + dependencies (GPG-signed)
+│   ├── 12.5.0/    # GCC 12.5.0 + dependencies (GPG-signed)
+│   ├── 11.5.0/    # GCC 11.5.0 + dependencies (GPG-signed)
+│   ├── 10.5.0/    # GCC 10.5.0 + dependencies (GPG-signed)
+│   ├── 9.5.0/     # GCC 9.5.0 + dependencies (GPG-signed)
+│   ├── 8.5.0/     # GCC 8.5.0 + dependencies (GPG-signed)
+│   └── 7.5.0/     # GCC 7.5.0 + dependencies (GPG-signed)
+└── slurm/
+    ├── 25.11/
+    │   ├── 15.2.0/    # Slurm 25.11 built with GCC 15.2.0 (GPG-signed)
+    │   ├── 14.2.0/    # Slurm 25.11 built with GCC 14.2.0 (GPG-signed)
+    │   ├── 13.4.0/    # Slurm 25.11 built with GCC 13.4.0 (GPG-signed)
+    │   └── ...
+    ├── 24.11/
+    │   └── ...        # All GCC versions (GPG-signed)
+    └── 23.11/
+        └── ...        # All GCC versions (GPG-signed)
+```
+
+## Requirements
+
+- Python 3.12+
+- Docker 24.0+ (for building from source)
+- 50GB disk space
+- 4+ CPU cores (8+ recommended)
+- 16GB RAM (32GB+ recommended)
+
+For buildcache installs: only Spack required (no Docker needed)
+
+## Documentation
+
 **[vantagecompute.github.io/slurm-factory](https://vantagecompute.github.io/slurm-factory)**
 
-- **[Installation Guide](https://vantagecompute.github.io/slurm-factory/installation/)**: Detailed setup instructions
-- **[Architecture Overview](https://vantagecompute.github.io/slurm-factory/architecture/)**: How slurm-factory works
-- **[Deployment Guide](https://vantagecompute.github.io/slurm-factory/deployment/)**: Production deployment workflows
-- **[API Reference](https://vantagecompute.github.io/slurm-factory/api-reference/)**: Complete CLI documentation
-- **[Troubleshooting](https://vantagecompute.github.io/slurm-factory/troubleshooting/)**: Common issues and solutions
+- [Overview](https://vantagecompute.github.io/slurm-factory/overview) - Architecture and features
+- [Installation](https://vantagecompute.github.io/slurm-factory/installation) - Setup and quick start
+- [Examples](https://vantagecompute.github.io/slurm-factory/examples) - Common use cases
+- [Buildcache Guide](https://vantagecompute.github.io/slurm-factory/slurm-factory-spack-build-cache) - GPG signing and distribution
+- [API Reference](https://vantagecompute.github.io/slurm-factory/api-reference) - Python API
 
-## 🛠️ Basic Usage
-
-### Building Packages
+## Development
 
 ```bash
-# Build latest Slurm (CPU-optimized, truly relocatable)
-uv run slurm-factory build
+# Install from source
+git clone https://github.com/vantagecompute/slurm-factory.git
+cd slurm-factory
+pip install -e .
 
-# Build specific version with GPU support
-uv run slurm-factory build --slurm-version 24.11 --gpu
+# Run tests
+pytest
 
-# Build minimal Slurm (no OpenMPI, smaller size)
-uv run slurm-factory build --minimal
-
-# Build with CI verification (for testing relocatability)
-uv run slurm-factory build --minimal --verify
-
-# Build with verbose output
-uv run slurm-factory --verbose build
+# Build docs
+cd docusaurus && npm run build
 ```
 
-**Note**: All builds now use a bootstrapped compiler workflow (gcc@13.3.0 +binutils) and generate self-contained Lmod modules with proper RPATH configuration, eliminating any host dependencies for true relocatability.
+## License
 
-### Deploying Packages
+Apache License 2.0 - See [LICENSE](LICENSE) file.
 
-```bash
-# Extract software package on target system
-sudo mkdir -p /opt/slurm
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /opt/slurm
+## Support
 
-# Extract module files to system module directory
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-module.tar.gz -C /usr/share/lmod/lmod/modulefiles
-
-# Load the module (module name will be generated by Spack, typically slurm/version)
-module load slurm/25.05
-```
-
-### Deploying Relocatable Packages
-
-```bash
-# Traditional deployment (specific path)
-sudo mkdir -p /opt/slurm
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /opt/slurm
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-module.tar.gz -C /usr/share/lmod/lmod/modulefiles
-
-# Load module (uses default path from build)
-module load slurm/25.05
-
-# Alternative deployment (custom path)  
-sudo mkdir -p /shared/apps/slurm-25.05
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /shared/apps/slurm-25.05
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-module.tar.gz -C /usr/share/lmod/lmod/modulefiles
-
-# Load module with custom path
-export SLURM_INSTALL_PREFIX=/shared/apps/slurm-25.05/software
-module load slurm/25.05
-
-# Verify relocated installation
-which srun squeue  # Points to custom path
-echo $SLURM_ROOT   # Shows: /shared/apps/slurm-25.05/software
-```
-
-### Output Structure
-
-```
-~/.slurm-factory/
-├── builds/                      # Build outputs
-│   ├── 25.05/
-│   │   ├── slurm-25.05-software.tar.gz    # Relocatable software (~2-5GB)
-│   │   └── slurm-25.05-module.tar.gz      # Dynamic modules (~4KB)
-│   └── 24.11/
-├── spack-buildcache/            # Persistent binary cache (speeds rebuilds)
-├── spack-sourcecache/           # Source downloads cache
-└── binary_index/                # Build index for dependency tracking
-```
-
-## 🏗️ Build Process Flow
-
-slurm-factory uses an optimized multi-stage build process designed for speed and reproducibility:
-
-```mermaid
-graph LR
-    A[Base Image] --> B[LXD Copy]
-    B --> C[Cache Mount]
-    C --> D[Spack Bootstrap]
-    D --> E[Slurm Build]
-    E --> F[Package Creation]
-    
-    subgraph "Optimization Layers"
-        G[Build Cache] --> E
-        H[Source Cache] --> E
-        I[ccache] --> E
-        J[Parallel Jobs] --> E
-    end
-    
-    subgraph "Output Artifacts"
-        F --> K[Software TAR]
-        F --> L[Module TAR]
-        F --> M[Relocatable Module]
-    end
-```
-
-### Stage 1: Base Container Preparation
-- **Base Image**: Ubuntu 24.04 LXD container with essential build tools
-- **Cache Strategy**: Reuse base container across builds for consistency
-- **Mount Points**: Persistent cache directories for build and source artifacts
-
-### Stage 2: Dependency Resolution & Optimization
-- **External Tools**: Use system build tools (cmake, autotools, compilers) as externals
-- **Runtime Libraries**: Build essential runtime deps (munge, json-c, curl, openssl) fresh
-- **Smart Externals**: Leverage system packages for build-only dependencies
-
-### Stage 3: Accelerated Compilation
-- **Build Cache**: Reuse compiled packages across builds (>10x speedup for subsequent builds)
-- **Source Cache**: Persistent source downloads to avoid re-fetching
-- **ccache**: Compiler cache for faster C/C++ compilation  
-- **Parallel Jobs**: 4 concurrent build jobs for faster compilation
-- **Hardlink Views**: Efficient package views using hardlinks instead of symlinks
-
-### Stage 4: Relocatable Package Assembly  
-- **Dynamic Prefix**: Modules support `SLURM_INSTALL_PREFIX` environment variable override
-- **Self-Contained**: All runtime dependencies included in package
-- **Portable Modules**: Lmod modules work across different filesystem layouts
-
-### Runtime vs Build Dependencies Strategy
-
-slurm-factory uses an intelligent dependency classification system for optimal package size and performance:
-
-#### 🔧 **Built Fresh (Runtime Critical)**
-These libraries are compiled specifically for your target architecture and included in the package:
-- **munge** - Authentication daemon (security critical)
-- **json-c** - JSON parsing (runtime linked)  
-- **curl** - HTTP client for REST API (runtime linked)
-- **openssl** - SSL/TLS encryption (runtime linked)
-- **hwloc** - Hardware topology (runtime linked)
-- **readline, ncurses** - Interactive CLI support
-- **lz4, zlib-ng** - Compression libraries (runtime linked)
-
-#### ⚙️ **External Tools (Build Only)**  
-System packages used during build but not needed at runtime:
-- **cmake, autotools** - Build system tools
-- **gcc, compilers** - Compilation toolchain
-- **pkg-config** - Build configuration
-- **bison, flex** - Parser generators
-- **System libraries** - glib, libxml2, dbus (system-level abstractions)
-
-This strategy results in:
-- **Minimal Runtime Footprint**: Only essential libraries included
-- **Maximum Performance**: Architecture-specific optimizations for runtime deps
-- **Fast Builds**: Leverage fast system packages for build tools
-- **High Portability**: Self-contained runtime with minimal system requirements
-
-## 🎯 Relocatable Module Architecture
-
-slurm-factory generates **relocatable Lmod modules** that can be deployed to different filesystem locations without modification:
-
-### Dynamic Prefix Support
-```bash
-# Default behavior - uses build-time installation path
-module load slurm/25.05
-
-# Custom installation path - override at runtime  
-export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.05
-
-# Works with any filesystem layout
-export SLURM_INSTALL_PREFIX=/opt/hpc/slurm-25.05
-module load slurm/25.05
-```
-
-### Module Implementation
-The generated modules use **environment variable substitution** with **fallback support**:
-
-```lua
--- Dynamic paths that adapt to installation location
-prepend_path("PATH", "${SLURM_INSTALL_PREFIX:-/opt/slurm/software}/bin")
-prepend_path("LD_LIBRARY_PATH", "${SLURM_INSTALL_PREFIX:-/opt/slurm/software}/lib")
-
--- Runtime configuration with override capability
-setenv("SLURM_ROOT", "${SLURM_INSTALL_PREFIX:-/opt/slurm/software}")
-setenv("SLURM_PREFIX", "${SLURM_INSTALL_PREFIX:-/opt/slurm/software}")
-```
-
-### Benefits
-- **🚀 Deploy Once, Use Anywhere**: Same package works across different clusters
-- **🔧 Runtime Flexibility**: Change installation path without rebuilding
-- **📦 Distribution Ready**: Perfect for software repositories and container images
-- **⚡ Zero Downtime**: Update installation paths without rebuilding modules
-- **🏢 Multi-Tenant**: Different users/projects can use different installation locations
-
-## 🎯 Use Cases
-
-- **🏢 Multi-Site Deployments**: Deploy same package across clusters with different filesystem layouts
-- **☁️ Cloud HPC**: Relocatable packages for elastic infrastructure and container orchestration
-- **📦 Software Distribution**: Create redistributable Slurm packages for software repositories
-- **🔄 Migration & Upgrades**: Move installations without rebuilding or reconfiguration
-- **🏫 Research Computing**: Standardized deployments across heterogeneous cluster environments
-- **⚡ DevOps Automation**: Scriptable deployments with runtime path configuration
-
-## 🤝 Contributing
-
-We welcome contributions! See our [Contributing Guide](https://vantagecompute.github.io/slurm-factory/contributing/) for details on:
-
-- Setting up development environment
-- Code style guidelines  
-- Submitting pull requests
-- Reporting issues
-
-## 📄 License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-Copyright 2025 Vantage Compute Corporation
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
-## 🆘 Support
-
-- **Issues**: [GitHub Issues](https://github.com/vantagecompute/slurm-factory/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/vantagecompute/slurm-factory/discussions)
-- **Email**: [james@vantagecompute.ai](mailto:james@vantagecompute.ai)
+- Issues: [github.com/vantagecompute/slurm-factory/issues](https://github.com/vantagecompute/slurm-factory/issues)
+- Docs: [vantagecompute.github.io/slurm-factory](https://vantagecompute.github.io/slurm-factory)
+- Website: [vantagecompute.ai](https://www.vantagecompute.ai)
 
 ---
 
-**Made with ❤️ by [Vantage Compute](https://vantagecompute.ai)**
+Built with ❤️ by [Vantage Compute](https://www.vantagecompute.ai)

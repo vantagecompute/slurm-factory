@@ -1,0 +1,297 @@
+# Copyright 2025 Vantage Compute Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "Build and Publish Compiler Buildcache to S3"
+
+on:
+  workflow_dispatch:
+    inputs:
+      compiler_versions:
+        description: 'Compiler versions to build (comma-separated, e.g., "11.5.0,13.4.0" or "all")'
+        required: true
+        default: 'all'
+        type: string
+
+env:
+  S3_BUCKET: slurm-factory-spack-buildcache-4b670
+  CLOUDFRONT_URL: https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - name: Prepare compiler version matrix
+        id: set-matrix
+        run: |
+          if [ "${{ inputs.compiler_versions }}" = "all" ]; then
+            # Build all supported compiler versions
+            VERSIONS='["15.2.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
+          else
+            # Parse comma-separated list into JSON array
+            IFS=',' read -ra VERS <<< "${{ inputs.compiler_versions }}"
+            VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)  # trim whitespace
+              VERSIONS="${VERSIONS}\"${v}\","
+            done
+            VERSIONS="${VERSIONS%,}]"  # remove trailing comma
+          fi
+          echo "matrix=${VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building compiler versions: ${VERSIONS}"
+
+  build-compiler-buildcache:
+    needs: prepare-matrix
+    runs-on: self-hosted
+    timeout-minutes: 360
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        compiler_version: ${{ fromJson(needs.prepare-matrix.outputs.matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Clean previous builds
+        run: |
+          # Clean up any previous compiler builds for this version
+          rm -rf "$HOME/.slurm-factory/compilers/${{ matrix.compiler_version }}"
+          docker images | grep "slurm-factory:compiler-${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+          
+          # Clean Spack cache directories to prevent state leakage between runs
+          # This ensures the buildcache test truly validates buildcache installation
+          rm -rf "$HOME/.spack"
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 10800  # 3 hours for long-running builds
+
+      - name: Validate GPG secrets
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID secret is not set"
+            exit 1
+          fi
+          echo "✓ GPG secrets are configured"
+          echo "  GPG_KEY_ID: $GPG_KEY_ID"
+
+      - name: Build compiler and publish to buildcache
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "🔨 Building GCC ${{ matrix.compiler_version }} compiler..."
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PASSPHRASE" ]; then
+            echo "Error: GPG_PASSPHRASE is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          echo "Using GPG signing key: $GPG_KEY_ID"
+          uv run slurm-factory build-compiler \
+            --compiler-version ${{ matrix.compiler_version }} \
+            --publish=compiler \
+            --no-cache \
+            --signing-key "$GPG_KEY_ID" \
+            --gpg-private-key "$GPG_PRIVATE_KEY" \
+            --gpg-passphrase "$GPG_PASSPHRASE"
+          
+          # Cleanup build cache
+          docker buildx prune -f
+
+      - name: Verify buildcache upload
+        run: |
+          echo "✅ Compiler buildcache published successfully!"
+          echo "📦 Compiler: GCC ${{ matrix.compiler_version }}"
+          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/compilers/${{ matrix.compiler_version }}"
+          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}"
+          
+          # Verify some files exist in S3
+          echo ""
+          echo "📋 Checking buildcache contents..."
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/compilers/${{ matrix.compiler_version }}/" --recursive | head -10 || echo "Warning: Could not list buildcache contents"
+
+      - name: Setup Python 3.12 for Spack test
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test buildcache installation
+        shell: bash
+        run: |
+          set -e
+          echo "Testing compiler installation from buildcache in Docker container..."
+          
+          # Run test in Docker container with same base image as build
+          docker run --rm \
+            -e CLOUDFRONT_URL="${{ env.CLOUDFRONT_URL }}" \
+            -e COMPILER_VERSION="${{ matrix.compiler_version }}" \
+            ubuntu:24.04 \
+            bash -c '
+            set -e
+            
+            # Install required packages
+            apt-get update
+            apt-get install -y --no-install-recommends \
+              build-essential \
+              ca-certificates \
+              curl \
+              git \
+              gnupg2 \
+              python3 \
+              python3-pip
+            
+            # Create test directory
+            TEST_DIR="/tmp/test-buildcache"
+            mkdir -p "$TEST_DIR"
+            cd "$TEST_DIR"
+            
+            # Clone Spack
+            git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+            cd spack
+            
+            # Isolate Spack user data to prevent caching between runs
+            export SPACK_USER_CACHE_PATH="$TEST_DIR/spack-cache"
+            export SPACK_USER_CONFIG_PATH="$TEST_DIR/spack-config"
+            mkdir -p "$SPACK_USER_CACHE_PATH" "$SPACK_USER_CONFIG_PATH"
+            
+            # Initialize Spack
+            export SPACK_ROOT="$(pwd)"
+            export PATH="$SPACK_ROOT/bin:$PATH"
+            
+            # Verify spack works
+            spack --version
+            
+            # Configure system compiler for bootstrapping
+            echo "Configuring system compiler for bootstrapping..."
+            GCC_VERSION=$(gcc -dumpfullversion -dumpversion)
+            echo "Detected system GCC version: ${GCC_VERSION}"
+            
+            # Create compiler configuration
+            mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
+            printf "%s\n" \
+              "compilers:" \
+              "- compiler:" \
+              "    spec: gcc@${GCC_VERSION}" \
+              "    paths:" \
+              "      cc: /usr/bin/gcc" \
+              "      cxx: /usr/bin/g++" \
+              "      f77: /usr/bin/gfortran" \
+              "      fc: /usr/bin/gfortran" \
+              "    flags: {}" \
+              "    operating_system: ubuntu24.04" \
+              "    target: x86_64" \
+              "    modules: []" \
+              "    environment: {}" \
+              "    extra_rpaths: []" \
+              > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml"
+            
+            echo "✓ Configured GCC ${GCC_VERSION}"
+            spack compiler list
+            
+            # Add buildcache mirror
+            MIRROR_URL="${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+            spack mirror add slurm-factory-buildcache "$MIRROR_URL"
+            
+            # Import GPG keys for signature verification
+            echo "Importing GPG keys..."
+            spack buildcache keys --install --trust || echo "Warning: Could not import GPG keys"
+            
+            # Update the buildcache index
+            echo "Updating buildcache index..."
+            spack buildcache update-index slurm-factory-buildcache || echo "Warning: Could not update buildcache index (buildcache may be new/empty)"
+            
+            # List available packages
+            echo "Available packages in buildcache:"
+            spack buildcache list --allarch | head -20
+            
+            # Install GCC from buildcache only (with signature verification)
+            echo ""
+            echo "Installing GCC ${COMPILER_VERSION} from buildcache with GPG verification..."
+            spack install --use-buildcache only gcc@${COMPILER_VERSION} target=x86_64_v3 2>&1 | tail -50
+            
+            # Verify installation
+            echo ""
+            echo "Verifying GCC installation..."
+            eval $(spack load --sh gcc@${COMPILER_VERSION})
+            gcc --version
+            
+            # Test compilation
+            echo ""
+            echo "Testing C compilation..."
+            printf "%s\n" \
+              "#include <stdio.h>" \
+              "int main() {" \
+              "    printf(\"Hello from GCC!\\\\n\");" \
+              "    return 0;" \
+              "}" \
+              > test.c
+            gcc test.c -o test
+            ./test
+            
+            echo ""
+            echo "✓ Buildcache test successful!"
+            '
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Compiler Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Version:** GCC ${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/compilers/${{ matrix.compiler_version }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-factory-buildcache ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
