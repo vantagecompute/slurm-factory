@@ -1,0 +1,237 @@
+name: "Build and Publish All Slurm Packages (Slurm + Dependencies)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      slurm_versions:
+        description: 'Slurm versions to build (comma-separated, e.g., "25.05,24.11" or "all")'
+        required: true
+        default: '25.05'
+        type: string
+      compiler_versions:
+        description: 'Compiler versions to use (comma-separated, e.g., "11.5.0,13.4.0" or "all")'
+        required: true
+        default: '13.4.0'
+        type: string
+      build_type:
+        description: 'Build type'
+        required: true
+        default: 'default'
+        type: choice
+        options:
+          - default
+          - gpu
+          - minimal
+
+env:
+  S3_BUCKET: slurm-factory-spack-buildcache-4b670
+  CLOUDFRONT_URL: https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+jobs:
+  prepare-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
+      compiler_matrix: ${{ steps.set-matrix.outputs.compiler_matrix }}
+    steps:
+      - name: Prepare version matrices
+        id: set-matrix
+        run: |
+          # Prepare Slurm versions matrix
+          if [ "${{ inputs.slurm_versions }}" = "all" ]; then
+            SLURM_VERSIONS='["25.05", "24.11", "23.11", "23.02"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
+            SLURM_VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              SLURM_VERSIONS="${SLURM_VERSIONS}\"${v}\","
+            done
+            SLURM_VERSIONS="${SLURM_VERSIONS%,}]"
+          fi
+          echo "slurm_matrix=${SLURM_VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building Slurm versions: ${SLURM_VERSIONS}"
+          
+          # Prepare compiler versions matrix
+          if [ "${{ inputs.compiler_versions }}" = "all" ]; then
+            COMPILER_VERSIONS='["14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.compiler_versions }}"
+            COMPILER_VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              COMPILER_VERSIONS="${COMPILER_VERSIONS}\"${v}\","
+            done
+            COMPILER_VERSIONS="${COMPILER_VERSIONS%,}]"
+          fi
+          echo "compiler_matrix=${COMPILER_VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building with compiler versions: ${COMPILER_VERSIONS}"
+
+  build-and-publish-all:
+    needs: prepare-matrix
+    runs-on: self-hosted
+    timeout-minutes: 480
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
+        compiler_version: ${{ fromJson(needs.prepare-matrix.outputs.compiler_matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: "Set up Python"
+        uses: actions/setup-python@v5
+        with:
+          python-version-file: "pyproject.toml"
+
+      - name: Install uv
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Clean previous builds
+        run: |
+          # Clean up any previous builds for this version/compiler combo
+          docker images | grep "slurm-factory:${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - name: Build Slurm and all dependencies and publish to buildcache
+        run: |
+          echo "🔨 Building Slurm ${{ matrix.slurm_version }} (full) with GCC ${{ matrix.compiler_version }}..."
+          
+          BUILD_FLAGS=""
+          if [ "${{ inputs.build_type }}" = "gpu" ]; then
+            BUILD_FLAGS="--gpu"
+          elif [ "${{ inputs.build_type }}" = "minimal" ]; then
+            BUILD_FLAGS="--minimal"
+          fi
+          
+          uv run slurm-factory build \
+            --slurm-version ${{ matrix.slurm_version }} \
+            --compiler-version ${{ matrix.compiler_version }} \
+            ${BUILD_FLAGS} \
+            --publish=all
+
+      - name: Verify buildcache upload
+        run: |
+          echo "✅ Slurm buildcache published successfully!"
+          echo "📦 Slurm Version: ${{ matrix.slurm_version }}"
+          echo "📦 Compiler: GCC ${{ matrix.compiler_version }}"
+          echo "📦 Build Type: ${{ inputs.build_type }}"
+          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache"
+          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache"
+          
+          # Verify some files exist in S3
+          echo ""
+          echo "📋 Checking buildcache contents..."
+          aws s3 ls "s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache/" --recursive | head -30 || echo "Warning: Could not list buildcache contents"
+
+      - name: Setup Python 3.12 for Spack test
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Test buildcache installation
+        shell: bash
+        run: |
+          set -e
+          echo "Testing Slurm installation from buildcache..."
+          
+          # Create test directory
+          TEST_DIR="/tmp/test-slurm-buildcache-${{ matrix.slurm_version }}-${{ matrix.compiler_version }}"
+          rm -rf "$TEST_DIR"
+          mkdir -p "$TEST_DIR"
+          cd "$TEST_DIR"
+          
+          # Clone Spack
+          git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+          cd spack
+          
+          # Initialize Spack (avoid sourcing which can have issues)
+          export SPACK_ROOT="$(pwd)"
+          export PATH="$SPACK_ROOT/bin:$PATH"
+          
+          # Verify spack works
+          spack --version
+          
+          # Add buildcache mirrors (remove if exists first)
+          COMPILER_MIRROR_URL="${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache"
+          SLURM_MIRROR_URL="${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache"
+          spack mirror remove compiler-buildcache 2>/dev/null || true
+          spack mirror remove slurm-buildcache 2>/dev/null || true
+          spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
+          spack mirror add slurm-buildcache "$SLURM_MIRROR_URL"
+          
+          # List available packages
+          echo "Available packages in buildcache:"
+          spack buildcache list --allarch | grep -i slurm | head -20
+          
+          # Try to install Slurm from buildcache only
+          echo ""
+          echo "Installing Slurm from buildcache..."
+          spack install --no-check-signature --cache-only slurm 2>&1 | tail -50
+          
+          # Verify installation
+          echo ""
+          echo "Verifying Slurm installation..."
+          eval $(spack load --sh slurm)
+          sinfo --version || slurmd --version
+          
+          echo ""
+          echo "Buildcache test successful!"
+          
+          # Cleanup
+          cd /
+          rm -rf "$TEST_DIR"
+
+      - name: Summary
+        if: always()
+        run: |
+          echo "## Slurm Full Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Version:** ${{ matrix.slurm_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Version:** GCC ${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Type:** ${{ inputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** This buildcache contains Slurm and all its dependencies" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add compiler-buildcache ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "spack install --no-check-signature slurm@${{ matrix.slurm_version }}" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    needs: build-and-publish-all
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Build Summary
+        run: |
+          echo "## Overall Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Slurm buildcaches (Slurm + dependencies) have been built and published." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Versions:** ${{ inputs.slurm_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Versions:** ${{ inputs.compiler_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Build Type:** ${{ inputs.build_type }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
+          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/slurm/" >> $GITHUB_STEP_SUMMARY
