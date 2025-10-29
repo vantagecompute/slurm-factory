@@ -28,21 +28,16 @@ SLURM_VERSIONS = {
 
 # Supported compiler versions for building
 # Key: user-facing version, Value: (gcc_version, glibc_version, description)
+# Latest stable minor versions for each major GCC version from Spack
 COMPILER_TOOLCHAINS = {
-    # Latest GCC versions (safe/stable from Spack)
-    "15.2.0": ("15.2.0", "2.39", "Latest GCC 15 - glibc 2.39"),
-    "14.3.0": ("14.3.0", "2.39", "Latest GCC 14 - glibc 2.39"),
-    "13.4.0": ("13.4.0", "2.39", "Latest GCC 13 (default) - glibc 2.39"),
-    "12.5.0": ("12.5.0", "2.35", "Latest GCC 12 - glibc 2.35"),
-    "11.5.0": ("11.5.0", "2.35", "Latest GCC 11 / Ubuntu 22.04 - glibc 2.35"),
-    # Older stable versions
-    "10.5.0": ("10.5.0", "2.31", "RHEL 8 / Ubuntu 20.04 - glibc 2.31"),
-    "9.5.0": ("9.5.0", "2.28", "Latest GCC 9 - glibc 2.28"),
-    "8.5.0": ("8.5.0", "2.28", "RHEL 8 minimum - glibc 2.28"),
-    "7.5.0": ("7.5.0", "2.17", "RHEL 7 compatible - glibc 2.17"),
-    # Deprecated but still functional (for backwards compatibility)
-    "13.3.0": ("13.3.0", "2.39", "Ubuntu 24.04 (deprecated, use 13.4.0) - glibc 2.39"),
-    "11.4.0": ("11.4.0", "2.35", "Ubuntu 22.04 (deprecated, use 11.5.0) - glibc 2.35"),
+    "14.2.0": ("14.2.0", "2.39", "GCC 14.2 (latest stable) - glibc 2.39"),
+    "13.4.0": ("13.4.0", "2.39", "GCC 13.4 / Ubuntu 24.04 (default) - glibc 2.39"),
+    "12.5.0": ("12.5.0", "2.35", "GCC 12.5 (latest stable) - glibc 2.35"),
+    "11.5.0": ("11.5.0", "2.35", "GCC 11.5 / Ubuntu 22.04 - glibc 2.35"),
+    "10.5.0": ("10.5.0", "2.31", "GCC 10.5 / RHEL 8 / Ubuntu 20.04 - glibc 2.31"),
+    "9.5.0": ("9.5.0", "2.28", "GCC 9.5 (latest stable) - glibc 2.28"),
+    "8.5.0": ("8.5.0", "2.28", "GCC 8.5 / RHEL 8 minimum - glibc 2.28"),
+    "7.5.0": ("7.5.0", "2.17", "GCC 7.5 / RHEL 7 compatible - glibc 2.17"),
 }
 
 
@@ -185,7 +180,6 @@ def get_spack_build_script() -> str:
         rm -f spack.lock && \\
         spack concretize -j \\$(nproc) -f --fresh && \\
         spack install -j\\$(nproc) --only-concrete -f --verbose -p 4 --no-cache && \\
-        spack env view regenerate && \\
         spack module lmod refresh --delete-tree -y && \\
         spack module lmod refresh -y && \\
         mkdir -p {CONTAINER_SLURM_DIR}/modules && \\
@@ -352,10 +346,6 @@ RUN {spack_profile_script}
 # Create compiler bootstrap project directory
 RUN mkdir -p /root/compiler-bootstrap
 
-# Configure system compiler for Spack
-RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
-    spack compiler find'
-
 # Copy compiler bootstrap spack.yaml
 RUN cat > /root/compiler-bootstrap/spack.yaml << 'BOOTSTRAP_YAML_EOF'
 {bootstrap_yaml}
@@ -364,7 +354,17 @@ BOOTSTRAP_YAML_EOF
 WORKDIR /root/compiler-bootstrap
 
 # Build the compiler toolchain
-RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
+# CRITICAL: Hide system gcc binaries ONLY during Spack environment activation
+# This prevents Spack v1.0.0 from auto-detecting and adding gcc as external
+# But we restore them before concretization so gcc can be used to BUILD gcc@11.4.0
+RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
+        [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true; \\
+    done && \\
+    source /opt/spack/share/spack/setup-env.sh && \\
+    eval $(spack env activate --sh .) && \\
+    for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
+        [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
+    done && \\
     spack -e . concretize -f && \\
     spack -e . install --verbose'
 
@@ -372,7 +372,7 @@ RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     cd /root/compiler-bootstrap && \\
     spack -e . compiler find && \\
-    spack -e . view -v symlink /opt/spack-compiler gcc@{gcc_ver}'
+    spack -e . view -v symlink -i /opt/spack-compiler gcc@{gcc_ver}'
 
 # Verify compiler installation
 RUN /opt/spack-compiler/bin/gcc --version && \\
