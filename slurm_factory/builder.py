@@ -41,6 +41,12 @@ def build(
     minimal: bool = False,
     verify: bool = False,
     no_cache: bool = False,
+    enable_hierarchy: Annotated[
+        bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
+    ] = False,
+    enable_buildcache: Annotated[
+        bool, typer.Option("--enable-buildcache", help="Enable binary cache for faster rebuilds")
+    ] = False,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -108,6 +114,8 @@ def build(
             cache_dir=str(settings.home_cache_dir),
             verbose=verbose,
             no_cache=no_cache,
+            enable_hierarchy=enable_hierarchy,
+            enable_buildcache=enable_buildcache,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")
