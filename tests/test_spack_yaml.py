@@ -107,48 +107,46 @@ class TestSpackConfigGeneration:
         config = generate_spack_config()
         compilers = config["spack"]["compilers"]
         
-        assert len(compilers) == 1
-        compiler = compilers[0]["compiler"]
-        
-        # Test compiler spec and paths (using default 13.4.0, built by Spack)
-        assert compiler["spec"] == "gcc@=13.4.0"
-        assert compiler["paths"]["cc"] == "/usr/bin/gcc"
-        assert compiler["paths"]["cxx"] == "/usr/bin/g++"
-        assert compiler["paths"]["f77"] == "/usr/bin/gfortran"
-        assert compiler["paths"]["fc"] == "/usr/bin/gfortran"
-        
-        # Test RPATH configuration (empty by default, can be customized later)
-        assert "extra_rpaths" in compiler
-        rpaths = compiler["extra_rpaths"]
-        assert isinstance(rpaths, list)
+        # Compilers start empty - GCC is installed from buildcache and detected via spack compiler find
+        assert len(compilers) == 0
 
-    def test_gcc_external_prevention(self):
-        """Test that GCC external package is properly configured."""
-        config = generate_spack_config()
+    def test_gcc_buildcache_configuration(self):
+        """Test that GCC is properly configured to use buildcache."""
+        # Use default compiler version
+        compiler_version = "13.4.0"
+        config = generate_spack_config(compiler_version=compiler_version)
         packages = config["spack"]["packages"]
         
-        # Test that GCC is configured as external (built by Spack in compiler-bootstrap stage)
+        # Test that GCC is configured as external (downloaded from buildcache during bootstrap)
         assert "gcc" in packages
         gcc_config = packages["gcc"]
+        
+        # GCC should NOT be buildable (it's pre-built in buildcache)
         assert gcc_config["buildable"] is False
+        
+        # GCC should have externals pointing to buildcache location
         assert "externals" in gcc_config
-        # Should have one external entry for the Spack-built GCC
-        assert len(gcc_config["externals"]) == 1
-        external = gcc_config["externals"][0]
-        assert "gcc@13.4.0" in external["spec"]
-        assert external["prefix"] == "/opt/spack-compiler"
+        assert len(gcc_config["externals"]) > 0
+        assert gcc_config["externals"][0]["spec"] == f"gcc@{compiler_version}"
+        assert gcc_config["externals"][0]["prefix"] == "/opt/spack-compiler-view"
 
     def test_package_configurations(self):
         """Test package-specific configurations."""
         config = generate_spack_config()
         packages = config["spack"]["packages"]
         
-        # Test external build tools
-        external_tools = ["cmake", "python", "autoconf", "automake", "libtool"]
+        # Test external build tools that should not be built (using system versions)
+        external_tools = ["cmake", "python", "gmake", "m4", "pkgconf", "diffutils", "findutils", "gettext", "tar"]
         for tool in external_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is False
             assert "externals" in packages[tool]
+        
+        # Test autotools are buildable (built from source for libjwt compatibility)
+        buildable_tools = ["autoconf", "automake", "libtool"]
+        for tool in buildable_tools:
+            assert tool in packages
+            assert packages[tool]["buildable"] is True
         
         # Test runtime libraries are buildable
         runtime_libs = ["munge", "json-c", "curl", "openssl", "readline", "ncurses"]
@@ -360,8 +358,9 @@ class TestConfigurationValidation:
         config = generate_spack_config()
         concretizer = config["spack"]["concretizer"]
         
-        assert concretizer["unify"] is True
-        assert concretizer["reuse"] is True  # Always reuse Spack-built compiler
+        # unify can be a string "true" for Spack 1.x
+        assert concretizer["unify"] == "true" or concretizer["unify"] is True
+        assert concretizer["reuse"]["roots"] is True  # Reuse from buildcache
 
     def test_mirror_configuration(self):
         """Test mirror configuration."""

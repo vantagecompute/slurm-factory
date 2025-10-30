@@ -35,6 +35,8 @@ from slurm_factory.constants import (
     BASH_HEADER,
     get_package_tarball_script,
     get_dockerfile,
+    get_compiler_dockerfile,
+    get_spack_build_script,
 )
 
 
@@ -186,6 +188,54 @@ class TestScriptTemplates:
         lines = script.strip().split('\n')
         assert len(lines) > 5  # Should be a substantial script
 
+    def test_get_spack_build_script(self):
+        """Test spack build script generation with dedicated compiler environment."""
+        compiler_version = "14.2.0"
+        script = get_spack_build_script(compiler_version)
+        
+        # Test that it returns a string
+        assert isinstance(script, str)
+        assert len(script) > 0
+        
+        # Test that it contains expected elements
+        assert "source /opt/spack/share/spack/setup-env.sh" in script
+        assert compiler_version in script
+        
+        # Test that it creates a dedicated compiler environment
+        assert "Creating temporary environment to install GCC compiler from buildcache" in script
+        assert "mkdir -p /tmp/compiler-install" in script
+        assert "cd /tmp/compiler-install" in script
+        
+        # Test that the compiler environment YAML is properly configured
+        assert "spack.yaml << 'COMPILER_ENV_EOF'" in script
+        assert f"- gcc@{compiler_version}" in script
+        assert "view: /opt/spack-compiler-view" in script
+        assert "type: buildcache" in script
+        assert f"path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache" in script
+        
+        # Test that it installs from buildcache with correct flags
+        assert "spack -e . install --cache-only --no-check-signature" in script
+        
+        # Test that it registers compiler from the view location
+        assert "spack compiler find --scope site /opt/spack-compiler-view" in script
+        
+        # Test that other setup steps are present
+        assert "spack mirror add" in script
+        assert "spack buildcache keys --install --trust" in script
+        
+        # Test that compiler verification steps are present
+        assert "spack compiler list" in script
+        
+        # Test that Slurm build steps are present
+        assert "spack env activate" in script
+        assert "spack concretize" in script
+        assert "spack install" in script
+        
+        # Test that it's properly formatted shell script
+        lines = script.strip().split('\n')
+        assert len(lines) > 50  # Should be a substantial script with compiler env setup
+
+
     def test_get_dockerfile(self):
         """Test Dockerfile generation."""
         spack_yaml_content = "spack:\n  specs:\n    - slurm@25.05"
@@ -201,13 +251,42 @@ class TestScriptTemplates:
         assert "ENV" in dockerfile
         assert spack_yaml_content in dockerfile
         
-        # Test that it installs required packages
+        # Test that it installs required packages  
         assert "git" in dockerfile
-        assert "build-essential" in dockerfile
+        # Note: build-essential is not installed in the new minimal dependencies approach
         
         # Test that it's properly formatted Dockerfile
         lines = dockerfile.strip().split('\n')
         assert len(lines) > 10  # Should be a substantial Dockerfile
+
+    def test_get_compiler_dockerfile(self):
+        """Test compiler Dockerfile generation."""
+        dockerfile = get_compiler_dockerfile(compiler_version="13.4.0")
+        
+        # Test that it returns a string
+        assert isinstance(dockerfile, str)
+        assert len(dockerfile) > 0
+        
+        # Test that it contains expected elements
+        assert "FROM ubuntu:24.04" in dockerfile
+        assert "compiler-bootstrap" in dockerfile
+        assert "compiler-packager" in dockerfile
+        assert "gcc@13.4.0" in dockerfile
+        
+        # Test that it has BuildKit syntax
+        assert "syntax=docker/dockerfile:1" in dockerfile
+        
+        # Test that it's properly formatted Dockerfile
+        lines = dockerfile.strip().split('\n')
+        assert len(lines) > 10  # Should be a substantial Dockerfile
+        
+        # Test that compiler registration uses explicit path (fix for issue)
+        assert "spack compiler find --scope site /opt/spack-compiler" in dockerfile
+        # Verify old code is not present
+        assert "spack -e . compiler find --scope site" not in dockerfile
+        
+        # Test that gcc-runtime installation is present
+        assert "spack install gcc-runtime@13.4.0 %gcc@13.4.0" in dockerfile
 
 
 class TestConstantTypes:

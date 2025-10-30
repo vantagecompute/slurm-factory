@@ -31,6 +31,7 @@ dependencies = [
     "typer>=0.19.2",
     "rich>=14.1.0",
     "pyyaml>=6.0.3",
+    "boto3>=1.35.0",
 ]
 
 [project.optional-dependencies]
@@ -49,6 +50,9 @@ dev = [
 slurm-factory = "slurm_factory.main:app"
 
 # ===== Build Configuration =====
+[tool.hatch.metadata]
+allow-direct-references = true
+
 [tool.hatch.build.targets.wheel]
 packages = ["slurm_factory"]
 exclude = [

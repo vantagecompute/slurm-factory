@@ -25,9 +25,88 @@ from typing_extensions import Annotated
 
 from .constants import INSTANCE_NAME_PREFIX, SlurmVersion
 from .exceptions import SlurmFactoryError
-from .utils import create_slurm_package
+from .utils import create_compiler_package, create_slurm_package
 
 logger = logging.getLogger(__name__)
+
+
+def build_compiler(
+    ctx: typer.Context,
+    compiler_version: str = "13.4.0",
+    no_cache: bool = False,
+    publish: bool = False,
+):
+    """Build a GCC compiler toolchain in a Docker container."""
+    console = Console()
+
+    # Initialize settings and ensure cache directories exist
+    settings = ctx.obj["settings"]
+    verbose = ctx.obj["verbose"]
+
+    logger.debug(
+        f"Starting compiler build with parameters: compiler_version={compiler_version}, "
+        f"no_cache={no_cache}, publish={publish}"
+    )
+    logger.debug(f"Verbose mode: {verbose}")
+
+    settings.ensure_cache_dirs()
+    logger.debug(f"Ensured cache directories exist at {settings.home_cache_dir}")
+
+    # Check if Docker is available
+    try:
+        result = subprocess.run(
+            ["docker", "version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            console.print("[bold red]Docker is not running or not accessible[/bold red]")
+            logger.error("Docker version check failed")
+            raise SlurmFactoryError("Docker is not available. Please ensure Docker is installed and running.")
+    except FileNotFoundError:
+        console.print("[bold red]Docker is not installed[/bold red]")
+        logger.error("Docker command not found")
+        raise SlurmFactoryError("Docker is not installed. Please install Docker first.")
+    except subprocess.TimeoutExpired:
+        console.print("[bold red]Docker check timed out[/bold red]")
+        logger.error("Docker version check timed out")
+        raise SlurmFactoryError("Docker is not responding. Please check your Docker installation.")
+
+    console.print(f"Starting compiler build process for GCC {compiler_version}")
+    logger.debug(f"Building compiler version {compiler_version}")
+
+    # Generate unique container name for this build
+    short_uuid = f"{uuid.uuid4()}"[:8]
+    safe_version = compiler_version.replace(".", "-")
+    container_name = f"{INSTANCE_NAME_PREFIX}-compiler-{safe_version}-{short_uuid}"
+    image_tag = f"{INSTANCE_NAME_PREFIX}:compiler-{safe_version}-{short_uuid}"
+    logger.debug(f"Generated container name: {container_name}")
+    logger.debug(f"Generated image tag: {image_tag}")
+
+    console.print(f"[bold blue]Building Docker image for compiler {container_name}...[/bold blue]")
+
+    try:
+        # Build the compiler package
+        create_compiler_package(
+            container_name=container_name,
+            image_tag=image_tag,
+            compiler_version=compiler_version,
+            cache_dir=str(settings.home_cache_dir),
+            verbose=verbose,
+            no_cache=no_cache,
+            publish=publish,
+        )
+        logger.debug("Compiler package creation completed")
+        console.print("[bold green]✓ Compiler package created successfully[/bold green]")
+    except SlurmFactoryError as e:
+        logger.error(f"Failed to create compiler package: {e}")
+        console.print(f"[bold red]Failed to create compiler package:[/bold red] {escape(str(e))}")
+        console.print(f"[yellow]Build container {container_name} may be left running for debugging[/yellow]")
+        raise
+
+    logger.info(f"Compiler build process completed successfully for GCC {compiler_version}")
+    console.print("[bold green]Compiler build completed successfully![/bold green]")
 
 
 def build(
@@ -41,6 +120,12 @@ def build(
     minimal: bool = False,
     verify: bool = False,
     no_cache: bool = False,
+    use_local_buildcache: bool = False,
+    publish_s3: bool = False,
+    publish: str = "none",
+    enable_hierarchy: Annotated[
+        bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
+    ] = False,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -52,7 +137,8 @@ def build(
     logger.debug(
         f"Starting build with parameters: slurm_version={slurm_version.value}, "
         f"compiler_version={compiler_version}, "
-        f"gpu={gpu}, minimal={minimal}, verify={verify}"
+        f"gpu={gpu}, minimal={minimal}, verify={verify}, use_local_buildcache={use_local_buildcache}, "
+        f"publish_s3={publish_s3}, publish={publish}, enable_hierarchy={enable_hierarchy}"
     )
     logger.debug(f"Verbose mode: {verbose}")
 
@@ -108,6 +194,10 @@ def build(
             cache_dir=str(settings.home_cache_dir),
             verbose=verbose,
             no_cache=no_cache,
+            use_local_buildcache=use_local_buildcache,
+            publish_s3=publish_s3,
+            publish=publish,
+            enable_hierarchy=enable_hierarchy,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")
