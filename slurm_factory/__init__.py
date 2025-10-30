@@ -41,7 +41,10 @@ from slurm_factory.exceptions import (
 from slurm_factory.main import app
 from slurm_factory.spack_yaml import generate_spack_config, generate_yaml_string
 
-__version__ = importlib.metadata.version("slurm-factory")
+try:
+    __version__ = importlib.metadata.version("slurm-factory")
+except importlib.metadata.PackageNotFoundError:
+    __version__ = "0.1.19"  # Fallback version for development
 __author__ = "Vantage Compute Corporation"
 __email__ = "info@vantagecompute.ai"
 

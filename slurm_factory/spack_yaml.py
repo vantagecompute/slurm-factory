@@ -61,6 +61,11 @@ def generate_compiler_bootstrap_config(
         "spack": {
             "specs": [
                 f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran'",
+                # Build autotools in compiler env so they're available in /opt/spack-compiler
+                # but not during Slurm build (which needs different versions for libjwt compatibility)
+                "autoconf@2.72",
+                "automake@1.16.5",
+                "libtool@2.4.7",
             ],
             "concretizer": {
                 "unify": False,  # Allow different gcc versions for build vs runtime
@@ -76,20 +81,26 @@ def generate_compiler_bootstrap_config(
                     "externals": [],
                     "buildable": True,
                 },
+                # Build autotools from source in compiler env
+                "autoconf": {"buildable": True},
+                "automake": {"buildable": True},
+                "libtool": {"buildable": True},
                 # Build tools as externals for speed
                 "cmake": {"externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}], "buildable": False},
-                "autoconf": {"externals": [{"spec": "autoconf@2.71", "prefix": "/usr"}], "buildable": False},
-                "automake": {
-                    "externals": [{"spec": "automake@1.16.5", "prefix": "/usr"}],
-                    "buildable": False,
-                },
-                "libtool": {"externals": [{"spec": "libtool@2.4.7", "prefix": "/usr"}], "buildable": False},
                 "m4": {"externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}], "buildable": False},
                 "gmake": {"externals": [{"spec": "gmake@4.3", "prefix": "/usr"}], "buildable": False},
             },
+            "view": {
+                "/opt/spack-compiler": {
+                    "root": "/opt/spack-compiler",
+                    "select": [f"gcc@{gcc_ver}"],
+                    "link": "all",
+                    "link_type": "symlink",
+                }
+            },
             "config": {
                 "install_tree": {
-                    "root": "/opt/spack-compiler",
+                    "root": "/opt/spack-compiler-install",
                     "padded_length": 128,
                 },
                 "build_stage": ["/tmp/spack-stage"],
@@ -183,7 +194,7 @@ def generate_module_config(
                 "core_compilers": [f"gcc@{compiler_version}"],  # Mark gcc as core for relocatable binaries
                 "hierarchy": [],  # Flat hierarchy for simpler deployment
                 "include": (
-                    ["slurm", "openmpi", "mysql"] if not minimal else ["slurm"]
+                    ["slurm", "openmpi", "mysql-connector-c"] if not minimal else ["slurm"]
                 ),  # Include OpenMPI for full builds
                 "slurm": {
                     "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
@@ -292,8 +303,8 @@ def generate_spack_config(
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         f"openssl@3.4.1 ^zlib@1.3.1 {compiler_spec}",  # Build OpenSSL with explicit zlib dependency
         f"jansson@2.14 {compiler_spec}",  # JSON library for libjwt
-        # JWT library with all dependencies
-        f"libjwt@1.15.3 ^openssl@3.4.1 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
+        # JWT library with all dependencies - let Spack choose available version
+        f"libjwt ^openssl@3.4.1 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
         openldap_spec,  # Build openldap before curl since curl+ldap needs it
         curl_spec,
         f"patchelf@0.18.0 {compiler_spec}",  # For RPATH fixing during relocatability
@@ -307,7 +318,7 @@ def generate_spack_config(
         specs.append(f"freeipmi@1.6.9 {compiler_spec}")
         specs.append(f"openmpi@5.0.3 schedulers=slurm fabrics=auto {compiler_spec}")
         specs.append(f"pmix@5.0.8 ~munge ~python {compiler_spec}")
-        specs.append(f"mysql@8.0.35+client_only {compiler_spec}")
+        specs.append(f"mysql-connector-c {compiler_spec}")
         specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
         specs.append(
             f"slurm_factory.slurm@{slurm_package_version} {additional_variants} "
@@ -347,16 +358,13 @@ def generate_spack_config(
                     "require": "@3.12.3",
                 },
                 "autoconf": {
-                    "externals": [{"spec": "autoconf@2.71", "prefix": "/usr"}],
-                    "buildable": False,
+                    "buildable": True,  # Build from source for libjwt compatibility
                 },
                 "automake": {
-                    "externals": [{"spec": "automake@1.16.5", "prefix": "/usr"}],
-                    "buildable": False,
+                    "buildable": True,  # Build from source for libjwt compatibility
                 },
                 "libtool": {
-                    "externals": [{"spec": "libtool@2.4.7", "prefix": "/usr"}],
-                    "buildable": False,
+                    "buildable": True,  # Build from source for libjwt compatibility
                 },
                 "gmake": {"externals": [{"spec": "gmake@4.3", "prefix": "/usr"}], "buildable": False},
                 "m4": {"externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}], "buildable": False},
@@ -429,10 +437,11 @@ def generate_spack_config(
                     "require": [
                         "^openssl@3:",
                         "^jansson",
+                        "^automake@:1.16.3",  # libjwt@1.15.3 incompatible with automake 1.16.5
                     ],  # Ensure it uses Spack-built OpenSSL 3.x and jansson
                 },  # JWT token support - essential for Slurm REST API
                 # MySQL client library for Slurm accounting storage
-                "mysql": {"buildable": True, "variants": "+client_only"},
+                "mysql-connector-c": {"buildable": True},
                 "librdkafka": {
                     "buildable": True,
                 },
@@ -552,10 +561,10 @@ def generate_spack_config(
                     "compiler": {
                         "spec": f"gcc@={compiler_version}",
                         "paths": {
-                            "cc": "/usr/bin/gcc",
-                            "cxx": "/usr/bin/g++",
-                            "f77": "/usr/bin/gfortran",
-                            "fc": "/usr/bin/gfortran",
+                            "cc": "/opt/spack-compiler/bin/gcc",
+                            "cxx": "/opt/spack-compiler/bin/g++",
+                            "f77": "/opt/spack-compiler/bin/gfortran",
+                            "fc": "/opt/spack-compiler/bin/gfortran",
                         },
                         "operating_system": "ubuntu24.04",
                         "target": "x86_64",
