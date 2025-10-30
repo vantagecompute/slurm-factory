@@ -62,7 +62,7 @@ def generate_compiler_bootstrap_config(
             "specs": [
                 # Use binutils@2.44 instead of 2.45 to avoid build failures
                 # 2.44 is stable enough for GCC 14.2 while avoiding 2.45 issues
-                f"gcc@{gcc_ver} +binutils ^binutils@2.44 +piclibs languages='c,c++,fortran'",
+                f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran' ^binutils@2.44",
                 # Build autotools in compiler env so they're available in /opt/spack-compiler
                 # but not during Slurm build (which needs different versions for libjwt compatibility)
                 "autoconf@2.72",
