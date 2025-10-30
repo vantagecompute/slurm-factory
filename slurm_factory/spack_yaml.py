@@ -194,7 +194,7 @@ def generate_module_config(
                 "core_compilers": [f"gcc@{compiler_version}"],  # Mark gcc as core for relocatable binaries
                 "hierarchy": [],  # Flat hierarchy for simpler deployment
                 "include": (
-                    ["slurm", "openmpi", "mysql"] if not minimal else ["slurm"]
+                    ["slurm", "openmpi", "mysql-connector-c"] if not minimal else ["slurm"]
                 ),  # Include OpenMPI for full builds
                 "slurm": {
                     "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
@@ -318,7 +318,7 @@ def generate_spack_config(
         specs.append(f"freeipmi@1.6.9 {compiler_spec}")
         specs.append(f"openmpi@5.0.3 schedulers=slurm fabrics=auto {compiler_spec}")
         specs.append(f"pmix@5.0.8 ~munge ~python {compiler_spec}")
-        specs.append(f"mysql@8.0.35+client_only {compiler_spec}")
+        specs.append(f"mysql-connector-c {compiler_spec}")
         specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
         specs.append(
             f"slurm_factory.slurm@{slurm_package_version} {additional_variants} "
@@ -441,7 +441,7 @@ def generate_spack_config(
                     ],  # Ensure it uses Spack-built OpenSSL 3.x and jansson
                 },  # JWT token support - essential for Slurm REST API
                 # MySQL client library for Slurm accounting storage
-                "mysql": {"buildable": True, "variants": "+client_only"},
+                "mysql-connector-c": {"buildable": True},
                 "librdkafka": {
                     "buildable": True,
                 },
