@@ -88,7 +88,6 @@ def _build_docker_image(
         cmd = [
             "docker",
             "build",
-            "--progress=plain",  # Use plain progress output to avoid Docker's 2MiB log limit
             "-t",
             image_tag,
             "-f",
@@ -124,13 +123,15 @@ def _build_docker_image(
             process.stdin.close()
 
         # Stream output line by line
-        # Note: Use print() instead of console.print() to avoid Rich's output size limits
+        # Use sys.stdout.write() instead of console.print() to avoid any buffering/limits
         if process.stdout:
+            import sys
             for line in process.stdout:
                 line = line.rstrip()
                 if line:
-                    # Use plain print to avoid Rich console truncation (2MB limit)
-                    console.print(f"  {escape(line)}")
+                    # Direct write to stdout to avoid any buffering or size limits
+                    sys.stdout.write(f"  {line}\n")
+                    sys.stdout.flush()
                     logger.debug(f"Docker build: {line}")
 
         # Wait for process to complete

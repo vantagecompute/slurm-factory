@@ -122,9 +122,6 @@ def get_install_system_deps_script() -> str:
         python3 \\
         unzip \\
         gfortran \\
-        autoconf \\
-        automake \\
-        libtool \\
         bison \\
         flex \\
         cmake \\
@@ -179,7 +176,23 @@ def get_spack_build_script() -> str:
         spack env activate . && \\
         rm -f spack.lock && \\
         spack concretize -j \\$(nproc) -f --fresh && \\
-        spack install -j\\$(nproc) --only-concrete -f --verbose -p 4 --no-cache && \\
+        spack install -j\\$(nproc) --only-concrete -f --verbose -p 4 --no-cache || {{ \\
+            echo 'ERROR: spack install failed'; \\
+            echo 'Checking view status:'; \\
+            ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'; \\
+            echo 'Installed specs:'; \\
+            spack find -v 2>&1 || true; \\
+            exit 1; \\
+        }} && \\
+        echo 'Verifying view was created...' && \\
+        ls -la {CONTAINER_SLURM_DIR}/view || {{ \\
+            echo 'ERROR: View was not created at {CONTAINER_SLURM_DIR}/view'; \\
+            echo 'Environment status:'; \\
+            spack env status; \\
+            echo 'spack.yaml content:'; \\
+            cat spack.yaml; \\
+            exit 1; \\
+        }} && \\
         spack module lmod refresh --delete-tree -y && \\
         spack module lmod refresh -y && \\
         mkdir -p {CONTAINER_SLURM_DIR}/modules && \\
@@ -361,18 +374,18 @@ RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true; \\
     done && \\
     source /opt/spack/share/spack/setup-env.sh && \\
+    cd /root/compiler-bootstrap && \\
     eval $(spack env activate --sh .) && \\
     for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
     done && \\
-    spack -e . concretize -f && \\
-    spack -e . install --verbose'
+    spack concretize -j $(nproc) -f && \\
+    spack install -j$(nproc) --verbose'
 
-# Register the newly built compiler with Spack and create a view
+# Register the newly built compiler with Spack
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     cd /root/compiler-bootstrap && \\
-    spack -e . compiler find && \\
-    spack -e . view -v symlink -i /opt/spack-compiler gcc@{gcc_ver}'
+    spack -e . compiler find'
 
 # Verify compiler installation
 RUN /opt/spack-compiler/bin/gcc --version && \\
