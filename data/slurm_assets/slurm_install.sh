@@ -200,6 +200,7 @@ EOF
         sssd-ad \
         sssd-ldap \
         sssd-dbus \
+        sssd-tools \
         libpam-sss \
         libnss-sss
     
