@@ -21,6 +21,7 @@ env:
 jobs:
   build-slurm-tarball:
     runs-on: self-hosted
+    timeout-minutes: 3600
     environment: release
     permissions:
       contents: read

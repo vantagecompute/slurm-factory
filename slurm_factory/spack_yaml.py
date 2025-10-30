@@ -60,7 +60,7 @@ def generate_compiler_bootstrap_config(
     config: Dict[str, Any] = {
         "spack": {
             "specs": [
-                f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran'",
+                f"gcc@{gcc_ver} ~binutils +piclibs languages='c,c++,fortran'",
                 # Build autotools in compiler env so they're available in /opt/spack-compiler
                 # but not during Slurm build (which needs different versions for libjwt compatibility)
                 "autoconf@2.72",
@@ -89,6 +89,8 @@ def generate_compiler_bootstrap_config(
                 "cmake": {"externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}], "buildable": False},
                 "m4": {"externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}], "buildable": False},
                 "gmake": {"externals": [{"spec": "gmake@4.3", "prefix": "/usr"}], "buildable": False},
+                # Use system binutils to avoid build failures with newer GCC versions
+                "binutils": {"externals": [{"spec": "binutils@2.42", "prefix": "/usr"}], "buildable": False},
             },
             "view": {
                 "/opt/spack-compiler": {
