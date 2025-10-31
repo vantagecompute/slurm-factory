@@ -40,6 +40,15 @@ module load slurm/25.05
 - **Portable** - Runtime prefix override via environment variable
 - **Optimized** - Architecture-specific compilation, parallel builds
 - **Clean** - Docker isolation, no system pollution
+- **Advanced Spack 1.x** - Enhanced compiler packaging and module hierarchy
+
+## Advanced Features (Spack 1.x)
+
+- **Enhanced Compiler Packaging** - GCC runtime libraries as separate package for better relocatability
+- **Module Hierarchy** - Optional Core/Compiler/MPI 3-tier Lmod hierarchy
+- **Binary Cache** - Fast rebuilds with buildcache support (5-10x speedup)
+- **Improved RPATH** - Enhanced RPATH/RUNPATH for true relocatability
+- **Professional Modules** - Advanced Jinja2 templates with autoloading and conflict resolution
 
 ## Requirements
 
@@ -51,6 +60,30 @@ module load slurm/25.05
 
 ## Build Options
 
+### Compiler Toolchain Build
+
+Build a GCC compiler toolchain separately for reuse across multiple builds:
+
+```bash
+# Build default compiler (GCC 13.4.0)
+slurm-factory build-compiler
+
+# Build specific compiler version
+slurm-factory build-compiler --compiler-version 14.2.0
+
+# Build and publish to buildcache
+slurm-factory build-compiler --compiler-version 13.4.0 --publish
+
+# Fresh build without Docker cache
+slurm-factory build-compiler --no-cache
+```
+
+The compiler build produces:
+- Relocatable GCC compiler tarball (for manual distribution)
+- Spack buildcache binaries (for automated reuse)
+
+### Slurm Package Build
+
 ```bash
 # Standard (CPU-optimized, 2-5GB)
 slurm-factory build --slurm-version 25.05
@@ -61,6 +94,10 @@ slurm-factory build --slurm-version 25.05 --gpu
 # Minimal (no OpenMPI, 1-2GB)
 slurm-factory build --slurm-version 25.05 --minimal
 
+# Advanced Spack 1.x features
+slurm-factory build --slurm-version 25.05 --enable-hierarchy  # Core/Compiler/MPI hierarchy
+slurm-factory build --slurm-version 25.05 --enable-buildcache  # Binary cache for 5-10x faster rebuilds
+
 # Cross-distro compatibility with older toolchains
 slurm-factory build --compiler-version 10.5.0  # RHEL 8 / Ubuntu 20.04
 slurm-factory build --compiler-version 7.5.0   # RHEL 7
@@ -69,18 +106,22 @@ slurm-factory build --compiler-version 7.5.0   # RHEL 7
 slurm-factory build --compiler-version 15.2.0  # Latest GCC 15
 slurm-factory build --compiler-version 14.3.0  # Latest GCC 14
 
+# Combine multiple options
+slurm-factory build --slurm-version 25.05 --enable-hierarchy --enable-buildcache
+
 # Verbose
 slurm-factory --verbose build --slurm-version 25.05
 ```
 
 ## Compiler Toolchains
 
-All compiler toolchains are built by Spack for maximum relocatability and cross-distribution compatibility.
+All compiler toolchains are built by Spack for maximum relocatability and cross-distribution compatibility. 
+
+You can now build compiler toolchains separately using `slurm-factory build-compiler` and reuse them across multiple Slurm builds.
 
 | Version | Target Distro        | glibc | Description                      |
 |---------|----------------------|-------|----------------------------------|
-| 15.2.0  | Latest               | 2.39  | Latest GCC 15, newest features   |
-| 14.3.0  | Latest               | 2.39  | Latest GCC 14, modern features   |
+| 14.2.0  | Latest               | 2.39  | Latest GCC 14, modern features   |
 | 13.4.0  | Ubuntu 24.04         | 2.39  | **Default**, Ubuntu 24.04        |
 | 12.5.0  | Latest               | 2.35  | Latest GCC 12                    |
 | 11.5.0  | Ubuntu 22.04         | 2.35  | Good compatibility               |
@@ -127,21 +168,116 @@ export SLURM_INSTALL_PREFIX=/shared/apps/slurm
 module load slurm/25.05
 ```
 
+## Spack 1.x Features
+
+### Module Hierarchy (--enable-hierarchy)
+
+The optional 3-tier Core/Compiler/MPI hierarchy provides better dependency management:
+
+- **Core**: GCC runtime libraries (always available)
+- **Compiler**: Packages compiled with specific GCC version (e.g., OpenMPI)
+- **MPI**: Packages requiring both compiler and MPI (e.g., Slurm)
+
+**Benefits:**
+- Automatic dependency loading
+- Prevents incompatible module combinations
+- Professional HPC environment
+
+**Usage:**
+```bash
+# Build with hierarchy
+slurm-factory build --slurm-version 25.05 --enable-hierarchy
+
+# After deployment
+module avail           # Shows available Core modules
+module load slurm      # Automatically loads required dependencies
+```
+
+### Binary Cache (--enable-buildcache)
+
+Enable binary package caching for 5-10x faster rebuilds:
+
+**Benefits:**
+- Reuse compiled packages across builds
+- Dramatically faster incremental builds (2-5 minutes vs 45-90 minutes)
+- Efficient CI/CD workflows
+
+**Usage:**
+```bash
+# First build with buildcache
+slurm-factory build --slurm-version 25.05 --enable-buildcache
+
+# Subsequent builds are much faster
+slurm-factory build --slurm-version 25.05 --enable-buildcache
+# Uses cached binaries, only rebuilds changed packages
+```
+
+### Enhanced Relocatability
+
+All builds use Spack 1.x enhanced RPATH configuration:
+
+- **RPATH/RUNPATH**: Binaries find libraries without LD_LIBRARY_PATH
+- **Unbound paths**: RPATH not bound to absolute paths - allows relocation
+- **GCC runtime**: Separate gcc-runtime package for clean ABI compatibility
+- **Padded paths**: Optional padded install paths for binary caching
+
 ## Documentation
 
 **[vantagecompute.github.io/slurm-factory](https://vantagecompute.github.io/slurm-factory)**
 
 ## How It Works
 
+### Two-Stage Build System
+
+The build process is now split into two independent stages for better efficiency and reusability:
+
+#### Stage 1: Compiler Toolchain Build (Optional, One-time)
+
 1. **Docker Container** - Ubuntu 24.04 with build tools
-2. **Spack Bootstrap** - Install GCC compiler toolchain
-3. **Build Slurm** - Compile with dependencies (cached)
+2. **Spack Bootstrap** - Build custom GCC compiler with specific glibc
+3. **Package Compiler** - Create tarball and populate buildcache
+4. **Publish** - Store binaries for reuse across builds
+
+```bash
+slurm-factory build-compiler --compiler-version 13.4.0 --publish
+```
+
+**Output:**
+- `~/.slurm-factory/compilers/13.4.0/gcc-13.4.0-compiler.tar.gz` - Relocatable compiler tarball
+- `~/.slurm-factory/buildcache/` - Spack binary cache for reuse
+
+#### Stage 2: Slurm Package Build
+
+1. **Docker Container** - Ubuntu 24.04 with build tools
+2. **Compiler Reuse** - Use pre-built compiler from buildcache (or build from source)
+3. **Build Slurm** - Compile Slurm with dependencies using Spack
 4. **Package** - Create tarball with modules and install script
 5. **Deploy** - Extract and run installation script
 
+```bash
+slurm-factory build --slurm-version 25.05 --use-buildcache
+```
+
+**Output:**
+- `~/.slurm-factory/25.05/13.4.0/slurm-25.05-gcc13.4.0-software.tar.gz`
+
+### Build Cache Architecture
+
+The build system uses Spack's buildcache to store and reuse binaries:
+
+- **Source Cache** (`~/.slurm-factory/source/`) - Downloaded source tarballs
+- **Build Cache** (`~/.slurm-factory/buildcache/`) - Compiled binary packages
+
+These caches are mounted into Docker containers during builds, enabling:
+- Faster rebuilds (reuse pre-built dependencies)
+- Consistency across builds
+- Publishable binary artifacts for sharing
+
 **Performance:**
-- First build: 45-90 minutes
-- Cached builds: 5-15 minutes (>10x speedup)
+- First compiler build: 30-60 minutes
+- First Slurm build (with compiler from buildcache): 30-60 minutes  
+- First Slurm build (building compiler from source): 60-120 minutes
+- Cached Slurm builds: 5-15 minutes (>10x speedup)
 - Cache hit rate: 80-95%
 
 ## Development

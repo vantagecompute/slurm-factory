@@ -21,6 +21,7 @@ docker run hello-world
 ```
 
 **System Requirements:**
+
 - **OS**: Ubuntu 20.04+ or equivalent Linux distribution
 - **Docker**: 24.0+ (latest stable version recommended)
 - **Python**: 3.12+ (required for modern type hints and features)
@@ -162,28 +163,39 @@ Build caches are stored in your home directory:
 Once installed, you can immediately start building Slurm packages:
 
 ```bash
-# Build latest Slurm with CPU optimizations (default)
-slurm-factory build
+# Build latest Slurm with default compiler (GCC 13.4.0)
+slurm-factory build --slurm-version 25.05
+
+# Build with specific compiler for RHEL 8 / Ubuntu 20.04 compatibility
+slurm-factory build --slurm-version 25.05 --compiler-version 10.5.0
+
+# Build for RHEL 7 compatibility
+slurm-factory build --slurm-version 24.11 --compiler-version 7.5.0
 
 # Build with GPU support (CUDA/ROCm)
-slurm-factory build --gpu
+slurm-factory build --slurm-version 25.05 --gpu
 
 # Build minimal package (smallest size)
-slurm-factory build --minimal
-
-# Build specific version
-slurm-factory build --slurm-version 24.11
+slurm-factory build --slurm-version 25.05 --minimal
 
 # Use custom project name (for container naming)
-slurm-factory --project-name production build --slurm-version 25.05
+slurm-factory --project-name production build --slurm-version 25.05 --compiler-version 13.4.0
 
 # Clean up when done
 slurm-factory clean --full
 ```
 
+**Available Versions:**
+
+- **Slurm**: 25.05, 24.11, 23.11, 23.02
+- **Compilers**: 14.2.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
+
+See [Build Artifacts](build-artifacts.md) for pre-built S3 packages.
+
 ## Troubleshooting
 
 ### Docker Permission Issues
+
 ```bash
 # Add your user to the docker group
 sudo usermod -aG docker $USER
@@ -196,6 +208,7 @@ docker ps
 ```
 
 ### Python Path Issues
+
 ```bash
 # If command not found after pip install
 pip install --user slurm-factory
@@ -206,6 +219,7 @@ python -m slurm_factory --help
 ```
 
 ### Storage Issues
+
 ```bash
 # Check available space (needs 50GB+)
 df -h ~/.slurm-factory/

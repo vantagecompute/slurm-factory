@@ -84,6 +84,37 @@ SLURM_PATCH_FILES = ["slurm_prefix.patch", "package.py"]
 BASH_HEADER = ["bash", "-c"]
 
 
+def get_compiler_tarball_name(compiler_version: str) -> str:
+    """
+    Generate the standard compiler tarball name for a given version.
+
+    Args:
+        compiler_version: GCC compiler version (e.g., "13.4.0")
+
+    Returns:
+        Tarball filename (e.g., "gcc-13.4.0-compiler.tar.gz")
+
+    """
+    return f"gcc-{compiler_version}-compiler.tar.gz"
+
+
+def get_compiler_tarball_path(cache_dir: str, compiler_version: str) -> str:
+    """
+    Generate the full path to a compiler tarball in the cache directory.
+
+    Args:
+        cache_dir: Base cache directory path
+        compiler_version: GCC compiler version (e.g., "13.4.0")
+
+    Returns:
+        Full path to compiler tarball (e.g., "/path/to/cache/compilers/13.4.0/gcc-13.4.0-compiler.tar.gz")
+
+    """
+    from pathlib import Path
+
+    return str(Path(cache_dir) / "compilers" / compiler_version / get_compiler_tarball_name(compiler_version))
+
+
 def get_module_template_content() -> str:
     """Return the embedded Lmod module template content."""
     template_path = Path(__file__).parent.parent / "data" / "templates" / "relocatable_modulefile.lua"
@@ -122,9 +153,6 @@ def get_install_system_deps_script() -> str:
         python3 \\
         unzip \\
         gfortran \\
-        autoconf \\
-        automake \\
-        libtool \\
         bison \\
         flex \\
         cmake \\
@@ -179,7 +207,23 @@ def get_spack_build_script() -> str:
         spack env activate . && \\
         rm -f spack.lock && \\
         spack concretize -j \\$(nproc) -f --fresh && \\
-        spack install -j\\$(nproc) --only-concrete -f --verbose -p 4 --no-cache && \\
+        spack install -j\\$(nproc) --only-concrete -f --verbose -p 4 --no-cache || {{ \\
+            echo 'ERROR: spack install failed'; \\
+            echo 'Checking view status:'; \\
+            ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'; \\
+            echo 'Installed specs:'; \\
+            spack find -v 2>&1 || true; \\
+            exit 1; \\
+        }} && \\
+        echo 'Verifying view was created...' && \\
+        ls -la {CONTAINER_SLURM_DIR}/view || {{ \\
+            echo 'ERROR: View was not created at {CONTAINER_SLURM_DIR}/view'; \\
+            echo 'Environment status:'; \\
+            spack env status; \\
+            echo 'spack.yaml content:'; \\
+            cat spack.yaml; \\
+            exit 1; \\
+        }} && \\
         spack module lmod refresh --delete-tree -y && \\
         spack module lmod refresh -y && \\
         mkdir -p {CONTAINER_SLURM_DIR}/modules && \\
@@ -267,64 +311,51 @@ def get_package_tarball_script(
     """).strip()
 
 
-def get_dockerfile(
-    spack_yaml_content: str,
-    version: str = "25.05",
+def get_compiler_dockerfile(
     compiler_version: str = "13.4.0",
-    gpu_support: bool = False,
     cache_dir: str = "",
 ) -> str:
     """
-    Generate a multi-stage Dockerfile for building Slurm packages.
+    Generate a Dockerfile for building only the compiler toolchain.
 
-    Stage 0 (compiler-bootstrap): Build custom GCC toolchain
-    Stage 1 (init): Ubuntu + system deps + Spack (heavily cached)
-    Stage 2 (builder): Runs spack install, creates view, generates modules (cached on spack.yaml)
-    Stage 3 (packager): Copies slurm_assets and creates tarball (invalidates on asset changes)
+    This creates a standalone build for the compiler that can be published
+    to the buildcache and reused across multiple Slurm builds.
 
     Args:
-        spack_yaml_content: The complete spack.yaml content as a string
-        version: Slurm version (e.g., "25.05") for the tarball filename
-        compiler_version: GCC compiler version to use (always built by Spack)
-        gpu_support: Whether GPU support is enabled
-        cache_dir: Host cache directory for compiler bootstrap cache
+        compiler_version: GCC compiler version to build
+        cache_dir: Host cache directory for mounting buildcache and source cache
 
     Returns:
-        A complete multi-stage Dockerfile as a string
+        A complete Dockerfile as a string for building the compiler
 
     """
     # Generate all script components
     install_deps_script = get_install_system_deps_script()
     install_spack_script = get_install_spack_script()
     spack_profile_script = get_spack_profile_script()
-    create_dirs_script = get_create_directories_script()
-    module_template_content = get_module_template_content()
-    spack_build_script = get_spack_build_script()
-
-    # Generate the modulerc creation script
-    modulerc_script = get_modulerc_creation_script(
-        module_dir=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm",
-        modulerc_path=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm/.modulerc.lua",
-    )
-
-    # Generate the packaging script
-    package_script = get_package_tarball_script(modulerc_script, version, compiler_version, gpu_support)
-
-    # Always generate compiler bootstrap stage (build GCC with Spack)
-    from .spack_yaml import generate_compiler_bootstrap_yaml
-
-    # Extract GCC version for use in the bootstrap stage
-    gcc_ver = compiler_version
 
     # Generate bootstrap spack.yaml for building the compiler
+    from .spack_yaml import generate_compiler_bootstrap_yaml
+
     bootstrap_yaml = generate_compiler_bootstrap_yaml(
         compiler_version=compiler_version,
         buildcache_root=f"{CONTAINER_CACHE_DIR}/buildcache",
         sourcecache_root=f"{CONTAINER_CACHE_DIR}/source",
     )
 
-    compiler_bootstrap_stage = textwrap.dedent(
+    gcc_ver = compiler_version
+
+    return textwrap.dedent(
         f"""\
+# syntax=docker/dockerfile:1
+# Compiler Toolchain Build Container
+# Generated by slurm-factory - DO NOT EDIT MANUALLY
+# 
+# This Dockerfile uses BuildKit for enhanced caching.
+# Cache directories are configured in spack.yaml to use:
+# - {CONTAINER_CACHE_DIR}/buildcache for binary packages
+# - {CONTAINER_CACHE_DIR}/source for source archives
+
 # ========================================================================
 # Stage 0: Compiler Bootstrap - Build custom GCC toolchain
 # ========================================================================
@@ -342,6 +373,9 @@ RUN {install_spack_script}
 ENV SPACK_ROOT=/opt/spack
 ENV PATH=$SPACK_ROOT/bin:$PATH
 RUN {spack_profile_script}
+
+# Create directories for cache (will be populated by Spack during build)
+RUN mkdir -p {CONTAINER_CACHE_DIR}/buildcache {CONTAINER_CACHE_DIR}/source
 
 # Create compiler bootstrap project directory
 RUN mkdir -p /root/compiler-bootstrap
@@ -379,8 +413,195 @@ RUN /opt/spack-compiler/bin/gcc --version && \\
     /opt/spack-compiler/bin/g++ --version && \\
     /opt/spack-compiler/bin/gfortran --version
 
+# ========================================================================
+# Stage 1: Compiler Packager - Create tarball and buildcache output
+# ========================================================================
+FROM compiler-bootstrap AS compiler-packager
+
+SHELL ["/bin/bash", "-c"]
+
+# Package the compiler into a tarball
+RUN mkdir -p /opt/compiler-output && \\
+    cd /opt && \\
+    tar -czf /opt/compiler-output/{get_compiler_tarball_name(gcc_ver)} spack-compiler
+
+# Export buildcache binaries (Spack build cache from {CONTAINER_CACHE_DIR}/buildcache)
+# This will be copied from the image after build completes
+
+CMD ["/bin/bash"]
 """
     )
+
+
+def get_dockerfile(
+    spack_yaml_content: str,
+    version: str = "25.05",
+    compiler_version: str = "13.4.0",
+    gpu_support: bool = False,
+    cache_dir: str = "",
+    use_buildcache: bool = True,
+) -> str:
+    """
+    Generate a multi-stage Dockerfile for building Slurm packages.
+
+    Stage 0 (compiler-bootstrap): Build custom GCC toolchain or reuse from buildcache
+    Stage 1 (init): Ubuntu + system deps + Spack (heavily cached)
+    Stage 2 (builder): Runs spack install, creates view, generates modules (cached on spack.yaml)
+    Stage 3 (packager): Copies slurm_assets and creates tarball (invalidates on asset changes)
+
+    Args:
+        spack_yaml_content: The complete spack.yaml content as a string
+        version: Slurm version (e.g., "25.05") for the tarball filename
+        compiler_version: GCC compiler version to use (always built by Spack)
+        gpu_support: Whether GPU support is enabled
+        cache_dir: Host cache directory for compiler bootstrap cache
+        use_buildcache: Whether to use compiler from buildcache (if available)
+
+    Returns:
+        A complete multi-stage Dockerfile as a string
+
+    """
+    # Generate all script components
+    install_deps_script = get_install_system_deps_script()
+    install_spack_script = get_install_spack_script()
+    spack_profile_script = get_spack_profile_script()
+    create_dirs_script = get_create_directories_script()
+    module_template_content = get_module_template_content()
+    spack_build_script = get_spack_build_script()
+
+    # Generate the modulerc creation script
+    modulerc_script = get_modulerc_creation_script(
+        module_dir=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm",
+        modulerc_path=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm/.modulerc.lua",
+    )
+
+    # Generate the packaging script
+    package_script = get_package_tarball_script(modulerc_script, version, compiler_version, gpu_support)
+
+    # Always generate compiler bootstrap stage (build GCC with Spack)
+    from .spack_yaml import generate_compiler_bootstrap_yaml
+
+    # Generate bootstrap spack.yaml for building the compiler
+    bootstrap_yaml = generate_compiler_bootstrap_yaml(
+        compiler_version=compiler_version,
+        buildcache_root=f"{CONTAINER_CACHE_DIR}/buildcache",
+        sourcecache_root=f"{CONTAINER_CACHE_DIR}/source",
+    )
+
+    # Generate compiler bootstrap stage or use from buildcache
+    if use_buildcache and cache_dir:
+        # Check if compiler tarball exists in buildcache
+        from pathlib import Path
+
+        buildcache_tarball = Path(get_compiler_tarball_path(cache_dir, compiler_version))
+        
+        if buildcache_tarball.exists():
+            # Use pre-built compiler from buildcache
+            # NOTE: The following is a Python f-string template that generates Dockerfile syntax
+            compiler_bootstrap_stage = textwrap.dedent(
+                f"""\
+# ========================================================================
+# Stage 0: Compiler Bootstrap - Use pre-built compiler from buildcache
+# ========================================================================
+FROM ubuntu:24.04 AS compiler-bootstrap
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install minimal system dependencies for Spack
+RUN {install_deps_script}
+
+# Install Spack v1.0.0
+RUN {install_spack_script}
+
+ENV SPACK_ROOT=/opt/spack
+ENV PATH=$SPACK_ROOT/bin:$PATH
+RUN {spack_profile_script}
+
+# Create directory for compiler
+RUN mkdir -p /opt
+
+# Copy pre-built compiler from buildcache
+COPY compilers/{compiler_version}/{get_compiler_tarball_name(compiler_version)} /tmp/
+RUN cd /opt && tar -xzf /tmp/{get_compiler_tarball_name(compiler_version)} && \\
+    rm /tmp/{get_compiler_tarball_name(compiler_version)}
+
+# Verify compiler installation
+RUN /opt/spack-compiler/bin/gcc --version && \\
+    /opt/spack-compiler/bin/g++ --version && \\
+    /opt/spack-compiler/bin/gfortran --version
+
+# Register the compiler with Spack
+RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
+    spack compiler add /opt/spack-compiler/bin'
+
+"""
+            )
+        else:
+            # Buildcache requested but tarball not found, build from source
+            use_buildcache = False
+    
+    if not use_buildcache:
+        # Build compiler from source
+        # NOTE: The following is a Python f-string template that generates Dockerfile syntax
+        compiler_bootstrap_stage = textwrap.dedent(
+            f"""\
+# ========================================================================
+# Stage 0: Compiler Bootstrap - Build custom GCC toolchain
+# ========================================================================
+FROM ubuntu:24.04 AS compiler-bootstrap
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install minimal system dependencies for Spack
+RUN {install_deps_script}
+
+# Install Spack v1.0.0
+RUN {install_spack_script}
+
+ENV SPACK_ROOT=/opt/spack
+ENV PATH=$SPACK_ROOT/bin:$PATH
+RUN {spack_profile_script}
+
+# Create compiler bootstrap project directory
+RUN mkdir -p /root/compiler-bootstrap
+
+# Copy compiler bootstrap spack.yaml
+RUN cat > /root/compiler-bootstrap/spack.yaml << 'BOOTSTRAP_YAML_EOF'
+{bootstrap_yaml}
+BOOTSTRAP_YAML_EOF
+
+WORKDIR /root/compiler-bootstrap
+
+# Build the compiler toolchain
+# CRITICAL: Hide system gcc binaries ONLY during Spack environment activation
+# This prevents Spack v1.0.0 from auto-detecting and adding gcc as external
+# But we restore them before concretization so gcc can be used to BUILD gcc@11.4.0
+RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
+        [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true; \\
+    done && \\
+    source /opt/spack/share/spack/setup-env.sh && \\
+    cd /root/compiler-bootstrap && \\
+    eval $(spack env activate --sh .) && \\
+    for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
+        [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
+    done && \\
+    spack concretize -j $(nproc) -f && \\
+    spack install -j$(nproc) --verbose'
+
+# Register the newly built compiler with Spack
+RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
+    cd /root/compiler-bootstrap && \\
+    spack -e . compiler find'
+
+# Verify compiler installation
+RUN /opt/spack-compiler/bin/gcc --version && \\
+    /opt/spack-compiler/bin/g++ --version && \\
+    /opt/spack-compiler/bin/gfortran --version
+
+"""
+        )
 
     # Always use compiler-bootstrap as base stage
     base_stage = "compiler-bootstrap"
@@ -390,16 +611,25 @@ RUN /opt/spack-compiler/bin/gcc --version && \\
 
     return textwrap.dedent(
         f"""\
+# syntax=docker/dockerfile:1
 # Slurm Factory Build Container - Multi-Stage Build
 # Generated by slurm-factory - DO NOT EDIT MANUALLY
+#
+# This Dockerfile uses BuildKit for enhanced caching.
+# Cache directories are configured in spack.yaml to use:
+# - {CONTAINER_CACHE_DIR}/buildcache for binary packages
+# - {CONTAINER_CACHE_DIR}/source for source archives
 
 {compiler_bootstrap_stage}# ========================================================================
 # Stage 1: Init - Base system with Spack (heavily cached)
 # ========================================================================
 FROM {base_stage} AS init
 
-{init_stage_setup}# Create required directories
-RUN {create_dirs_script}
+# Create required directories including cache directories
+RUN {create_dirs_script} && \\
+    mkdir -p {CONTAINER_CACHE_DIR}/buildcache {CONTAINER_CACHE_DIR}/source
+
+{init_stage_setup}
 
 # ========================================================================
 # Stage 2: Builder - Compile Slurm (cached on spack.yaml changes)

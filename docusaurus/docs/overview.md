@@ -53,41 +53,59 @@ Slurm Factory simplifies the complex process of building and packaging Slurm for
 ## CLI Examples
 
 ```bash
-# Build latest Slurm with default settings (GCC 13.4.0)
+# Build latest Slurm with default settings (Slurm 25.05, GCC 13.4.0)
 slurm-factory build
+
+# Build specific Slurm version with default compiler
+slurm-factory build --slurm-version 24.11
+
+# Build with specific compiler for older distributions
+slurm-factory build --compiler-version 10.5.0
+
+# Build for RHEL 7 compatibility
+slurm-factory build --compiler-version 7.5.0 --slurm-version 23.11
+
+# Build specific combination
+slurm-factory build --slurm-version 25.05 --compiler-version 14.2.0
 
 # Build with GPU support and verbose output
 slurm-factory --verbose build --gpu
 
-# Build for older distributions (RHEL 8)
-slurm-factory build --compiler-version 10.5.0
+# Build minimal package (no OpenMPI, smaller size)
+slurm-factory build --minimal
 
-# Build for maximum compatibility (RHEL 7)
-slurm-factory build --compiler-version 7.5.0
-
-# Build with latest compiler (GCC 15)
-slurm-factory build --compiler-version 15.2.0
-
-# Build specific version with custom project
+# Build with custom project name for isolated caching
 slurm-factory --project-name production build --slurm-version 24.11
 
 # Clean up build artifacts
 slurm-factory clean --full
 ```
 
-## Compiler Toolchains
+## Supported Versions
 
-All GCC compiler versions are built by Spack for maximum relocatability:
+### Slurm Versions
 
-| Version | glibc | Target | Description |
-|---------|-------|--------|-------------|
-| 15.2.0  | 2.39  | Latest | Latest GCC 15, newest features |
-| 14.3.0  | 2.39  | Latest | Latest GCC 14, modern features |
+Slurm Factory supports building the following Slurm versions:
+
+- **25.05** - Latest stable release (default)
+- **24.11** - Previous stable release
+- **23.11** - Long-term support
+- **23.02** - Extended support
+
+Use `--slurm-version` to specify which version to build.
+
+### Compiler Toolchains
+
+All GCC compiler versions are built by Spack for maximum relocatability and cross-distribution compatibility. Use `--compiler-version` to select your target environment:
+
+| Version | glibc | Target Distribution | Description |
+|---------|-------|---------------------|-------------|
+| 14.2.0  | 2.39  | Latest | Latest GCC 14, modern features |
 | 13.4.0  | 2.39  | Ubuntu 24.04 | **Default**, good balance |
-| 12.5.0  | 2.35  | Latest | Latest GCC 12 |
+| 12.5.0  | 2.35  | Ubuntu 22.04 | Latest GCC 12 |
 | 11.5.0  | 2.35  | Ubuntu 22.04 | Good compatibility |
 | 10.5.0  | 2.31  | RHEL 8/Ubuntu 20.04 | Wide compatibility |
-| 9.5.0   | 2.28  | Latest | Latest GCC 9 |
+| 9.5.0   | 2.28  | RHEL 8 | Latest GCC 9 |
 | 8.5.0   | 2.28  | RHEL 8 | Older distributions |
 | 7.5.0   | 2.17  | RHEL 7 | Maximum compatibility |
 
