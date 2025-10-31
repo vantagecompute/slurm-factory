@@ -39,7 +39,7 @@ def _build_docker_image(
     verbose: bool = False,
     no_cache: bool = False,
     target: str = "",
-    build_args: dict = None,
+    build_args: dict | None = None,
 ) -> None:
     """
     Build a Docker image from a Dockerfile string.
@@ -66,7 +66,7 @@ def _build_docker_image(
         logger.debug(f"Building target stage: {target}")
         console.print(f"[dim]Building target stage: {target}[/dim]")
 
-    if build_args:
+    if build_args is not None:
         logger.debug(f"Build arguments: {build_args}")
 
     process = None
@@ -113,7 +113,7 @@ def _build_docker_image(
         ]
 
         # Add build arguments
-        if build_args:
+        if build_args is not None:
             for key, value in build_args.items():
                 cmd.extend(["--build-arg", f"{key}={value}"])
 
@@ -617,7 +617,9 @@ def extract_compiler_package_from_image(
     container_name = f"slurm-factory-extract-compiler-{compiler_version.replace('.', '-')}"
 
     # Tarball name for the compiler
-    tarball_name = f"gcc-{compiler_version}-compiler.tar.gz"
+    from .constants import get_compiler_tarball_name
+
+    tarball_name = get_compiler_tarball_name(compiler_version)
 
     container_tarball_path = f"/opt/compiler-output/{tarball_name}"
 

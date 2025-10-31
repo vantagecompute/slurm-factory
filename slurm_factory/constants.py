@@ -84,6 +84,20 @@ SLURM_PATCH_FILES = ["slurm_prefix.patch", "package.py"]
 BASH_HEADER = ["bash", "-c"]
 
 
+def get_compiler_tarball_name(compiler_version: str) -> str:
+    """
+    Generate the standard compiler tarball name for a given version.
+
+    Args:
+        compiler_version: GCC compiler version (e.g., "13.4.0")
+
+    Returns:
+        Tarball filename (e.g., "gcc-13.4.0-compiler.tar.gz")
+
+    """
+    return f"gcc-{compiler_version}-compiler.tar.gz"
+
+
 def get_module_template_content() -> str:
     """Return the embedded Lmod module template content."""
     template_path = Path(__file__).parent.parent / "data" / "templates" / "relocatable_modulefile.lua"
@@ -379,7 +393,7 @@ SHELL ["/bin/bash", "-c"]
 # Package the compiler into a tarball
 RUN mkdir -p /opt/compiler-output && \\
     cd /opt && \\
-    tar -czf /opt/compiler-output/gcc-{gcc_ver}-compiler.tar.gz spack-compiler
+    tar -czf /opt/compiler-output/{get_compiler_tarball_name(gcc_ver)} spack-compiler
 
 # Export buildcache binaries (Spack build cache from {CONTAINER_CACHE_DIR}/buildcache)
 # This will be copied from the image after build completes
@@ -452,7 +466,7 @@ def get_dockerfile(
         # Check if compiler tarball exists in buildcache
         from pathlib import Path
 
-        buildcache_tarball = Path(cache_dir) / "compilers" / compiler_version / f"gcc-{compiler_version}-compiler.tar.gz"
+        buildcache_tarball = Path(cache_dir) / "compilers" / compiler_version / get_compiler_tarball_name(compiler_version)
         
         if buildcache_tarball.exists():
             # Use pre-built compiler from buildcache
@@ -480,9 +494,9 @@ RUN {spack_profile_script}
 RUN mkdir -p /opt
 
 # Copy pre-built compiler from buildcache
-COPY compilers/{compiler_version}/gcc-{compiler_version}-compiler.tar.gz /tmp/
-RUN cd /opt && tar -xzf /tmp/gcc-{compiler_version}-compiler.tar.gz && \\
-    rm /tmp/gcc-{compiler_version}-compiler.tar.gz
+COPY compilers/{compiler_version}/{get_compiler_tarball_name(compiler_version)} /tmp/
+RUN cd /opt && tar -xzf /tmp/{get_compiler_tarball_name(compiler_version)} && \\
+    rm /tmp/{get_compiler_tarball_name(compiler_version)}
 
 # Verify compiler installation
 RUN /opt/spack-compiler/bin/gcc --version && \\
