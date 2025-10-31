@@ -39,6 +39,7 @@ def _build_docker_image(
     verbose: bool = False,
     no_cache: bool = False,
     target: str = "",
+    build_args: dict = None,
 ) -> None:
     """
     Build a Docker image from a Dockerfile string.
@@ -50,6 +51,7 @@ def _build_docker_image(
         verbose: Whether to show detailed output
         no_cache: Force a fresh build without using Docker cache
         target: Build target stage in multi-stage builds (e.g., "builder")
+        build_args: Dictionary of build arguments to pass to Docker
 
     """
     console.print(f"[bold blue]Building Docker image {image_tag}...[/bold blue]")
@@ -63,6 +65,9 @@ def _build_docker_image(
     if target:
         logger.debug(f"Building target stage: {target}")
         console.print(f"[dim]Building target stage: {target}[/dim]")
+
+    if build_args:
+        logger.debug(f"Build arguments: {build_args}")
 
     process = None
     try:
@@ -84,7 +89,18 @@ def _build_docker_image(
         else:
             logger.debug(f"Using repository root as build context: {repo_root}")
 
+        # Ensure cache directory exists and is absolute
+        if cache_dir:
+            cache_path = Path(cache_dir).resolve()
+            cache_path.mkdir(parents=True, exist_ok=True)
+            
+            # Create subdirectories for buildcache and source cache
+            (cache_path / "buildcache").mkdir(parents=True, exist_ok=True)
+            (cache_path / "source").mkdir(parents=True, exist_ok=True)
+            logger.debug(f"Using cache directory: {cache_path}")
+
         # Use docker build with stdin for the Dockerfile
+        # Enable BuildKit for better caching and features
         cmd = [
             "docker",
             "build",
@@ -95,6 +111,20 @@ def _build_docker_image(
             "-",  # Read Dockerfile from stdin
             str(repo_root),  # Build context - use repository root so COPY paths work
         ]
+
+        # Add build arguments
+        if build_args:
+            for key, value in build_args.items():
+                cmd.extend(["--build-arg", f"{key}={value}"])
+
+        # Add cache directory as build context if specified
+        if cache_dir:
+            cache_path = Path(cache_dir).resolve()
+            # Pass cache directory paths as build args for use in RUN --mount
+            cmd.extend([
+                "--build-arg", f"BUILDCACHE_DIR={cache_path}/buildcache",
+                "--build-arg", f"SOURCECACHE_DIR={cache_path}/source",
+            ])
 
         # Add --no-cache flag if requested
         if no_cache:
@@ -660,6 +690,9 @@ def publish_compiler_to_buildcache(
     """
     Publish compiler binaries to buildcache from a Docker image.
 
+    This extracts the Spack buildcache directory which contains binary packages
+    that can be reused in future builds.
+
     Args:
         image_tag: Tag of the compiler Docker image
         cache_dir: Base cache directory
@@ -678,6 +711,12 @@ def publish_compiler_to_buildcache(
 
     container_name = f"slurm-factory-publish-compiler-{compiler_version.replace('.', '-')}"
 
+    # The Spack buildcache is stored in the misc_cache directory configured in spack.yaml
+    # which is {CONTAINER_CACHE_DIR}/buildcache
+    from .constants import CONTAINER_CACHE_DIR
+
+    container_buildcache_path = f"{CONTAINER_CACHE_DIR}/buildcache"
+
     try:
         # Create a temporary container from the image
         logger.debug(f"Creating temporary container {container_name}")
@@ -694,25 +733,38 @@ def publish_compiler_to_buildcache(
             console.print(f"[bold red]{escape(msg)}[/bold red]")
             raise SlurmFactoryError(msg)
 
+        # Check if buildcache exists in container
+        logger.debug(f"Checking if buildcache exists at {container_buildcache_path}")
+        check_result = subprocess.run(
+            ["docker", "run", "--rm", image_tag, "ls", "-la", container_buildcache_path],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if check_result.returncode != 0:
+            logger.warning(f"Buildcache directory not found or empty at {container_buildcache_path}")
+            console.print(
+                f"[yellow]Warning: No buildcache found at {container_buildcache_path}. "
+                "Spack may not have created binary packages.[/yellow]"
+            )
+            # Don't fail - this might be expected in some cases
+            return
+
         # Copy the buildcache directory from the container
-        container_buildcache_path = "/root/compiler-bootstrap/.spack-env/view"
         logger.debug(f"Copying buildcache from {container_buildcache_path} to {buildcache_path}")
         console.print(f"[dim]Copying compiler binaries to buildcache...[/dim]")
-
-        # Create a subdirectory for this compiler version
-        version_buildcache_path = buildcache_path / f"gcc-{compiler_version}"
-        version_buildcache_path.mkdir(parents=True, exist_ok=True)
 
         result = subprocess.run(
             [
                 "docker",
                 "cp",
                 f"{container_name}:{container_buildcache_path}/.",
-                str(version_buildcache_path),
+                str(buildcache_path),
             ],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=180,
         )
 
         if result.returncode != 0:
@@ -721,8 +773,8 @@ def publish_compiler_to_buildcache(
             console.print(f"[bold red]{escape(msg)}[/bold red]")
             raise SlurmFactoryError(msg)
 
-        console.print(f"[bold green]✓ Published compiler binaries to {version_buildcache_path}[/bold green]")
-        logger.debug(f"Successfully published compiler to buildcache at {version_buildcache_path}")
+        console.print(f"[bold green]✓ Published compiler binaries to {buildcache_path}[/bold green]")
+        logger.debug(f"Successfully published compiler to buildcache at {buildcache_path}")
 
     except subprocess.TimeoutExpired:
         msg = "Publishing timed out"
