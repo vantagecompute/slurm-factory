@@ -1,12 +1,23 @@
 # Examples
 
-Practical examples for building and deploying Slurm packages.
+Practical examples for building and deploying Slurm packages with different versions and configurations.
 
-## Build Examples
+## Supported Versions
+
+**Slurm Versions:** 25.05, 24.11, 23.11, 23.02
+
+**GCC Compilers:** 14.2.0, 13.4.0 (default), 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
+
+See [Build Artifacts](build-artifacts.md) for pre-built S3 packages covering all version combinations.
+
+## Basic Build Examples
 
 ```bash
-# Standard build (default GCC 13.4.0)
+# Standard build with default compiler (GCC 13.4.0)
 slurm-factory build --slurm-version 25.05
+
+# Build specific version with default compiler
+slurm-factory build --slurm-version 24.11
 
 # GPU support (~15-25GB)
 slurm-factory build --slurm-version 25.05 --gpu
@@ -26,51 +37,73 @@ slurm-factory --project-name prod build --slurm-version 25.05
 Build with different GCC compiler versions for cross-distribution compatibility:
 
 ```bash
-# Latest compilers
-slurm-factory build --compiler-version 15.2.0  # Latest GCC 15, glibc 2.39
-slurm-factory build --compiler-version 14.3.0  # Latest GCC 14, glibc 2.39
+# Latest compiler (Ubuntu 24.10+, Fedora 40+)
+slurm-factory build --slurm-version 25.05 --compiler-version 14.2.0
 
-# Default (Ubuntu 24.04)
-slurm-factory build --compiler-version 13.4.0  # Default, glibc 2.39
+# Default (Ubuntu 24.04, Debian 13+)
+slurm-factory build --slurm-version 25.05 --compiler-version 13.4.0
 
-# Older distributions
-slurm-factory build --compiler-version 11.5.0  # Ubuntu 22.04, glibc 2.35
-slurm-factory build --compiler-version 10.5.0  # RHEL 8/Ubuntu 20.04, glibc 2.31
-slurm-factory build --compiler-version 7.5.0   # RHEL 7, glibc 2.17
+# Ubuntu 22.04, Debian 12+
+slurm-factory build --slurm-version 24.11 --compiler-version 11.5.0
+
+# RHEL 8, Ubuntu 20.04, Debian 11+
+slurm-factory build --slurm-version 23.11 --compiler-version 10.5.0
+
+# RHEL 7, CentOS 7
+slurm-factory build --slurm-version 23.02 --compiler-version 7.5.0
 
 # Combine with GPU support
-slurm-factory build --compiler-version 10.5.0 --gpu  # RHEL 8 with GPU
+slurm-factory build --slurm-version 25.05 --compiler-version 10.5.0 --gpu
 ```
 
-**Compiler Version Selection Guide:**
-- **15.2.0/14.3.0**: Latest features, Ubuntu 24.04+
-- **13.4.0**: Default, good balance of features and compatibility
-- **11.5.0/10.5.0**: Wide compatibility, Ubuntu 22.04/20.04, RHEL 8
-- **7.5.0**: Maximum compatibility, RHEL 7 and older systems
+**Compiler Selection Guide:**
+
+| Version | Compatible Distros | glibc | Use Case |
+|---------|-------------------|-------|----------|
+| 14.2.0 | Ubuntu 24.10+, Fedora 40+ | 2.40+ | Latest features |
+| 13.4.0 | Ubuntu 24.04+, Debian 13+ | 2.39 | **Default** |
+| 12.5.0 | Ubuntu 23.10+, Debian 12+ | 2.38 | Wide compatibility |
+| 11.5.0 | Ubuntu 22.04+, Debian 12+ | 2.35 | LTS distributions |
+| 10.5.0 | RHEL 8+, Ubuntu 20.04+ | 2.31 | Enterprise Linux |
+| 9.5.0 | RHEL 8+, CentOS 8+ | 2.28 | RHEL 8 compatibility |
+| 8.5.0 | RHEL 8+, CentOS 8+ | 2.28 | RHEL 8 minimal |
+| 7.5.0 | RHEL 7+, CentOS 7+ | 2.17 | Legacy systems |
 
 ## Deployment Examples
 
 ```bash
-# Standard
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /opt/
+# Standard deployment with default compiler
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-gcc13.4.0-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
-module load slurm/25.05
+module load slurm/25.05-gcc13.4.0
+
+# Deploy RHEL 8 compatible build
+sudo tar -xzf ~/.slurm-factory/builds/slurm-24.11-gcc10.5.0-software.tar.gz -C /opt/
+cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
+module load slurm/24.11-gcc10.5.0
+
+# Deploy from S3
+aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.05-gcc13.4.0-software.tar.gz /tmp/
+sudo tar -xzf /tmp/slurm-25.05-gcc13.4.0-software.tar.gz -C /opt/
+cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
+module load slurm/25.05-gcc13.4.0
 
 # Custom path
 export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.05
+module load slurm/25.05-gcc13.4.0
 
-# Multi-version
-sudo tar -xzf slurm-25.05-software.tar.gz -C /opt/slurm-25.05/
-sudo tar -xzf slurm-24.11-software.tar.gz -C /opt/slurm-24.11/
+# Multi-version deployment
+sudo tar -xzf slurm-25.05-gcc13.4.0-software.tar.gz -C /opt/slurm-25.05/
+sudo tar -xzf slurm-24.11-gcc11.5.0-software.tar.gz -C /opt/slurm-24.11/
 cd /opt/slurm-25.05 && sudo ./data/slurm_assets/slurm_install.sh
 cd /opt/slurm-24.11 && sudo ./data/slurm_assets/slurm_install.sh
-module load slurm/25.05  # or slurm/24.11
+module load slurm/25.05-gcc13.4.0  # or slurm/24.11-gcc11.5.0
 ```
 
 ## CI/CD Integration
 
 **GitHub Actions:**
+
 ```yaml
 name: Build Slurm
 on: [push]
@@ -82,7 +115,7 @@ jobs:
       - name: Build
         run: |
           pipx install slurm-factory
-          slurm-factory build --slurm-version 25.05
+          slurm-factory build --slurm-version 25.05 --compiler-version 13.4.0
       - uses: actions/upload-artifact@v4
         with:
           name: slurm-package
@@ -90,13 +123,14 @@ jobs:
 ```
 
 **GitLab CI:**
+
 ```yaml
 build:
   image: ubuntu:24.04
   script:
     - apt-get update && apt-get install -y pipx docker.io
     - pipx install slurm-factory
-    - slurm-factory build --slurm-version 25.05
+    - slurm-factory build --slurm-version 25.05 --compiler-version 13.4.0
   artifacts:
     paths:
       - ~/.slurm-factory/builds/
