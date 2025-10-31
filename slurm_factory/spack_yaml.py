@@ -19,7 +19,6 @@ This module generates Spack environment configurations as Python dictionaries,
 allowing for easy parameterization of Slurm versions and GPU support options.
 """
 
-import os
 from typing import Any, Dict
 
 from slurm_factory.constants import COMPILER_TOOLCHAINS, SLURM_VERSIONS
@@ -111,7 +110,7 @@ def generate_compiler_bootstrap_config(
                 "build_stage": ["/tmp/spack-stage"],
                 "source_cache": sourcecache_root,
                 "misc_cache": buildcache_root,
-                "build_jobs": os.cpu_count() or 4,  # Use all available cores, fallback to 4
+                "build_jobs": 4,
                 "ccache": True,
             },
             "mirrors": {
@@ -572,7 +571,7 @@ def generate_spack_config(
                 "checksum": True,
                 "deprecated": True,
                 # Spack 1.x performance enhancements
-                "build_jobs": os.cpu_count() or 4,  # Use all available cores, fallback to 4
+                "build_jobs": 4,  # Parallel build jobs
                 "ccache": True,  # Enable ccache for faster rebuilds
                 "connect_timeout": 30,  # Network timeout for downloads
                 "verify_ssl": True,  # Security setting
