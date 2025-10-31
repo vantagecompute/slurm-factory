@@ -161,6 +161,7 @@ def generate_module_config(
     gpu_support: bool = False,
     minimal: bool = False,
     compiler_version: str = "13.4.0",
+    enable_hierarchy: bool = False,
 ) -> Dict[str, Any]:
     """
     Generate the Lmod module configuration section for Spack.
@@ -170,6 +171,7 @@ def generate_module_config(
         gpu_support: Whether to include GPU support (NVML, RSMI)
         minimal: Whether to build minimal Slurm (without OpenMPI and extra features)
         compiler_version: GCC compiler version to use
+        enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False for backward compatibility)
 
     Returns:
         Dictionary representing the modules configuration section
@@ -190,13 +192,26 @@ def generate_module_config(
     else:
         build_type = "standard build"
 
+    # Configure module hierarchy
+    # Core/Compiler/MPI hierarchy provides better dependency management
+    # but adds complexity for simple deployments
+    if enable_hierarchy and not minimal:
+        # 3-tier hierarchy: Core -> Compiler -> MPI
+        # Core: packages built with any compiler (e.g., gcc-runtime)
+        # Compiler: packages that depend on a specific compiler (e.g., openmpi)
+        # MPI: packages that depend on both compiler and MPI implementation (e.g., slurm with MPI)
+        hierarchy = ["mpi"]
+    else:
+        # Flat hierarchy for simpler deployment and backward compatibility
+        hierarchy = []
+
     # Base module configuration
     modules_config: Dict[str, Any] = {
         "default": {
             "enable": ["lmod"],
             "lmod": {
                 "core_compilers": [f"gcc@{compiler_version}"],  # Mark gcc as core for relocatable binaries
-                "hierarchy": [],  # Flat hierarchy for simpler deployment
+                "hierarchy": hierarchy,
                 "include": (
                     ["slurm", "openmpi", "mysql-connector-c"] if not minimal else ["slurm"]
                 ),  # Include OpenMPI for full builds
@@ -244,7 +259,15 @@ def generate_module_config(
 
     # Configure OpenMPI module behavior based on build type
     if not minimal:
-        modules_config["default"]["lmod"]["openmpi"] = {"environment": {"set": {"OMPI_MCA_plm": "slurm"}}}
+        # Set OpenMPI scheduler integration and autoload behavior for hierarchical modules
+        openmpi_config = {
+            "environment": {"set": {"OMPI_MCA_plm": "slurm"}},
+        }
+        if enable_hierarchy:
+            # In hierarchical mode, automatically load OpenMPI when compiler module is loaded
+            openmpi_config["autoload"] = "direct"
+        
+        modules_config["default"]["lmod"]["openmpi"] = openmpi_config
 
     return modules_config
 
@@ -261,6 +284,8 @@ def generate_spack_config(
     additional_variants: str = "",
     enable_verification: bool = False,
     compiler_version: str = "13.4.0",
+    enable_hierarchy: bool = False,
+    enable_buildcache: bool = False,
 ) -> Dict[str, Any]:
     """
     Generate a Spack environment configuration dictionary.
@@ -277,6 +302,8 @@ def generate_spack_config(
         additional_variants: Additional Spack variants to add to the Slurm spec
         enable_verification: Whether to enable relocatability verification checks
         compiler_version: GCC compiler version to use (always built by Spack)
+        enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
+        enable_buildcache: Whether to enable binary cache for faster rebuilds (default: False)
 
     Returns:
         Dictionary representing the Spack environment configuration
@@ -545,15 +572,20 @@ def generate_spack_config(
                 "deprecated": True,
                 # Spack 1.x performance enhancements
                 "build_jobs": 4,  # Parallel build jobs
-                "ccache": True,  # Disable ccache if not present
+                "ccache": True,  # Enable ccache for faster rebuilds
                 "connect_timeout": 30,  # Network timeout for downloads
                 "verify_ssl": True,  # Security setting
                 "suppress_gpg_warnings": False,  # Show GPG warnings
+                # Enhanced RPATH configuration for Spack 1.x
+                # This ensures binaries are truly relocatable with proper RPATH/RUNPATH
                 "shared_linking": {
                     "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
                     "bind": False,  # Don't bind absolute paths - allow relocation
-                    "missing_library_policy": "warn",  # Ignore on missing system
+                    "missing_library_policy": "warn",  # Warn on missing system libraries
                 },
+                # Enable build cache for faster rebuilds (Spack 1.x feature)
+                "install_missing_compilers": False,  # Don't install compilers automatically
+                "db_lock_timeout": 120,  # Database lock timeout in seconds
             },
             "mirrors": {
                 # Only use spack-public mirror for source downloads, not binaries
@@ -578,9 +610,23 @@ def generate_spack_config(
                     }
                 }
             ],
-            "modules": generate_module_config(slurm_version, gpu_support, minimal, compiler_version),
+            "modules": generate_module_config(slurm_version, gpu_support, minimal, compiler_version, enable_hierarchy),
         }
     }
+
+    # Add buildcache mirror for faster rebuilds if enabled
+    if enable_buildcache:
+        # Add local buildcache mirror for binary package caching
+        # This dramatically speeds up rebuilds by reusing compiled binaries
+        config["spack"]["mirrors"]["buildcache"] = {
+            "url": f"file://{buildcache_root}",
+            "signed": False,  # Don't require GPG signatures for local cache
+        }
+        # Enable buildcache in config
+        config["spack"]["config"]["install_tree"]["padded_length"] = 128  # Padded paths for relocatability
+        config["spack"]["config"]["source_cache"] = sourcecache_root
+        config["spack"]["config"]["misc_cache"] = buildcache_root
+
 
     # Add MPI provider configuration only for full builds (when OpenMPI is included)
     if not minimal:
@@ -615,6 +661,8 @@ def generate_yaml_string(
     minimal: bool = False,
     additional_variants: str = "",
     enable_verification: bool = False,
+    enable_hierarchy: bool = False,
+    enable_buildcache: bool = False,
 ) -> str:
     """
     Generate a YAML string representation of the Spack environment configuration.
@@ -626,6 +674,8 @@ def generate_yaml_string(
         minimal: Whether to build minimal Slurm
         additional_variants: Additional Spack variants to include
         enable_verification: Whether to enable relocatability verification checks
+        enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
+        enable_buildcache: Whether to enable binary cache for faster rebuilds
 
     Returns:
         YAML string representation of the configuration
@@ -640,6 +690,8 @@ def generate_yaml_string(
         minimal=minimal,
         additional_variants=additional_variants,
         enable_verification=enable_verification,
+        enable_hierarchy=enable_hierarchy,
+        enable_buildcache=enable_buildcache,
     )
     header = get_comment_header(slurm_version, gpu_support, minimal)
 
