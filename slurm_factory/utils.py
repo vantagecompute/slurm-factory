@@ -247,6 +247,103 @@ def _clear_cache_directory(cache_dir: str, verbose: bool = False) -> None:
         raise SlurmFactoryError(msg)
 
 
+def create_compiler_package(
+    container_name: str,
+    image_tag: str,
+    compiler_version: str = "13.4.0",
+    cache_dir: str = "",
+    verbose: bool = False,
+    no_cache: bool = False,
+    publish: bool = False,
+) -> None:
+    """Create compiler package in a Docker container."""
+    console.print("[bold blue]Creating compiler package in Docker container...[/bold blue]")
+
+    logger.debug(
+        f"Building compiler package: compiler_version={compiler_version}, "
+        f"no_cache={no_cache}, publish={publish}"
+    )
+
+    try:
+        # If no_cache is enabled, clean up everything first
+        if no_cache:
+            console.print("[bold yellow]🗑️  Performing fresh build - cleaning all caches...[/bold yellow]")
+
+            # Remove old Docker images
+            _remove_old_docker_image(image_tag, verbose=verbose)
+
+            # Clear Docker build cache
+            console.print("[dim]Pruning Docker build cache...[/dim]")
+            try:
+                subprocess.run(
+                    ["docker", "builder", "prune", "-f"],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+                logger.debug("Docker build cache cleared")
+            except subprocess.CalledProcessError as e:
+                logger.warning(f"Could not clear Docker build cache: {e}")
+                if verbose:
+                    console.print(f"[dim]Warning: Could not clear build cache: {escape(str(e))}[/dim]")
+
+        # Generate Dockerfile for compiler-only build
+        logger.debug("Generating compiler Dockerfile")
+        from .constants import get_compiler_dockerfile
+
+        dockerfile_content = get_compiler_dockerfile(
+            compiler_version=compiler_version,
+            cache_dir=cache_dir,
+        )
+        logger.debug(f"Generated Dockerfile ({len(dockerfile_content)} chars)")
+
+        # Build the compiler image
+        console.print("[bold cyan]Building compiler Docker image...[/bold cyan]")
+        _build_docker_image(
+            image_tag,
+            dockerfile_content,
+            cache_dir,
+            verbose=verbose,
+            no_cache=no_cache,
+            target="compiler-packager",  # Build up to the packager stage
+        )
+
+        console.print("[bold green]✓ Compiler build complete[/bold green]")
+
+        # Extract the tarball from the image
+        if cache_dir:
+            console.print("[bold cyan]Extracting compiler tarball from image...[/bold cyan]")
+            extract_compiler_package_from_image(
+                image_tag=image_tag,
+                output_dir=cache_dir,
+                compiler_version=compiler_version,
+                verbose=verbose,
+            )
+
+        # If publish is enabled, also publish to buildcache
+        if publish:
+            console.print("[bold cyan]Publishing compiler binaries to buildcache...[/bold cyan]")
+            publish_compiler_to_buildcache(
+                image_tag=image_tag,
+                cache_dir=cache_dir,
+                compiler_version=compiler_version,
+                verbose=verbose,
+            )
+
+        console.print("[bold green]✓ Compiler package built successfully[/bold green]")
+
+    except SlurmFactoryStreamExecError as e:
+        msg = f"Compiler build failed: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to create compiler package: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+
+
 def create_slurm_package(
     container_name: str,
     image_tag: str,
@@ -259,13 +356,15 @@ def create_slurm_package(
     cache_dir: str = "",
     verbose: bool = False,
     no_cache: bool = False,
+    use_buildcache: bool = True,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
 
     logger.debug(
         f"Building Slurm package: version={version}, compiler_version={compiler_version}, "
-        f"gpu={gpu_support}, minimal={minimal}, verify={verify}, no_cache={no_cache}"
+        f"gpu={gpu_support}, minimal={minimal}, verify={verify}, no_cache={no_cache}, "
+        f"use_buildcache={use_buildcache}"
     )
 
     try:
@@ -311,7 +410,7 @@ def create_slurm_package(
 
         # Generate multi-stage Dockerfile with embedded spack.yaml
         # This creates 3 stages:
-        # 0. compiler-bootstrap: Build custom GCC toolchain
+        # 0. compiler-bootstrap: Build custom GCC toolchain (or reuse from buildcache)
         # 1. init: Ubuntu + deps + Spack (heavily cached)
         # 2. builder: Spack install + view + modules (cached on spack.yaml changes)
         # 3. packager: Copy assets + create tarball (invalidates on asset changes)
@@ -322,6 +421,7 @@ def create_slurm_package(
             compiler_version=compiler_version,
             gpu_support=gpu_support,
             cache_dir=cache_dir,
+            use_buildcache=use_buildcache,
         )
         logger.debug(f"Generated Dockerfile ({len(dockerfile_content)} chars)")
 
@@ -442,6 +542,195 @@ def extract_slurm_package_from_image(
         raise SlurmFactoryError(msg)
     except Exception as e:
         msg = f"Failed to extract package: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+    finally:
+        # Clean up the temporary container
+        try:
+            subprocess.run(
+                ["docker", "rm", container_name],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            logger.debug(f"Removed temporary container {container_name}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temporary container: {e}")
+
+
+def extract_compiler_package_from_image(
+    image_tag: str,
+    output_dir: str,
+    compiler_version: str = "13.4.0",
+    verbose: bool = False,
+) -> None:
+    """
+    Extract the compiler package tarball from a Docker image.
+
+    Args:
+        image_tag: Tag of the compiler Docker image
+        output_dir: Directory to extract the tarball to
+        compiler_version: GCC compiler version
+        verbose: Whether to show detailed output
+
+    """
+    console.print(f"[bold blue]Extracting compiler package from image {image_tag}...[/bold blue]")
+
+    # Create compiler-specific output directory: ~/.slurm-factory/compilers/compiler_version/
+    base_path = Path(output_dir)
+    output_path = base_path / "compilers" / compiler_version
+    output_path.mkdir(parents=True, exist_ok=True)
+
+    logger.debug(f"Extracting compiler package from image {image_tag} to {output_path}")
+
+    container_name = f"slurm-factory-extract-compiler-{compiler_version.replace('.', '-')}"
+
+    # Tarball name for the compiler
+    tarball_name = f"gcc-{compiler_version}-compiler.tar.gz"
+
+    container_tarball_path = f"/opt/compiler-output/{tarball_name}"
+
+    try:
+        # Create a temporary container from the image
+        logger.debug(f"Creating temporary container {container_name}")
+        result = subprocess.run(
+            ["docker", "create", "--name", container_name, image_tag],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to create container for extraction: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        # Copy the tarball from the container
+        logger.debug(f"Copying {container_tarball_path} from container to {output_path}")
+        console.print(f"[dim]Copying compiler tarball to {output_path}...[/dim]")
+
+        result = subprocess.run(
+            ["docker", "cp", f"{container_name}:{container_tarball_path}", str(output_path)],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to copy tarball from container: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        console.print(f"[bold green]✓ Extracted {tarball_name} to {output_path}[/bold green]")
+        logger.debug(f"Successfully extracted compiler package to {output_path}/{tarball_name}")
+
+    except subprocess.TimeoutExpired:
+        msg = "Extraction timed out"
+        logger.error(msg)
+        console.print(f"[bold red]{msg}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to extract compiler package: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+    finally:
+        # Clean up the temporary container
+        try:
+            subprocess.run(
+                ["docker", "rm", container_name],
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
+            logger.debug(f"Removed temporary container {container_name}")
+        except Exception as e:
+            logger.warning(f"Failed to remove temporary container: {e}")
+
+
+def publish_compiler_to_buildcache(
+    image_tag: str,
+    cache_dir: str,
+    compiler_version: str = "13.4.0",
+    verbose: bool = False,
+) -> None:
+    """
+    Publish compiler binaries to buildcache from a Docker image.
+
+    Args:
+        image_tag: Tag of the compiler Docker image
+        cache_dir: Base cache directory
+        compiler_version: GCC compiler version
+        verbose: Whether to show detailed output
+
+    """
+    console.print(f"[bold blue]Publishing compiler binaries to buildcache...[/bold blue]")
+
+    # Create buildcache directory structure
+    base_path = Path(cache_dir)
+    buildcache_path = base_path / "buildcache"
+    buildcache_path.mkdir(parents=True, exist_ok=True)
+
+    logger.debug(f"Publishing compiler {compiler_version} to buildcache at {buildcache_path}")
+
+    container_name = f"slurm-factory-publish-compiler-{compiler_version.replace('.', '-')}"
+
+    try:
+        # Create a temporary container from the image
+        logger.debug(f"Creating temporary container {container_name}")
+        result = subprocess.run(
+            ["docker", "create", "--name", container_name, image_tag],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to create container for publishing: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        # Copy the buildcache directory from the container
+        container_buildcache_path = "/root/compiler-bootstrap/.spack-env/view"
+        logger.debug(f"Copying buildcache from {container_buildcache_path} to {buildcache_path}")
+        console.print(f"[dim]Copying compiler binaries to buildcache...[/dim]")
+
+        # Create a subdirectory for this compiler version
+        version_buildcache_path = buildcache_path / f"gcc-{compiler_version}"
+        version_buildcache_path.mkdir(parents=True, exist_ok=True)
+
+        result = subprocess.run(
+            [
+                "docker",
+                "cp",
+                f"{container_name}:{container_buildcache_path}/.",
+                str(version_buildcache_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=120,
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to copy buildcache from container: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        console.print(f"[bold green]✓ Published compiler binaries to {version_buildcache_path}[/bold green]")
+        logger.debug(f"Successfully published compiler to buildcache at {version_buildcache_path}")
+
+    except subprocess.TimeoutExpired:
+        msg = "Publishing timed out"
+        logger.error(msg)
+        console.print(f"[bold red]{msg}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to publish compiler to buildcache: {e}"
         logger.error(msg)
         console.print(f"[bold red]{escape(msg)}[/bold red]")
         raise SlurmFactoryError(msg)
