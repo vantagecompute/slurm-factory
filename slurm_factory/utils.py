@@ -402,6 +402,8 @@ def create_slurm_package(
     no_cache: bool = False,
     use_buildcache: bool = True,
     publish_s3: bool = False,
+    enable_hierarchy: bool = False,
+    enable_buildcache: bool = False,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
@@ -409,7 +411,8 @@ def create_slurm_package(
     logger.debug(
         f"Building Slurm package: version={version}, compiler_version={compiler_version}, "
         f"gpu={gpu_support}, minimal={minimal}, verify={verify}, no_cache={no_cache}, "
-        f"use_buildcache={use_buildcache}, publish_s3={publish_s3}"
+        f"use_buildcache={use_buildcache}, publish_s3={publish_s3}, "
+        f"enable_hierarchy={enable_hierarchy}, enable_buildcache={enable_buildcache}"
     )
 
     try:
@@ -450,6 +453,8 @@ def create_slurm_package(
             minimal=minimal,
             additional_variants=additional_variants,
             enable_verification=verify,
+            enable_hierarchy=enable_hierarchy,
+            enable_buildcache=enable_buildcache,
         )
         logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
 
