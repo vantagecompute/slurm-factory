@@ -213,6 +213,9 @@ def build_compiler(
     publish: Annotated[
         bool, typer.Option("--publish", help="Publish compiler binaries to buildcache after build")
     ] = False,
+    publish_s3: Annotated[
+        bool, typer.Option("--publish-s3", help="Upload binaries to S3 (s3://slurm-factory-spack-binary-cache)")
+    ] = False,
 ):
     """
     Build a GCC compiler toolchain for use in Slurm builds.
@@ -262,7 +265,10 @@ def build_compiler(
     if publish:
         console.print("[bold blue]Will publish compiler binaries to buildcache after build[/bold blue]")
 
-    builder_build_compiler(ctx, compiler_version, no_cache, publish)
+    if publish_s3:
+        console.print("[bold blue]Will upload binaries to S3 (s3://slurm-factory-spack-binary-cache)[/bold blue]")
+
+    builder_build_compiler(ctx, compiler_version, no_cache, publish, publish_s3)
 
 
 @app.command("build")
@@ -297,6 +303,9 @@ def build(
         bool,
         typer.Option("--use-buildcache", help="Use compiler from buildcache instead of building from source"),
     ] = True,
+    publish_s3: Annotated[
+        bool, typer.Option("--publish-s3", help="Upload binaries to S3 (s3://slurm-factory-spack-binary-cache)")
+    ] = False,
 ):
     """
     Build a specific Slurm version.
@@ -382,8 +391,11 @@ def build(
     if not use_buildcache:
         console.print("[bold yellow]Building compiler from source (not using buildcache)[/bold yellow]")
 
+    if publish_s3:
+        console.print("[bold blue]Will upload binaries to S3 (s3://slurm-factory-spack-binary-cache)[/bold blue]")
+
     builder_build(
-        ctx, slurm_version, compiler_version, gpu, additional_variants, minimal, verify, no_cache, use_buildcache
+        ctx, slurm_version, compiler_version, gpu, additional_variants, minimal, verify, no_cache, use_buildcache, publish_s3
     )
 
 

@@ -35,6 +35,7 @@ def build_compiler(
     compiler_version: str = "13.4.0",
     no_cache: bool = False,
     publish: bool = False,
+    publish_s3: bool = False,
 ):
     """Build a GCC compiler toolchain in a Docker container."""
     console = Console()
@@ -45,7 +46,7 @@ def build_compiler(
 
     logger.debug(
         f"Starting compiler build with parameters: compiler_version={compiler_version}, "
-        f"no_cache={no_cache}, publish={publish}"
+        f"no_cache={no_cache}, publish={publish}, publish_s3={publish_s3}"
     )
     logger.debug(f"Verbose mode: {verbose}")
 
@@ -96,6 +97,7 @@ def build_compiler(
             verbose=verbose,
             no_cache=no_cache,
             publish=publish,
+            publish_s3=publish_s3,
         )
         logger.debug("Compiler package creation completed")
         console.print("[bold green]✓ Compiler package created successfully[/bold green]")
@@ -121,6 +123,7 @@ def build(
     verify: bool = False,
     no_cache: bool = False,
     use_buildcache: bool = True,
+    publish_s3: bool = False,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -132,7 +135,8 @@ def build(
     logger.debug(
         f"Starting build with parameters: slurm_version={slurm_version.value}, "
         f"compiler_version={compiler_version}, "
-        f"gpu={gpu}, minimal={minimal}, verify={verify}, use_buildcache={use_buildcache}"
+        f"gpu={gpu}, minimal={minimal}, verify={verify}, use_buildcache={use_buildcache}, "
+        f"publish_s3={publish_s3}"
     )
     logger.debug(f"Verbose mode: {verbose}")
 
@@ -189,6 +193,7 @@ def build(
             verbose=verbose,
             no_cache=no_cache,
             use_buildcache=use_buildcache,
+            publish_s3=publish_s3,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")

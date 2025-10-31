@@ -288,13 +288,14 @@ def create_compiler_package(
     verbose: bool = False,
     no_cache: bool = False,
     publish: bool = False,
+    publish_s3: bool = False,
 ) -> None:
     """Create compiler package in a Docker container."""
     console.print("[bold blue]Creating compiler package in Docker container...[/bold blue]")
 
     logger.debug(
         f"Building compiler package: compiler_version={compiler_version}, "
-        f"no_cache={no_cache}, publish={publish}"
+        f"no_cache={no_cache}, publish={publish}, publish_s3={publish_s3}"
     )
 
     try:
@@ -363,6 +364,16 @@ def create_compiler_package(
                 verbose=verbose,
             )
 
+        # If publish_s3 is enabled, upload to S3
+        if publish_s3:
+            console.print("[bold cyan]Uploading compiler binaries to S3...[/bold cyan]")
+            upload_to_s3_buildcache(
+                cache_dir=cache_dir,
+                compiler_version=compiler_version,
+                package_type="compiler",
+                verbose=verbose,
+            )
+
         console.print("[bold green]✓ Compiler package built successfully[/bold green]")
 
     except SlurmFactoryStreamExecError as e:
@@ -390,6 +401,7 @@ def create_slurm_package(
     verbose: bool = False,
     no_cache: bool = False,
     use_buildcache: bool = True,
+    publish_s3: bool = False,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
@@ -397,7 +409,7 @@ def create_slurm_package(
     logger.debug(
         f"Building Slurm package: version={version}, compiler_version={compiler_version}, "
         f"gpu={gpu_support}, minimal={minimal}, verify={verify}, no_cache={no_cache}, "
-        f"use_buildcache={use_buildcache}"
+        f"use_buildcache={use_buildcache}, publish_s3={publish_s3}"
     )
 
     try:
@@ -481,6 +493,17 @@ def create_slurm_package(
                 output_dir=cache_dir,
                 version=version,
                 compiler_version=compiler_version,
+                verbose=verbose,
+            )
+
+        # If publish_s3 is enabled, upload to S3
+        if publish_s3:
+            console.print("[bold cyan]Uploading Slurm binaries to S3...[/bold cyan]")
+            upload_to_s3_buildcache(
+                cache_dir=cache_dir,
+                compiler_version=compiler_version,
+                slurm_version=version,
+                package_type="slurm",
                 verbose=verbose,
             )
 
@@ -803,3 +826,147 @@ def publish_compiler_to_buildcache(
             logger.debug(f"Removed temporary container {container_name}")
         except Exception as e:
             logger.warning(f"Failed to remove temporary container: {e}")
+
+
+def upload_to_s3_buildcache(
+    cache_dir: str,
+    compiler_version: str | None = None,
+    slurm_version: str | None = None,
+    package_type: str = "compiler",
+    verbose: bool = False,
+) -> None:
+    """
+    Upload Spack buildcache binaries to S3.
+
+    Args:
+        cache_dir: Base cache directory containing buildcache
+        compiler_version: GCC compiler version (for compiler packages)
+        slurm_version: Slurm version (for slurm packages)
+        package_type: Type of package ("compiler" or "slurm")
+        verbose: Whether to show detailed output
+
+    """
+    console.print(f"[bold blue]Uploading {package_type} binaries to S3...[/bold blue]")
+
+    S3_BUCKET = "s3://slurm-factory-spack-binary-cache"
+    
+    # Determine the source path based on package type
+    base_path = Path(cache_dir)
+    
+    if package_type == "compiler":
+        if not compiler_version:
+            raise SlurmFactoryError("compiler_version required for compiler package type")
+        source_path = base_path / "buildcache"
+        s3_prefix = f"{S3_BUCKET}/compilers/{compiler_version}/"
+        # Also upload the tarball
+        tarball_path = base_path / "compilers" / compiler_version
+        from .constants import get_compiler_tarball_name
+        tarball_file = tarball_path / get_compiler_tarball_name(compiler_version)
+    elif package_type == "slurm":
+        if not slurm_version or not compiler_version:
+            raise SlurmFactoryError("Both slurm_version and compiler_version required for slurm package type")
+        source_path = base_path / "buildcache"
+        s3_prefix = f"{S3_BUCKET}/slurm/{slurm_version}/{compiler_version}/"
+        tarball_path = base_path / slurm_version / compiler_version
+        tarball_file = None  # Will be determined based on files in directory
+    else:
+        raise SlurmFactoryError(f"Invalid package_type: {package_type}")
+
+    if not source_path.exists():
+        logger.warning(f"Buildcache directory not found: {source_path}")
+        console.print(f"[yellow]Warning: No buildcache found at {source_path}[/yellow]")
+        return
+
+    try:
+        # Check if AWS CLI is available
+        result = subprocess.run(
+            ["aws", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            raise SlurmFactoryError("AWS CLI is not available. Please install aws-cli.")
+        
+        logger.debug(f"AWS CLI version: {result.stdout.strip()}")
+
+        # Upload buildcache directory
+        console.print(f"[dim]Uploading buildcache from {source_path} to {s3_prefix}...[/dim]")
+        logger.debug(f"Syncing {source_path} to {s3_prefix}")
+        
+        cmd = [
+            "aws", "s3", "sync",
+            str(source_path),
+            f"{s3_prefix}buildcache/",
+            "--acl", "public-read",
+        ]
+        
+        if verbose:
+            console.print(f"[dim]$ {' '.join(cmd)}[/dim]")
+        
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=600,  # 10 minutes for large uploads
+        )
+        
+        if result.returncode != 0:
+            msg = f"Failed to upload buildcache to S3: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+        
+        if verbose and result.stdout:
+            console.print(f"[dim]{result.stdout}[/dim]")
+        
+        console.print(f"[bold green]✓ Uploaded buildcache to {s3_prefix}buildcache/[/bold green]")
+
+        # Upload tarball if it exists
+        if package_type == "compiler" and tarball_file and tarball_file.exists():
+            console.print(f"[dim]Uploading tarball {tarball_file.name} to S3...[/dim]")
+            logger.debug(f"Uploading {tarball_file} to {s3_prefix}")
+            
+            cmd = [
+                "aws", "s3", "cp",
+                str(tarball_file),
+                f"{s3_prefix}{tarball_file.name}",
+                "--acl", "public-read",
+            ]
+            
+            if verbose:
+                console.print(f"[dim]$ {' '.join(cmd)}[/dim]")
+            
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=300,  # 5 minutes for tarball upload
+            )
+            
+            if result.returncode != 0:
+                msg = f"Failed to upload tarball to S3: {result.stderr}"
+                logger.error(msg)
+                console.print(f"[bold red]{escape(msg)}[/bold red]")
+                raise SlurmFactoryError(msg)
+            
+            console.print(f"[bold green]✓ Uploaded {tarball_file.name} to {s3_prefix}[/bold green]")
+
+        console.print(f"[bold green]✓ Successfully uploaded {package_type} binaries to S3[/bold green]")
+        logger.debug(f"Successfully uploaded to {s3_prefix}")
+
+    except FileNotFoundError:
+        msg = "AWS CLI not found. Please install aws-cli to upload to S3."
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except subprocess.TimeoutExpired:
+        msg = "S3 upload timed out"
+        logger.error(msg)
+        console.print(f"[bold red]{msg}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to upload to S3: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
