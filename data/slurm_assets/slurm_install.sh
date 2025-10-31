@@ -411,6 +411,14 @@ if [[ -n "$ORG_ID" ]] && [[ -n "$SSSD_BINDER_PASSWORD" ]] && [[ -n "$LDAP_URI" ]
 
     echo "  ✓ SSSD configuration updated"
 
+    echo "  Enabling SSSD PAM profile..."
+    pam-auth-update --enable sss
+    echo "  ✓ SSSD PAM profile enabled"
+
+    echo "  Enabling mkhomedir PAM profile..."
+    pam-auth-update --enable mkhomedir
+    echo "  ✓ mkhomedir PAM profile enabled"
+
     if systemctl is-active --quiet sssd; then
         echo "  Restarting SSSD service..."
         systemctl restart sssd
@@ -424,6 +432,24 @@ if [[ -n "$ORG_ID" ]] && [[ -n "$SSSD_BINDER_PASSWORD" ]] && [[ -n "$LDAP_URI" ]
         systemctl enable --now sssd
         echo "  ✓ SSSD enabled and started"
     fi
+
+    echo
+    echo "=== Configuring SSHD ==="
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cp "$SCRIPT_DIR/ssh/vantage_sshd.conf" /etc/ssh/sshd_config.d/
+    chmod 600 /etc/ssh/sshd_config.d/vantage_sshd.conf
+    chown root:root /etc/ssh/sshd_config.d/vantage_sshd.conf
+
+    if systemctl is-active --quiet ssh; then
+        echo "  Restarting SSH service..."
+        systemctl restart ssh
+        echo "  ✓ SSH restarted"
+    elif systemctl is-enabled --quiet ssh; then
+        echo "  Starting SSH service..."
+        systemctl start ssh
+        echo "  ✓ SSH started"
+    fi
+
 elif [[ -n "$ORG_ID" ]] || [[ -n "$SSSD_BINDER_PASSWORD" ]] || [[ -n "$LDAP_URI" ]]; then
     echo
     echo "Warning: Partial SSSD configuration provided. All three parameters are required:"
