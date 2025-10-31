@@ -115,7 +115,8 @@ def _build_docker_image(
         # Add build arguments
         if build_args is not None:
             for key, value in build_args.items():
-                cmd.extend(["--build-arg", f"{key}={value}"])
+                # Ensure value is converted to string for Docker build arg
+                cmd.extend(["--build-arg", f"{key}={str(value)}"])
 
         # Add cache directory as build context if specified
         if cache_dir:

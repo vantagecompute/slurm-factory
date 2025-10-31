@@ -98,6 +98,23 @@ def get_compiler_tarball_name(compiler_version: str) -> str:
     return f"gcc-{compiler_version}-compiler.tar.gz"
 
 
+def get_compiler_tarball_path(cache_dir: str, compiler_version: str) -> str:
+    """
+    Generate the full path to a compiler tarball in the cache directory.
+
+    Args:
+        cache_dir: Base cache directory path
+        compiler_version: GCC compiler version (e.g., "13.4.0")
+
+    Returns:
+        Full path to compiler tarball (e.g., "/path/to/cache/compilers/13.4.0/gcc-13.4.0-compiler.tar.gz")
+
+    """
+    from pathlib import Path
+
+    return str(Path(cache_dir) / "compilers" / compiler_version / get_compiler_tarball_name(compiler_version))
+
+
 def get_module_template_content() -> str:
     """Return the embedded Lmod module template content."""
     template_path = Path(__file__).parent.parent / "data" / "templates" / "relocatable_modulefile.lua"
@@ -466,10 +483,11 @@ def get_dockerfile(
         # Check if compiler tarball exists in buildcache
         from pathlib import Path
 
-        buildcache_tarball = Path(cache_dir) / "compilers" / compiler_version / get_compiler_tarball_name(compiler_version)
+        buildcache_tarball = Path(get_compiler_tarball_path(cache_dir, compiler_version))
         
         if buildcache_tarball.exists():
             # Use pre-built compiler from buildcache
+            # NOTE: The following is a Python f-string template that generates Dockerfile syntax
             compiler_bootstrap_stage = textwrap.dedent(
                 f"""\
 # ========================================================================
@@ -515,6 +533,7 @@ RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     
     if not use_buildcache:
         # Build compiler from source
+        # NOTE: The following is a Python f-string template that generates Dockerfile syntax
         compiler_bootstrap_stage = textwrap.dedent(
             f"""\
 # ========================================================================
