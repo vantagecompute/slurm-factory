@@ -415,6 +415,14 @@ if [[ -n "$ORG_ID" ]] && [[ -n "$SSSD_BINDER_PASSWORD" ]] && [[ -n "$LDAP_URI" ]
         echo "  Restarting SSSD service..."
         systemctl restart sssd
         echo "  ✓ SSSD restarted"
+    elif systemctl is-enabled --quiet sssd; then
+        echo "  Starting SSSD service..."
+        systemctl start sssd
+        echo "  ✓ SSSD started"
+    else
+        echo "  Enabling and starting SSSD service..."
+        systemctl enable --now sssd
+        echo "  ✓ SSSD enabled and started"
     fi
 elif [[ -n "$ORG_ID" ]] || [[ -n "$SSSD_BINDER_PASSWORD" ]] || [[ -n "$LDAP_URI" ]]; then
     echo
