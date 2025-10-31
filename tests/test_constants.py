@@ -35,6 +35,7 @@ from slurm_factory.constants import (
     BASH_HEADER,
     get_package_tarball_script,
     get_dockerfile,
+    get_compiler_dockerfile,
 )
 
 
@@ -204,6 +205,27 @@ class TestScriptTemplates:
         # Test that it installs required packages
         assert "git" in dockerfile
         assert "build-essential" in dockerfile
+        
+        # Test that it's properly formatted Dockerfile
+        lines = dockerfile.strip().split('\n')
+        assert len(lines) > 10  # Should be a substantial Dockerfile
+
+    def test_get_compiler_dockerfile(self):
+        """Test compiler Dockerfile generation."""
+        dockerfile = get_compiler_dockerfile(compiler_version="13.4.0")
+        
+        # Test that it returns a string
+        assert isinstance(dockerfile, str)
+        assert len(dockerfile) > 0
+        
+        # Test that it contains expected elements
+        assert "FROM ubuntu:24.04" in dockerfile
+        assert "compiler-bootstrap" in dockerfile
+        assert "compiler-packager" in dockerfile
+        assert "gcc@13.4.0" in dockerfile
+        
+        # Test that it has BuildKit syntax
+        assert "syntax=docker/dockerfile:1" in dockerfile
         
         # Test that it's properly formatted Dockerfile
         lines = dockerfile.strip().split('\n')
