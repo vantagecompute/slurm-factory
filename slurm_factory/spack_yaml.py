@@ -515,7 +515,9 @@ def generate_spack_config(
                 # GCC compiler - downloaded from buildcache (built separately with build-compiler command)
                 # Set buildable: true so it can be installed, but require specific version from buildcache
                 # IMPORTANT: These requirements must match what's built in compiler bootstrap (see generate_compiler_bootstrap_config)
+                # CRITICAL: Prevent gcc from being used as external (Spack auto-detects and adds it)
                 "gcc": {
+                    "externals": [],  # Don't use system GCC
                     "buildable": True,  # Allow installation (from buildcache)
                     "require": [f"@{compiler_version}", "+binutils", "+piclibs", "~nvptx", "languages=c,c++,fortran"],
                 },
