@@ -107,36 +107,33 @@ class TestSpackConfigGeneration:
         config = generate_spack_config()
         compilers = config["spack"]["compilers"]
         
-        assert len(compilers) == 1
-        compiler = compilers[0]["compiler"]
-        
-        # Test compiler spec and paths (using Spack-built compiler from compiler-bootstrap)
-        assert compiler["spec"] == "gcc@=13.4.0"
-        assert compiler["paths"]["cc"] == "/opt/spack-compiler/bin/gcc"
-        assert compiler["paths"]["cxx"] == "/opt/spack-compiler/bin/g++"
-        assert compiler["paths"]["f77"] == "/opt/spack-compiler/bin/gfortran"
-        assert compiler["paths"]["fc"] == "/opt/spack-compiler/bin/gfortran"
-        
-        # Test RPATH configuration (empty by default, can be customized later)
-        assert "extra_rpaths" in compiler
-        rpaths = compiler["extra_rpaths"]
-        assert isinstance(rpaths, list)
+        # Compilers start empty - GCC is installed from buildcache and detected via spack compiler find
+        assert len(compilers) == 0
 
-    def test_gcc_external_prevention(self):
-        """Test that GCC external package is properly configured."""
+    def test_gcc_buildcache_configuration(self):
+        """Test that GCC is properly configured to use buildcache."""
         config = generate_spack_config()
         packages = config["spack"]["packages"]
         
-        # Test that GCC is configured as external (built by Spack in compiler-bootstrap stage)
+        # Test that GCC is configured to use buildcache (not external system GCC)
         assert "gcc" in packages
         gcc_config = packages["gcc"]
-        assert gcc_config["buildable"] is False
+        
+        # GCC should be buildable (from buildcache)
+        assert gcc_config["buildable"] is True
+        
+        # GCC should have empty externals to prevent system GCC detection
         assert "externals" in gcc_config
-        # Should have one external entry for the Spack-built GCC
-        assert len(gcc_config["externals"]) == 1
-        external = gcc_config["externals"][0]
-        assert "gcc@13.4.0" in external["spec"]
-        assert external["prefix"] == "/opt/spack-compiler"
+        assert gcc_config["externals"] == []
+        
+        # GCC should have requirements that match compiler bootstrap
+        assert "require" in gcc_config
+        requirements = gcc_config["require"]
+        assert "@13.4.0" in requirements
+        assert "+binutils" in requirements
+        assert "+piclibs" in requirements
+        assert "~nvptx" in requirements
+        assert "languages=c,c++,fortran" in requirements
 
     def test_package_configurations(self):
         """Test package-specific configurations."""
