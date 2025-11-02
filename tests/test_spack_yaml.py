@@ -110,12 +110,12 @@ class TestSpackConfigGeneration:
         assert len(compilers) == 1
         compiler = compilers[0]["compiler"]
         
-        # Test compiler spec and paths (using default 13.4.0, built by Spack)
+        # Test compiler spec and paths (using default 13.4.0, built by Spack in bootstrap stage)
         assert compiler["spec"] == "gcc@=13.4.0"
-        assert compiler["paths"]["cc"] == "/usr/bin/gcc"
-        assert compiler["paths"]["cxx"] == "/usr/bin/g++"
-        assert compiler["paths"]["f77"] == "/usr/bin/gfortran"
-        assert compiler["paths"]["fc"] == "/usr/bin/gfortran"
+        assert compiler["paths"]["cc"] == "/opt/spack-compiler/bin/gcc"
+        assert compiler["paths"]["cxx"] == "/opt/spack-compiler/bin/g++"
+        assert compiler["paths"]["f77"] == "/opt/spack-compiler/bin/gfortran"
+        assert compiler["paths"]["fc"] == "/opt/spack-compiler/bin/gfortran"
         
         # Test RPATH configuration (empty by default, can be customized later)
         assert "extra_rpaths" in compiler

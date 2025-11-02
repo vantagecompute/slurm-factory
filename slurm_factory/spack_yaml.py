@@ -552,10 +552,10 @@ def generate_spack_config(
                     "compiler": {
                         "spec": f"gcc@={compiler_version}",
                         "paths": {
-                            "cc": "/usr/bin/gcc",
-                            "cxx": "/usr/bin/g++",
-                            "f77": "/usr/bin/gfortran",
-                            "fc": "/usr/bin/gfortran",
+                            "cc": "/opt/spack-compiler/bin/gcc",
+                            "cxx": "/opt/spack-compiler/bin/g++",
+                            "f77": "/opt/spack-compiler/bin/gfortran",
+                            "fc": "/opt/spack-compiler/bin/gfortran",
                         },
                         "operating_system": "ubuntu24.04",
                         "target": "x86_64",
