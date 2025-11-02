@@ -82,32 +82,33 @@ class TestBuildcacheSupport:
         assert "spack-public" in mirrors
         assert "buildcache" not in mirrors
 
-    def test_buildcache_enabled(self):
-        """Test buildcache configuration when enabled."""
-        config = generate_spack_config(enable_buildcache=True)
-        mirrors = config["spack"]["mirrors"]
-        
-        # Should have buildcache mirror
-        assert "buildcache" in mirrors
-        assert mirrors["buildcache"]["signed"] is False
-        assert "file://" in mirrors["buildcache"]["url"]
+    # Local buildcache feature removed - remote Spack buildcache mirror used instead
+    # def test_buildcache_enabled(self):
+    #     """Test buildcache configuration when enabled."""
+    #     config = generate_spack_config()
+    #     mirrors = config["spack"]["mirrors"]
+    #     
+    #     # Should have buildcache mirror
+    #     assert "buildcache" in mirrors
+    #     assert mirrors["buildcache"]["signed"] is False
+    #     assert "file://" in mirrors["buildcache"]["url"]
 
-    def test_buildcache_config_paths(self):
-        """Test that buildcache adds necessary config paths."""
-        config = generate_spack_config(enable_buildcache=True)
-        spack_config = config["spack"]["config"]
-        
-        # Should have source_cache and misc_cache configured
-        assert "source_cache" in spack_config
-        assert "misc_cache" in spack_config
+    # def test_buildcache_config_paths(self):
+    #     """Test that buildcache adds necessary config paths."""
+    #     config = generate_spack_config()
+    #     spack_config = config["spack"]["config"]
+    #     
+    #     # Should have source_cache and misc_cache configured
+    #     assert "source_cache" in spack_config
+    #     assert "misc_cache" in spack_config
 
-    def test_buildcache_padded_length(self):
-        """Test that buildcache enables padded install paths."""
-        config = generate_spack_config(enable_buildcache=True)
-        install_tree = config["spack"]["config"]["install_tree"]
-        
-        # Should use padded length for relocatability
-        assert install_tree["padded_length"] == 128
+    # def test_buildcache_padded_length(self):
+    #     """Test that buildcache enables padded install paths."""
+    #     config = generate_spack_config()
+    #     install_tree = config["spack"]["config"]["install_tree"]
+    #     
+    #     # Should use padded length for relocatability
+    #     assert install_tree["padded_length"] == 128
 
 
 class TestEnhancedRPATH:
@@ -213,21 +214,20 @@ class TestYAMLGenerationWithNewFeatures:
         assert "hierarchy" in modules
         assert modules["hierarchy"] == ["mpi"]
 
-    def test_yaml_generation_with_buildcache(self):
-        """Test YAML generation with buildcache enabled."""
-        yaml_string = generate_yaml_string(enable_buildcache=True)
-        
-        parsed = yaml.safe_load(yaml_string)
-        mirrors = parsed["spack"]["mirrors"]
-        
-        # Should have buildcache mirror
-        assert "buildcache" in mirrors
+    # def test_yaml_generation_with_buildcache(self):
+    #     """Test YAML generation with buildcache enabled."""
+    #     yaml_string = generate_yaml_string()
+    #     
+    #     parsed = yaml.safe_load(yaml_string)
+    #     mirrors = parsed["spack"]["mirrors"]
+    #     
+    #     # Should have buildcache mirror
+    #     assert "buildcache" in mirrors
 
     def test_yaml_generation_with_all_features(self):
         """Test YAML generation with all features enabled."""
         yaml_string = generate_yaml_string(
             enable_hierarchy=True,
-            enable_buildcache=True,
             enable_verification=True,
         )
         
@@ -235,7 +235,6 @@ class TestYAMLGenerationWithNewFeatures:
         
         # Should have all features configured
         assert parsed["spack"]["modules"]["default"]["lmod"]["hierarchy"] == ["mpi"]
-        assert "buildcache" in parsed["spack"]["mirrors"]
         assert "verify" in parsed["spack"]["config"]
 
 
@@ -250,16 +249,11 @@ class TestBackwardCompatibility:
         # New behavior with defaults should match
         config_new = generate_spack_config(
             enable_hierarchy=False,
-            enable_buildcache=False,
         )
         
         # Both should have flat hierarchy
         assert config_old["spack"]["modules"]["default"]["lmod"]["hierarchy"] == []
         assert config_new["spack"]["modules"]["default"]["lmod"]["hierarchy"] == []
-        
-        # Both should not have buildcache
-        assert "buildcache" not in config_old["spack"]["mirrors"]
-        assert "buildcache" not in config_new["spack"]["mirrors"]
 
     def test_existing_tests_compatibility(self):
         """Test that existing test patterns still work."""
@@ -279,7 +273,6 @@ class TestBackwardCompatibility:
             config = generate_spack_config(
                 compiler_version=version,
                 enable_hierarchy=True,
-                enable_buildcache=True,
             )
             assert "spack" in config
             # Check that gcc-runtime version matches
@@ -299,30 +292,28 @@ class TestParameterValidation:
             config = generate_spack_config(slurm_version=version, enable_hierarchy=True)
             assert "spack" in config
 
-    def test_buildcache_with_different_configurations(self):
-        """Test buildcache works with different build configurations."""
-        configs = [
-            {"gpu_support": True, "minimal": False},
-            {"gpu_support": False, "minimal": False},
-            {"gpu_support": False, "minimal": True},
-        ]
-        
-        for config_params in configs:
-            config = generate_spack_config(enable_buildcache=True, **config_params)
-            assert "buildcache" in config["spack"]["mirrors"]
+    # Removed local buildcache tests
+    # def test_buildcache_with_different_configurations(self):
+    #     """Test buildcache works with different build configurations."""
+    #     configs = [
+    #         {"gpu_support": True, "minimal": False},
+    #         {"gpu_support": False, "minimal": False},
+    #         {"gpu_support": False, "minimal": True},
+    #     ]
+    #     
+    #     for config_params in configs:
+    #         config = generate_spack_config(**config_params)
+    #         assert "spack" in config
 
     def test_combined_features_minimal_build(self):
         """Test that features work correctly with minimal builds."""
         config = generate_spack_config(
             minimal=True,
             enable_hierarchy=True,
-            enable_buildcache=True,
         )
         
         # Hierarchy should be disabled for minimal builds
         assert config["spack"]["modules"]["default"]["lmod"]["hierarchy"] == []
-        # Buildcache should still be enabled
-        assert "buildcache" in config["spack"]["mirrors"]
 
 
 if __name__ == "__main__":

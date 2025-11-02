@@ -63,6 +63,7 @@ def generate_compiler_bootstrap_config(
                 # Use binutils@2.44 instead of 2.45 to avoid build failures
                 # 2.44 is stable enough for GCC 14.2 while avoiding 2.45 issues
                 f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran' ^binutils@2.44",
+                # NOTE: gcc-runtime@{gcc_ver} will be built in a second step after gcc is registered
                 # Build autotools in compiler env so they're available in /opt/spack-compiler
                 # but not during Slurm build (which needs different versions for libjwt compatibility)
                 "autoconf@2.72",
@@ -71,7 +72,10 @@ def generate_compiler_bootstrap_config(
             ],
             "concretizer": {
                 "unify": False,  # Allow different gcc versions for build vs runtime
-                "reuse": False,
+                "reuse": {
+                    "roots": True,
+                    "from": [{"type": "buildcache"}],
+                },
             },
             "packages": {
                 "all": {
@@ -112,9 +116,14 @@ def generate_compiler_bootstrap_config(
                 "misc_cache": buildcache_root,
                 "build_jobs": 4,
                 "ccache": True,
+                "binary_index_ttl": 600,
             },
             "mirrors": {
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                "slurm-factory-buildcache": {
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
+                    "signed": False,
+                },
             },
         }
     }
@@ -285,7 +294,6 @@ def generate_spack_config(
     enable_verification: bool = False,
     compiler_version: str = "13.4.0",
     enable_hierarchy: bool = False,
-    enable_buildcache: bool = False,
 ) -> Dict[str, Any]:
     """
     Generate a Spack environment configuration dictionary.
@@ -303,7 +311,6 @@ def generate_spack_config(
         enable_verification: Whether to enable relocatability verification checks
         compiler_version: GCC compiler version to use (always built by Spack)
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
-        enable_buildcache: Whether to enable binary cache for faster rebuilds (default: False)
 
     Returns:
         Dictionary representing the Spack environment configuration
@@ -322,15 +329,15 @@ def generate_spack_config(
     # Build Slurm spec with conditional features
     gpu_flags = "+nvml +rsmi" if gpu_support else "~nvml ~rsmi"
 
-    gcc_spec = f"gcc-runtime@{compiler_version} {compiler_spec}"
+    # Spec definitions for packages
     openldap_spec = f"openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl {compiler_spec}"
     curl_spec = (
         f"slurm_factory.curl@8.15.0+nghttp2+libssh2+libssh+gssapi+ldap+librtmp+libidn2 "
         f"libs=shared,static tls=openssl {compiler_spec}"
     )
     specs = [
-        # Build a bootstrapped compiler first (in-DAG)
-        gcc_spec,
+        # Note: gcc and gcc-runtime are installed outside the environment first
+        # All packages below will use %gcc@{compiler_version} which will be available after gcc is installed
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         f"openssl@3.4.1 ^zlib@1.3.1 {compiler_spec}",  # Build OpenSSL with explicit zlib dependency
         f"jansson@2.14 {compiler_spec}",  # JSON library for libjwt
@@ -369,7 +376,20 @@ def generate_spack_config(
             },
             "concretizer": {
                 "unify": True,  # Unify specs (Spack 1.x feature)
-                "reuse": True,  # Always reuse Spack-built compiler
+                "reuse": {
+                    "roots": True,
+                    "from": [{"type": "buildcache"}],
+                },
+            },
+            "config": {
+                "install_tree": {
+                    "padded_length": 128,  # For relocatable binaries
+                },
+                "bootstrap": {
+                    "enable": True,
+                    "root": "$spack/opt/spack",
+                    "sources": ["github-actions-v0.5", "github-actions-v0.4"],
+                },
             },
             # Force all packages to be buildable from source
             "packages": {
@@ -492,28 +512,15 @@ def generate_spack_config(
                 "libyaml": {"buildable": True},  # Configuration parsing
                 # NOTE: bzip2 and xz are configured as external packages above to avoid library conflicts
                 "zstd": {"buildable": True},  # Fast compression (transitive)
-                # GCC runtime libraries - build to ensure relocatability
+                # GCC compiler - downloaded from buildcache (built separately with build-compiler command)
+                # Set buildable: true so it can be installed, but require specific version from buildcache
+                "gcc": {
+                    "buildable": True,  # Allow installation (from buildcache)
+                    "require": [f"@{compiler_version}", "~nvptx", "~piclibs"],  # Force specific version, no cuda/pic libs
+                },
                 "gcc-runtime": {
                     "buildable": True,
-                    "version": [compiler_version],
-                },
-                # GCC compiler configuration - either use system or Spack-built compiler
-                "gcc": {
-                    "buildable": False,
-                    "externals": [
-                        {
-                            "spec": f"gcc@{compiler_version} languages:='c,c++,fortran'",
-                            "prefix": "/opt/spack-compiler",
-                            "extra_attributes": {
-                                "compilers": {
-                                    "c": "/opt/spack-compiler/bin/gcc",
-                                    "cxx": "/opt/spack-compiler/bin/g++",
-                                    "fortran": "/opt/spack-compiler/bin/gfortran",
-                                },
-                                "environment": {},
-                            },
-                        },
-                    ],
+                    "require": f"@{compiler_version}",
                 },
                 "slurm": {
                     "version": [slurm_package_version],
@@ -595,41 +602,12 @@ def generate_spack_config(
                     "signed": False,
                 },
             },
-            "compilers": [
-                {
-                    "compiler": {
-                        "spec": f"gcc@={compiler_version}",
-                        "paths": {
-                            "cc": "/opt/spack-compiler/bin/gcc",
-                            "cxx": "/opt/spack-compiler/bin/g++",
-                            "f77": "/opt/spack-compiler/bin/gfortran",
-                            "fc": "/opt/spack-compiler/bin/gfortran",
-                        },
-                        "operating_system": "ubuntu24.04",
-                        "target": "x86_64",
-                        "modules": [],
-                        "environment": {},
-                        "extra_rpaths": [],
-                    }
-                }
-            ],
+            # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
+            # via spack compiler find (system compiler detection is disabled)
+            "compilers": [],
             "modules": generate_module_config(slurm_version, gpu_support, minimal, compiler_version, enable_hierarchy),
         }
     }
-
-    # Add buildcache mirror for faster rebuilds if enabled
-    if enable_buildcache:
-        # Add local buildcache mirror for binary package caching
-        # This dramatically speeds up rebuilds by reusing compiled binaries
-        config["spack"]["mirrors"]["buildcache"] = {
-            "url": f"file://{buildcache_root}",
-            "signed": False,  # Don't require GPG signatures for local cache
-        }
-        # Enable buildcache in config
-        config["spack"]["config"]["install_tree"]["padded_length"] = 128  # Padded paths for relocatability
-        config["spack"]["config"]["source_cache"] = sourcecache_root
-        config["spack"]["config"]["misc_cache"] = buildcache_root
-
 
     # Add MPI provider configuration only for full builds (when OpenMPI is included)
     if not minimal:
@@ -665,7 +643,6 @@ def generate_yaml_string(
     additional_variants: str = "",
     enable_verification: bool = False,
     enable_hierarchy: bool = False,
-    enable_buildcache: bool = False,
 ) -> str:
     """
     Generate a YAML string representation of the Spack environment configuration.
@@ -678,7 +655,6 @@ def generate_yaml_string(
         additional_variants: Additional Spack variants to include
         enable_verification: Whether to enable relocatability verification checks
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
-        enable_buildcache: Whether to enable binary cache for faster rebuilds
 
     Returns:
         YAML string representation of the configuration
@@ -694,7 +670,6 @@ def generate_yaml_string(
         additional_variants=additional_variants,
         enable_verification=enable_verification,
         enable_hierarchy=enable_hierarchy,
-        enable_buildcache=enable_buildcache,
     )
     header = get_comment_header(slurm_version, gpu_support, minimal)
 

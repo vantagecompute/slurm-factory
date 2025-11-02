@@ -157,16 +157,6 @@ class SlurmFactoryBinaryCache(Stack):
                 ),
             )
 
-        # IAM User for manual uploads (james)
-        james_user = iam.User.from_user_name(
-            self,
-            "JamesUser",
-            user_name="james",
-        )
-
-        # Grant james permissions to push to buildcache
-        self.bucket.grant_read_write(james_user)
-
         # GitHub OIDC Provider
         # Note: This resource is manually managed and should not be deleted
         # If it already exists, delete the stack and recreate without changing this resource

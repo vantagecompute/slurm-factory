@@ -293,18 +293,15 @@ def build(
     no_cache: Annotated[
         bool, typer.Option("--no-cache", help="Force a fresh build without using Docker cache")
     ] = False,
-    use_buildcache: Annotated[
+    use_local_buildcache: Annotated[
         bool,
-        typer.Option("--use-buildcache", help="Use compiler from buildcache instead of building from source"),
-    ] = True,
+        typer.Option("--use-local-buildcache", help="Use locally cached compiler tarball instead of building from source"),
+    ] = False,
     publish_s3: Annotated[
         bool, typer.Option("--publish-s3", help="Upload binaries to S3 (s3://slurm-factory-spack-binary-cache)")
     ] = False,
     enable_hierarchy: Annotated[
         bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
-    ] = False,
-    enable_buildcache: Annotated[
-        bool, typer.Option("--enable-buildcache", help="Enable binary cache for faster rebuilds")
     ] = False,
 ):
     """
@@ -328,11 +325,15 @@ def build(
     - --minimal: ~1-2GB, basic Slurm only without OpenMPI or extra features
     - --verify: Enable relocatability verification for CI/testing
     - --no-cache: Force a fresh build without using Docker layer cache
-    - --use-buildcache: Reuse compiler binaries from buildcache (default: true)
+    - --use-local-buildcache: Use locally cached compiler tarball (advanced)
+
+    Remote Spack buildcache:
+    - Always enabled via mirror in spack.yaml
+    - Automatically downloads pre-built compiler binaries when available
+    - No flag needed - works automatically
 
     Advanced Spack 1.x features:
     - --enable-hierarchy: Enable Core/Compiler/MPI 3-tier module hierarchy
-    - --enable-buildcache: Enable binary cache for 5-10x faster rebuilds
 
     Each version includes:
     - Dynamic Spack configuration with relocatability features
@@ -354,10 +355,8 @@ def build(
         slurm-factory build --minimal                         # Build minimal version
         slurm-factory build --verify                          # Build with verification (CI)
         slurm-factory build --no-cache                        # Build without Docker cache
-        slurm-factory build --no-use-buildcache               # Build compiler from source (slower)
         slurm-factory build --enable-hierarchy                # Build with module hierarchy
-        slurm-factory build --enable-buildcache               # Build with binary cache
-        slurm-factory build --enable-hierarchy --enable-buildcache  # Build with all advanced features
+        slurm-factory build --use-local-buildcache            # Use local compiler tarball (advanced)
 
     """
     console = Console()
@@ -395,18 +394,16 @@ def build(
     if no_cache:
         console.print("[bold yellow]Building with --no-cache (fresh build)[/bold yellow]")
 
-    if not use_buildcache:
-        console.print("[bold yellow]Building compiler from source (not using buildcache)[/bold yellow]")
+    if use_local_buildcache:
+        console.print("[bold yellow]Using locally cached compiler tarball[/bold yellow]")
 
     if publish_s3:
         console.print("[bold blue]Will upload binaries to S3 (s3://slurm-factory-spack-binary-cache)[/bold blue]")
     if enable_hierarchy:
         console.print("[bold cyan]Enabling Core/Compiler/MPI module hierarchy[/bold cyan]")
-    if enable_buildcache:
-        console.print("[bold cyan]Enabling binary cache for faster rebuilds[/bold cyan]")
 
     builder_build(
-        ctx, slurm_version, compiler_version, gpu, additional_variants, minimal, verify, no_cache, use_buildcache, publish_s3, enable_hierarchy, enable_buildcache
+        ctx, slurm_version, compiler_version, gpu, additional_variants, minimal, verify, no_cache, use_local_buildcache, publish_s3, enable_hierarchy
     )
 
 

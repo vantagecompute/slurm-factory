@@ -120,13 +120,10 @@ def build(
     minimal: bool = False,
     verify: bool = False,
     no_cache: bool = False,
-    use_buildcache: bool = True,
+    use_local_buildcache: bool = False,
     publish_s3: bool = False,
     enable_hierarchy: Annotated[
         bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
-    ] = False,
-    enable_buildcache: Annotated[
-        bool, typer.Option("--enable-buildcache", help="Enable binary cache for faster rebuilds")
     ] = False,
 ):
     """Build a specific Slurm version in a Docker container."""
@@ -139,8 +136,8 @@ def build(
     logger.debug(
         f"Starting build with parameters: slurm_version={slurm_version.value}, "
         f"compiler_version={compiler_version}, "
-        f"gpu={gpu}, minimal={minimal}, verify={verify}, use_buildcache={use_buildcache}, "
-        f"publish_s3={publish_s3}, enable_hierarchy={enable_hierarchy}, enable_buildcache={enable_buildcache}"
+        f"gpu={gpu}, minimal={minimal}, verify={verify}, use_local_buildcache={use_local_buildcache}, "
+        f"publish_s3={publish_s3}, enable_hierarchy={enable_hierarchy}"
     )
     logger.debug(f"Verbose mode: {verbose}")
 
@@ -196,10 +193,9 @@ def build(
             cache_dir=str(settings.home_cache_dir),
             verbose=verbose,
             no_cache=no_cache,
-            use_buildcache=use_buildcache,
+            use_local_buildcache=use_local_buildcache,
             publish_s3=publish_s3,
             enable_hierarchy=enable_hierarchy,
-            enable_buildcache=enable_buildcache,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")
