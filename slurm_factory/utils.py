@@ -288,14 +288,13 @@ def create_compiler_package(
     verbose: bool = False,
     no_cache: bool = False,
     publish: bool = False,
-    publish_s3: bool = False,
 ) -> None:
     """Create compiler package in a Docker container."""
     console.print("[bold blue]Creating compiler package in Docker container...[/bold blue]")
 
     logger.debug(
         f"Building compiler package: compiler_version={compiler_version}, "
-        f"no_cache={no_cache}, publish={publish}, publish_s3={publish_s3}"
+        f"no_cache={no_cache}, publish={publish}"
     )
 
     try:
@@ -354,23 +353,13 @@ def create_compiler_package(
                 verbose=verbose,
             )
 
-        # If publish is enabled, also publish to buildcache
+        # If publish is enabled, push to S3 buildcache using spack
         if publish:
-            console.print("[bold cyan]Publishing compiler binaries to buildcache...[/bold cyan]")
+            console.print("[bold cyan]Publishing compiler to S3 buildcache...[/bold cyan]")
             publish_compiler_to_buildcache(
                 image_tag=image_tag,
                 cache_dir=cache_dir,
                 compiler_version=compiler_version,
-                verbose=verbose,
-            )
-
-        # If publish_s3 is enabled, upload to S3
-        if publish_s3:
-            console.print("[bold cyan]Uploading compiler binaries to S3...[/bold cyan]")
-            upload_to_s3_buildcache(
-                cache_dir=cache_dir,
-                compiler_version=compiler_version,
-                package_type="compiler",
                 verbose=verbose,
             )
 
@@ -721,96 +710,99 @@ def publish_compiler_to_buildcache(
     verbose: bool = False,
 ) -> None:
     """
-    Publish compiler binaries to buildcache from a Docker image.
+    Publish compiler binaries to S3 buildcache using spack buildcache push.
 
-    This extracts the Spack buildcache directory which contains binary packages
-    that can be reused in future builds.
+    This runs `spack buildcache push` inside the Docker container with AWS
+    credentials/role passed as environment variables.
 
     Args:
         image_tag: Tag of the compiler Docker image
-        cache_dir: Base cache directory
+        cache_dir: Base cache directory (not used, kept for compatibility)
         compiler_version: GCC compiler version
         verbose: Whether to show detailed output
 
     """
-    console.print(f"[bold blue]Publishing compiler binaries to buildcache...[/bold blue]")
+    console.print(f"[bold blue]Publishing compiler to S3 buildcache...[/bold blue]")
 
-    # Create buildcache directory structure
-    base_path = Path(cache_dir)
-    buildcache_path = base_path / "buildcache"
-    buildcache_path.mkdir(parents=True, exist_ok=True)
+    S3_BUCKET = "s3://slurm-factory-spack-buildcache-4b670"
+    s3_mirror_url = f"{S3_BUCKET}/compilers/{compiler_version}/buildcache"
+    
+    logger.debug(f"Publishing compiler {compiler_version} to {s3_mirror_url}")
 
-    logger.debug(f"Publishing compiler {compiler_version} to buildcache at {buildcache_path}")
-
-    container_name = f"slurm-factory-publish-compiler-{compiler_version.replace('.', '-')}"
-
-    # The Spack buildcache is stored in the misc_cache directory configured in spack.yaml
-    # which is {CONTAINER_CACHE_DIR}/buildcache
-    from .constants import CONTAINER_CACHE_DIR
-
-    container_buildcache_path = f"{CONTAINER_CACHE_DIR}/buildcache"
+    # Check for AWS credentials - support both direct credentials and OIDC role
+    import os
+    aws_env = {}
+    
+    # Check for AWS role (GitHub Actions OIDC)
+    if "AWS_ROLE_ARN" in os.environ:
+        aws_env["AWS_ROLE_ARN"] = os.environ["AWS_ROLE_ARN"]
+        if "AWS_WEB_IDENTITY_TOKEN_FILE" in os.environ:
+            aws_env["AWS_WEB_IDENTITY_TOKEN_FILE"] = os.environ["AWS_WEB_IDENTITY_TOKEN_FILE"]
+        if "AWS_DEFAULT_REGION" in os.environ:
+            aws_env["AWS_DEFAULT_REGION"] = os.environ["AWS_DEFAULT_REGION"]
+        logger.debug("Using AWS OIDC role authentication")
+    else:
+        # Fall back to checking for credentials file
+        aws_dir = Path.home() / ".aws"
+        if not aws_dir.exists():
+            msg = "AWS credentials not found. Set AWS_ROLE_ARN or configure ~/.aws/ credentials."
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+        logger.debug("Using AWS credentials from ~/.aws/")
 
     try:
-        # Create a temporary container from the image
-        logger.debug(f"Creating temporary container {container_name}")
+        console.print(f"[dim]Pushing packages to {s3_mirror_url} using spack buildcache push...[/dim]")
+        
+        # Build docker run command with AWS environment variables
+        cmd = ["docker", "run", "--rm"]
+        
+        # Add AWS environment variables
+        for key, value in aws_env.items():
+            cmd.extend(["-e", f"{key}={value}"])
+        
+        # Mount AWS credentials directory if not using OIDC
+        if "AWS_ROLE_ARN" not in aws_env:
+            cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
+        
+        # Add image and command
+        cmd.extend([
+            image_tag,
+            "bash", "-c",
+            f"source /opt/spack/share/spack/setup-env.sh && "
+            f"cd /root/compiler-bootstrap && "
+            f"spack mirror add --scope site s3-buildcache {s3_mirror_url} && "
+            f"spack -e . buildcache push --unsigned --update-index --without-build-dependencies s3-buildcache"
+        ])
+        
+        if verbose:
+            console.print(f"[dim]Running spack buildcache push in container with AWS credentials[/dim]")
+        
+        logger.debug(f"Running: {' '.join(cmd[:10])}...")
+        
         result = subprocess.run(
-            ["docker", "create", "--name", container_name, image_tag],
+            cmd,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=1800,  # 30 minutes for large uploads
         )
 
         if result.returncode != 0:
-            msg = f"Failed to create container for publishing: {result.stderr}"
+            msg = f"Failed to push to buildcache: {result.stderr}"
             logger.error(msg)
+            if verbose:
+                console.print(f"[dim]stdout: {result.stdout}[/dim]")
             console.print(f"[bold red]{escape(msg)}[/bold red]")
             raise SlurmFactoryError(msg)
 
-        # Check if buildcache exists in container
-        logger.debug(f"Checking if buildcache exists at {container_buildcache_path}")
-        check_result = subprocess.run(
-            ["docker", "run", "--rm", image_tag, "ls", "-la", container_buildcache_path],
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+        if verbose and result.stdout:
+            console.print(f"[dim]{result.stdout}[/dim]")
 
-        if check_result.returncode != 0:
-            logger.warning(f"Buildcache directory not found or empty at {container_buildcache_path}")
-            console.print(
-                f"[yellow]Warning: No buildcache found at {container_buildcache_path}. "
-                "Spack may not have created binary packages.[/yellow]"
-            )
-            # Don't fail - this might be expected in some cases
-            return
-
-        # Copy the buildcache directory from the container
-        logger.debug(f"Copying buildcache from {container_buildcache_path} to {buildcache_path}")
-        console.print(f"[dim]Copying compiler binaries to buildcache...[/dim]")
-
-        result = subprocess.run(
-            [
-                "docker",
-                "cp",
-                f"{container_name}:{container_buildcache_path}/.",
-                str(buildcache_path),
-            ],
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
-
-        if result.returncode != 0:
-            msg = f"Failed to copy buildcache from container: {result.stderr}"
-            logger.error(msg)
-            console.print(f"[bold red]{escape(msg)}[/bold red]")
-            raise SlurmFactoryError(msg)
-
-        console.print(f"[bold green]✓ Published compiler binaries to {buildcache_path}[/bold green]")
-        logger.debug(f"Successfully published compiler to buildcache at {buildcache_path}")
+        console.print(f"[bold green]✓ Published compiler to {s3_mirror_url}[/bold green]")
+        logger.debug(f"Successfully published compiler to {s3_mirror_url}")
 
     except subprocess.TimeoutExpired:
-        msg = "Publishing timed out"
+        msg = "Publishing timed out (>30 minutes)"
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
@@ -819,18 +811,6 @@ def publish_compiler_to_buildcache(
         logger.error(msg)
         console.print(f"[bold red]{escape(msg)}[/bold red]")
         raise SlurmFactoryError(msg)
-    finally:
-        # Clean up the temporary container
-        try:
-            subprocess.run(
-                ["docker", "rm", container_name],
-                capture_output=True,
-                text=True,
-                timeout=30,
-            )
-            logger.debug(f"Removed temporary container {container_name}")
-        except Exception as e:
-            logger.warning(f"Failed to remove temporary container: {e}")
 
 
 def upload_to_s3_buildcache(
@@ -853,7 +833,7 @@ def upload_to_s3_buildcache(
     """
     console.print(f"[bold blue]Uploading {package_type} binaries to S3...[/bold blue]")
 
-    S3_BUCKET = "s3://slurm-factory-spack-binary-cache"
+    S3_BUCKET = "s3://slurm-factory-spack-buildcache-4b670"
     
     # Determine the source path based on package type
     base_path = Path(cache_dir)
@@ -903,7 +883,6 @@ def upload_to_s3_buildcache(
             "aws", "s3", "sync",
             str(source_path),
             f"{s3_prefix}buildcache/",
-            "--acl", "public-read",
         ]
         
         if verbose:
@@ -936,7 +915,6 @@ def upload_to_s3_buildcache(
                 "aws", "s3", "cp",
                 str(tarball_file),
                 f"{s3_prefix}{tarball_file.name}",
-                "--acl", "public-read",
             ]
             
             if verbose:

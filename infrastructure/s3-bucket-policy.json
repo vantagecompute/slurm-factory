@@ -1,0 +1,36 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowCloudFrontServicePrincipal",
+      "Effect": "Allow",
+      "Principal": {
+        "Service": "cloudfront.amazonaws.com"
+      },
+      "Action": "s3:GetObject",
+      "Resource": "arn:aws:s3:::slurm-factory-spack-binary-cache/*",
+      "Condition": {
+        "StringEquals": {
+          "AWS:SourceArn": "arn:aws:cloudfront::266735843730:distribution/E2TW8JZ6A6JKVR"
+        }
+      }
+    },
+    {
+      "Sid": "AllowJamesBuildcachePush",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::266735843730:user/james"
+      },
+      "Action": [
+        "s3:PutObject",
+        "s3:PutObjectAcl",
+        "s3:GetObject",
+        "s3:ListBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::slurm-factory-spack-binary-cache/*",
+        "arn:aws:s3:::slurm-factory-spack-binary-cache"
+      ]
+    }
+  ]
+}

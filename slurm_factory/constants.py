@@ -151,6 +151,7 @@ def get_install_system_deps_script() -> str:
         git \\
         build-essential \\
         python3 \\
+        python3-pip \\
         unzip \\
         gfortran \\
         bison \\
@@ -168,6 +169,7 @@ def get_install_system_deps_script() -> str:
         lmod \\
         ca-certificates \\
         wget && \\
+        python3 -m pip install --break-system-packages boto3 && \\
         apt-get clean && rm -rf /var/lib/apt/lists/*
     """).strip()
 
@@ -399,8 +401,8 @@ RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
     for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
     done && \\
-    spack -e . concretize -f && \\
-    spack -e . install --verbose'
+    spack -e . concretize -j $(nproc) -f && \\
+    spack -e . install -j $(nproc) --verbose'
 
 # Register the newly built compiler with Spack and create a view
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
@@ -421,9 +423,10 @@ FROM compiler-bootstrap AS compiler-packager
 SHELL ["/bin/bash", "-c"]
 
 # Package the compiler into a tarball
+# Use -h flag to dereference symlinks and include actual files from Spack store
 RUN mkdir -p /opt/compiler-output && \\
     cd /opt && \\
-    tar -czf /opt/compiler-output/{get_compiler_tarball_name(gcc_ver)} spack-compiler
+    tar -chzf /opt/compiler-output/{get_compiler_tarball_name(gcc_ver)} spack-compiler
 
 # Export buildcache binaries (Spack build cache from {CONTAINER_CACHE_DIR}/buildcache)
 # This will be copied from the image after build completes

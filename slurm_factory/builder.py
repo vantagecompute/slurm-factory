@@ -35,7 +35,6 @@ def build_compiler(
     compiler_version: str = "13.4.0",
     no_cache: bool = False,
     publish: bool = False,
-    publish_s3: bool = False,
 ):
     """Build a GCC compiler toolchain in a Docker container."""
     console = Console()
@@ -46,7 +45,7 @@ def build_compiler(
 
     logger.debug(
         f"Starting compiler build with parameters: compiler_version={compiler_version}, "
-        f"no_cache={no_cache}, publish={publish}, publish_s3={publish_s3}"
+        f"no_cache={no_cache}, publish={publish}"
     )
     logger.debug(f"Verbose mode: {verbose}")
 
@@ -97,7 +96,6 @@ def build_compiler(
             verbose=verbose,
             no_cache=no_cache,
             publish=publish,
-            publish_s3=publish_s3,
         )
         logger.debug("Compiler package creation completed")
         console.print("[bold green]✓ Compiler package created successfully[/bold green]")

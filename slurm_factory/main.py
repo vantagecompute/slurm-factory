@@ -211,17 +211,14 @@ def build_compiler(
         bool, typer.Option("--no-cache", help="Force a fresh build without using Docker cache")
     ] = False,
     publish: Annotated[
-        bool, typer.Option("--publish", help="Publish compiler binaries to buildcache after build")
-    ] = False,
-    publish_s3: Annotated[
-        bool, typer.Option("--publish-s3", help="Upload binaries to S3 (s3://slurm-factory-spack-binary-cache)")
+        bool, typer.Option("--publish", help="Publish compiler binaries to S3 buildcache after build")
     ] = False,
 ):
     """
     Build a GCC compiler toolchain for use in Slurm builds.
 
     This command builds a relocatable GCC compiler toolchain using Spack and
-    optionally publishes it to the buildcache for reuse across builds.
+    optionally publishes it to S3 buildcache for reuse across builds.
 
     Compiler toolchains - all built with Spack for relocatability:
     - 14.2.0: GCC 14.2, glibc 2.39, latest stable
@@ -237,7 +234,7 @@ def build_compiler(
         slurm-factory build-compiler                              # Build default compiler (gcc 13.4.0)
         slurm-factory build-compiler --compiler-version 14.2.0    # Build gcc 14.2
         slurm-factory build-compiler --compiler-version 10.5.0    # Build gcc 10.5 for RHEL 8
-        slurm-factory build-compiler --publish                    # Build and publish to buildcache
+        slurm-factory build-compiler --publish                    # Build and publish to S3 buildcache
         slurm-factory build-compiler --no-cache                   # Build without Docker cache
 
     """
@@ -263,12 +260,9 @@ def build_compiler(
         console.print("[bold yellow]Building with --no-cache (fresh build)[/bold yellow]")
 
     if publish:
-        console.print("[bold blue]Will publish compiler binaries to buildcache after build[/bold blue]")
+        console.print("[bold blue]Will publish compiler to S3 buildcache after build[/bold blue]")
 
-    if publish_s3:
-        console.print("[bold blue]Will upload binaries to S3 (s3://slurm-factory-spack-binary-cache)[/bold blue]")
-
-    builder_build_compiler(ctx, compiler_version, no_cache, publish, publish_s3)
+    builder_build_compiler(ctx, compiler_version, no_cache, publish)
 
 
 @app.command("build")

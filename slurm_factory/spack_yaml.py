@@ -583,14 +583,17 @@ def generate_spack_config(
                     "bind": False,  # Don't bind absolute paths - allow relocation
                     "missing_library_policy": "warn",  # Warn on missing system libraries
                 },
-                # Enable build cache for faster rebuilds (Spack 1.x feature)
-                "install_missing_compilers": False,  # Don't install compilers automatically
                 "db_lock_timeout": 120,  # Database lock timeout in seconds
             },
             "mirrors": {
                 # Only use spack-public mirror for source downloads, not binaries
                 # In single-stage builds, we build everything from source
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                # Use slurm-factory buildcache for compiler binaries
+                "slurm-factory-buildcache": {
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
+                    "signed": False,
+                },
             },
             "compilers": [
                 {
