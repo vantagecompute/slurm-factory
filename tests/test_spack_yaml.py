@@ -112,7 +112,9 @@ class TestSpackConfigGeneration:
 
     def test_gcc_buildcache_configuration(self):
         """Test that GCC is properly configured to use buildcache."""
-        config = generate_spack_config()
+        # Use default compiler version
+        compiler_version = "13.4.0"
+        config = generate_spack_config(compiler_version=compiler_version)
         packages = config["spack"]["packages"]
         
         # Test that GCC is configured to use buildcache (not external system GCC)
@@ -129,7 +131,7 @@ class TestSpackConfigGeneration:
         # GCC should have requirements that match compiler bootstrap
         assert "require" in gcc_config
         requirements = gcc_config["require"]
-        assert "@13.4.0" in requirements
+        assert f"@{compiler_version}" in requirements
         assert "+binutils" in requirements
         assert "+piclibs" in requirements
         assert "~nvptx" in requirements

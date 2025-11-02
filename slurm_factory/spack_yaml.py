@@ -19,12 +19,36 @@ This module generates Spack environment configurations as Python dictionaries,
 allowing for easy parameterization of Slurm versions and GPU support options.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from slurm_factory.constants import COMPILER_TOOLCHAINS, SLURM_VERSIONS
 
 # Template name for relocatable module files (relative to Spack templates directory)
 TEMPLATE_NAME = "modules/relocatable_modulefile.lua"
+
+
+def get_gcc_buildcache_requirements(compiler_version: str) -> List[str]:
+    """
+    Get the GCC requirements that match what's built in compiler bootstrap.
+    
+    This ensures consistency between compiler bootstrap and Slurm build configurations,
+    preventing variant mismatches that would cause Spack to build GCC from source
+    instead of using the buildcache.
+    
+    Args:
+        compiler_version: GCC version (e.g., "13.4.0")
+    
+    Returns:
+        List of Spack requirement strings for GCC package
+    
+    """
+    return [
+        f"@{compiler_version}",
+        "+binutils",
+        "+piclibs",
+        "~nvptx",
+        "languages=c,c++,fortran",
+    ]
 
 
 def generate_compiler_bootstrap_config(
@@ -514,12 +538,12 @@ def generate_spack_config(
                 "zstd": {"buildable": True},  # Fast compression (transitive)
                 # GCC compiler - downloaded from buildcache (built separately with build-compiler command)
                 # Set buildable: true so it can be installed, but require specific version from buildcache
-                # IMPORTANT: These requirements must match what's built in compiler bootstrap (see generate_compiler_bootstrap_config)
+                # IMPORTANT: These requirements must match what's built in compiler bootstrap (see get_gcc_buildcache_requirements)
                 # CRITICAL: Prevent gcc from being used as external (Spack auto-detects and adds it)
                 "gcc": {
                     "externals": [],  # Don't use system GCC
                     "buildable": True,  # Allow installation (from buildcache)
-                    "require": [f"@{compiler_version}", "+binutils", "+piclibs", "~nvptx", "languages=c,c++,fortran"],
+                    "require": get_gcc_buildcache_requirements(compiler_version),
                 },
                 "gcc-runtime": {
                     "buildable": True,
