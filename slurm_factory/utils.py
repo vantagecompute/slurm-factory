@@ -771,7 +771,7 @@ def publish_compiler_to_buildcache(
             f"cd /root/compiler-bootstrap && "
             f"spack mirror add --scope site s3-buildcache {s3_mirror_url} && "
             f"spack -e . buildcache push --unsigned --update-index --without-build-dependencies s3-buildcache && "
-            f"spack buildcache push --unsigned --update-index gcc-runtime@{compiler_version} s3-buildcache"
+            f"spack buildcache push --unsigned --update-index --without-build-dependencies gcc-runtime@{compiler_version} s3-buildcache"
         ])
         
         if verbose:
