@@ -35,11 +35,11 @@ def generate_compiler_bootstrap_config(
     """
     Generate Spack configuration to bootstrap a custom GCC compiler.
 
-    This builds GCC with its own glibc to ensure compatibility across different distros.
-    The built compiler is then used to compile Slurm and dependencies.
+    This installs GCC from buildcache with its own glibc to ensure compatibility across different distros.
+    The installed compiler is then used to compile Slurm and dependencies.
 
     Args:
-        gcc_version: GCC version to build
+        gcc_version: GCC version to install from buildcache
         (e.g., "15.2.0", "14.3.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0")
         buildcache_root: Directory for binary build cache
         sourcecache_root: Directory for source cache
@@ -56,7 +56,7 @@ def generate_compiler_bootstrap_config(
 
     gcc_ver, glibc_ver, description = COMPILER_TOOLCHAINS[gcc_version]
 
-    # Build gcc with specific glibc version for cross-distro compatibility
+    # Install gcc from buildcache with specific glibc version for cross-distro compatibility
     config: Dict[str, Any] = {
         "spack": {
             "specs": [
@@ -64,7 +64,7 @@ def generate_compiler_bootstrap_config(
             ],
             "concretizer": {
                 "unify": False,  # Allow different gcc versions for build vs runtime
-                "reuse": False,
+                "reuse": True,  # Enable reuse to prefer buildcache binaries
             },
             "packages": {
                 "all": {
@@ -97,8 +97,13 @@ def generate_compiler_bootstrap_config(
                 "misc_cache": buildcache_root,
                 "build_jobs": 4,
                 "ccache": True,
+                "install_missing_compilers": False,  # Don't build missing compilers
             },
             "mirrors": {
+                "slurm-factory-compilers": {
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}",
+                    "signed": False,
+                },
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
             },
         }

@@ -326,7 +326,7 @@ def get_dockerfile(
     compiler_bootstrap_stage = textwrap.dedent(
         f"""\
 # ========================================================================
-# Stage 0: Compiler Bootstrap - Build custom GCC toolchain
+# Stage 0: Compiler Bootstrap - Install custom GCC toolchain from buildcache
 # ========================================================================
 FROM ubuntu:24.04 AS compiler-bootstrap
 
@@ -353,10 +353,9 @@ BOOTSTRAP_YAML_EOF
 
 WORKDIR /root/compiler-bootstrap
 
-# Build the compiler toolchain
+# Install the compiler toolchain from buildcache
 # CRITICAL: Hide system gcc binaries ONLY during Spack environment activation
 # This prevents Spack v1.0.0 from auto-detecting and adding gcc as external
-# But we restore them before concretization so gcc can be used to BUILD gcc@11.4.0
 RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true; \\
     done && \\
@@ -366,9 +365,9 @@ RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
     done && \\
     spack -e . concretize -f && \\
-    spack -e . install --verbose'
+    spack -e . install --verbose --cache-only --no-check-signature'
 
-# Register the newly built compiler with Spack and create a view
+# Register the installed compiler with Spack and create a view
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     cd /root/compiler-bootstrap && \\
     spack -e . compiler find && \\
