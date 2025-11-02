@@ -208,8 +208,8 @@ def get_spack_build_script(compiler_version: str) -> str:
         spack mirror add --scope site slurm-factory-buildcache https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache || true && \\
         echo '==> Installing buildcache keys...' && \\
         spack buildcache keys --install --trust && \\
-        echo '==> Installing GCC compiler from buildcache (dependencies will build from source as needed)...' && \\
-        spack install 'gcc@{compiler_version}' && \\
+        echo '==> Installing GCC compiler from buildcache (will fail if not found - use build-compiler first)...' && \\
+        spack buildcache install 'gcc@{compiler_version}' && \\
         echo '==> Hiding system gcc binaries to prevent auto-detection...' && \\
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do \\
             [ -f /usr/bin/\\$f ] && mv /usr/bin/\\$f /usr/bin/\\$f.hidden || true; \\
