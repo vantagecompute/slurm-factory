@@ -230,6 +230,14 @@ class TestScriptTemplates:
         # Test that it's properly formatted Dockerfile
         lines = dockerfile.strip().split('\n')
         assert len(lines) > 10  # Should be a substantial Dockerfile
+        
+        # Test that compiler registration uses explicit path (fix for issue)
+        assert "spack compiler find --scope site /opt/spack-compiler" in dockerfile
+        # Verify old code is not present
+        assert "spack -e . compiler find --scope site" not in dockerfile
+        
+        # Test that gcc-runtime installation is present
+        assert "spack install gcc-runtime@13.4.0 %gcc@13.4.0" in dockerfile
 
 
 class TestConstantTypes:
