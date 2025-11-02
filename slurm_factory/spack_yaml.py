@@ -379,7 +379,7 @@ def generate_spack_config(
     else:
         specs.append(f"freeipmi@1.6.9 {compiler_spec}")
         specs.append(f"openmpi@5.0.3 schedulers=slurm fabrics=auto {compiler_spec}")
-        specs.append(f"pmix@5.0.8 ~munge ~python {compiler_spec}")
+        specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
         specs.append(f"mysql-connector-c {compiler_spec}")
         specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
         specs.append(
@@ -523,7 +523,7 @@ def generate_spack_config(
                 # PMIx configuration for consistent version
                 "pmix": {
                     "buildable": True,
-                    "version": ["5.0.8"],
+                    "version": ["5.0.5"],
                     "variants": "~munge ~python",  # Removed +shared as it doesn't exist
                 },
                 "libsigsegv": {"buildable": True},
@@ -547,7 +547,6 @@ def generate_spack_config(
                 },
                 "gcc-runtime": {
                     "buildable": True,
-                    "require": f"@{compiler_version}",
                 },
                 "slurm": {
                     "version": [slurm_package_version],
