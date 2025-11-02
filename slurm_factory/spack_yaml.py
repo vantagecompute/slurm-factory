@@ -30,17 +30,17 @@ TEMPLATE_NAME = "modules/relocatable_modulefile.lua"
 def get_gcc_buildcache_requirements(compiler_version: str) -> List[str]:
     """
     Get the GCC requirements that match what's built in compiler bootstrap.
-    
+
     This ensures consistency between compiler bootstrap and Slurm build configurations,
     preventing variant mismatches that would cause Spack to build GCC from source
     instead of using the buildcache.
-    
+
     Args:
         compiler_version: GCC version (e.g., "13.4.0")
-    
+
     Returns:
         List of Spack requirement strings for GCC package
-    
+
     """
     return [
         f"@{compiler_version}",
