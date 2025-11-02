@@ -431,11 +431,11 @@ RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
     spack -e . concretize -j $(nproc) -f && \\
     spack -e . install -j $(nproc) --verbose'
 
-# Register the newly built compiler with Spack and create a view
+# Register the newly built compiler with Spack
+# The view at /opt/spack-compiler is automatically created by the environment configuration
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     cd /root/compiler-bootstrap && \\
-    spack -e . compiler find && \\
-    spack view -v symlink -i /opt/spack-compiler gcc@{gcc_ver}'
+    spack -e . compiler find'
 
 # Build gcc-runtime with the newly registered gcc compiler
 # This ensures gcc-runtime@{gcc_ver} is built with gcc@{gcc_ver}, not the system compiler
