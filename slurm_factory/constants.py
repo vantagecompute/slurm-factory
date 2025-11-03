@@ -246,7 +246,8 @@ COMPILER_ENV_EOF
         fi && \\
         echo '==> Configured compilers:' && \\
         spack compiler list && \\
-        echo '==> Activating environment to build Slurm...' && \\
+        echo '==> Switching to Slurm project environment...' && \\
+        cd {CONTAINER_SPACK_PROJECT_DIR} && \\
         spack env activate . && \\
         rm -f spack.lock && \\
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...' && \\
