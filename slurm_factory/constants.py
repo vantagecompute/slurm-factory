@@ -201,7 +201,31 @@ def get_create_directories_script() -> str:
 
 
 def get_spack_build_script(compiler_version: str) -> str:
-    """Generate script to build Slurm with Spack."""
+    """
+    Generate script to build Slurm with Spack using a bootstrap compiler.
+    
+    This implements a two-stage build process:
+    
+    Stage 1: Compiler Bootstrap (lines 1-25)
+    - Create temporary environment at /tmp/compiler-install
+    - Install GCC from buildcache with view at /opt/spack-compiler-view
+    - Register compiler globally with `spack compiler find --scope site`
+    - This makes the compiler available to ALL Spack environments
+    
+    Stage 2: Slurm Build (lines 26-end)
+    - Switch to Slurm project environment at {CONTAINER_SPACK_PROJECT_DIR}
+    - Activate the Slurm environment (which has spack.yaml with Slurm specs)
+    - Concretize and install Slurm using the registered compiler
+    
+    Key insight from Spack docs: Compilers registered at 'site' scope are global.
+    See: https://spack.readthedocs.io/en/latest/configuring_compilers.html
+    
+    Args:
+        compiler_version: GCC version to install and use (e.g., "13.4.0")
+        
+    Returns:
+        Complete bash script for compiler bootstrap and Slurm build
+    """
     return textwrap.dedent(f"""\
         bash -c "source {SPACK_SETUP_SCRIPT} && \\
         echo '==> Configuring buildcache mirror globally for compiler installation...' && \\

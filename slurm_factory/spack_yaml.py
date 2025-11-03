@@ -34,6 +34,26 @@ def get_gcc_buildcache_requirements(compiler_version: str) -> List[str]:
     This ensures consistency between compiler bootstrap and Slurm build configurations,
     preventing variant mismatches that would cause Spack to build GCC from source
     instead of using the buildcache.
+    
+    CRITICAL: These requirements must exactly match the GCC spec in generate_compiler_bootstrap_config().
+    
+    Why this matters:
+    - Compiler bootstrap builds: gcc@13.4.0 +binutils +piclibs languages=c,c++,fortran
+    - Slurm environment must require the SAME variants
+    - If variants don't match, Spack rebuilds GCC (wastes 30-60 minutes)
+    - Matching variants allows reuse from buildcache (saves time)
+    
+    Example:
+        # In compiler bootstrap:
+        specs: ["gcc@13.4.0 +binutils +piclibs languages='c,c++,fortran'"]
+        
+        # In Slurm environment:
+        packages:
+          gcc:
+            require: ["@13.4.0", "+binutils", "+piclibs", "languages=c,c++,fortran"]
+    
+    See Spack docs on package requirements:
+    https://spack.readthedocs.io/en/latest/build_settings.html#package-requirements
 
     Args:
         compiler_version: GCC version (e.g., "13.4.0")
@@ -60,7 +80,22 @@ def generate_compiler_bootstrap_config(
     Generate Spack configuration to bootstrap a custom GCC compiler.
 
     This builds GCC with its own glibc to ensure compatibility across different distros.
-    The built compiler is then used to compile Slurm and dependencies.
+    The built compiler is registered globally and used to compile Slurm and dependencies.
+    
+    Build Process:
+    1. Install GCC to /opt/spack-compiler-install (install tree)
+    2. Create view at /opt/spack-compiler (symlinked binaries/libraries)
+    3. Register with `spack compiler find --scope site /opt/spack-compiler`
+    4. Compiler becomes available to all Spack environments
+    
+    Key Configuration:
+    - view.select: Only includes gcc@{version} in the view
+    - packages.gcc.externals: [] prevents system GCC detection
+    - concretizer.reuse.from: [buildcache] tries to use pre-built binaries
+    
+    See Spack docs:
+    - Compiler configuration: https://spack.readthedocs.io/en/latest/configuring_compilers.html
+    - Views: https://spack.readthedocs.io/en/latest/environments.html#filesystem-views
 
     Args:
         gcc_version: GCC version to build
