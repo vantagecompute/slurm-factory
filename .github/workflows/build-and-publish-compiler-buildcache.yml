@@ -99,7 +99,8 @@ jobs:
 
       - name: Test buildcache installation
         run: |
-          echo "🧪 Testing compiler installation from buildcache..."
+          set -e
+          echo "Testing compiler installation from buildcache..."
           
           # Create test directory
           TEST_DIR="/tmp/test-buildcache-${{ matrix.compiler_version }}"
@@ -109,41 +110,44 @@ jobs:
           
           # Clone Spack
           git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
-          source spack/share/spack/setup-env.sh
+          
+          # Source Spack setup
+          . spack/share/spack/setup-env.sh
           
           # Add buildcache mirror
-          spack mirror add slurm-factory-buildcache "${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache"
+          MIRROR_URL="${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache"
+          spack mirror add slurm-factory-buildcache "$MIRROR_URL"
           
           # List available packages
-          echo "📦 Available packages in buildcache:"
+          echo "Available packages in buildcache:"
           spack buildcache list --allarch | head -20
           
           # Try to install GCC from buildcache only
           echo ""
-          echo "📥 Installing GCC ${{ matrix.compiler_version }} from buildcache..."
+          echo "Installing GCC ${{ matrix.compiler_version }} from buildcache..."
           spack install --no-check-signature --cache-only gcc@${{ matrix.compiler_version }} 2>&1 | tail -50
           
           # Verify installation
           echo ""
-          echo "✅ Verifying GCC installation..."
+          echo "Verifying GCC installation..."
           spack load gcc@${{ matrix.compiler_version }}
           gcc --version
           
           # Test compilation
           echo ""
-          echo "🧪 Testing C compilation..."
-          cat > test.c << 'EOF'
+          echo "Testing C compilation..."
+          cat > test.c <<'CEOF'
           #include <stdio.h>
           int main() {
               printf("Hello from GCC!\n");
               return 0;
           }
-          EOF
+          CEOF
           gcc test.c -o test
           ./test
           
           echo ""
-          echo "✅ Buildcache test successful!"
+          echo "Buildcache test successful!"
           
           # Cleanup
           cd /
