@@ -36,6 +36,7 @@ from slurm_factory.constants import (
     get_package_tarball_script,
     get_dockerfile,
     get_compiler_dockerfile,
+    get_spack_build_script,
 )
 
 
@@ -186,6 +187,42 @@ class TestScriptTemplates:
         # Test that it's properly formatted shell script
         lines = script.strip().split('\n')
         assert len(lines) > 5  # Should be a substantial script
+
+    def test_get_spack_build_script(self):
+        """Test spack build script generation and buildcache failure handling."""
+        compiler_version = "14.2.0"
+        script = get_spack_build_script(compiler_version)
+        
+        # Test that it returns a string
+        assert isinstance(script, str)
+        assert len(script) > 0
+        
+        # Test that it contains expected elements
+        assert "bash -c" in script
+        assert "source /opt/spack/share/spack/setup-env.sh" in script
+        assert compiler_version in script
+        
+        # Test that buildcache install has error handling (|| true)
+        # This is critical to prevent Docker build failures when buildcache is unavailable
+        assert "spack buildcache install 'gcc@14.2.0' || true" in script
+        
+        # Test that other buildcache operations are present
+        assert "spack mirror add" in script
+        assert "spack buildcache keys --install --trust" in script
+        
+        # Test that compiler setup steps are present
+        assert "spack compiler find" in script
+        assert "spack compiler list" in script
+        
+        # Test that Slurm build steps are present
+        assert "spack env activate" in script
+        assert "spack concretize" in script
+        assert "spack install" in script
+        
+        # Test that it's properly formatted shell script
+        lines = script.strip().split('\n')
+        assert len(lines) > 5  # Should be a substantial script
+
 
     def test_get_dockerfile(self):
         """Test Dockerfile generation."""

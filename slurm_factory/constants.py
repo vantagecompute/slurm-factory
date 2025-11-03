@@ -209,7 +209,7 @@ def get_spack_build_script(compiler_version: str) -> str:
         echo '==> Installing buildcache keys...' && \\
         spack buildcache keys --install --trust && \\
         echo '==> Installing GCC compiler from buildcache (will fail if not found - use build-compiler first)...' && \\
-        spack buildcache install 'gcc@{compiler_version}' && \\
+        spack buildcache install 'gcc@{compiler_version}' || true && \\
         echo '==> Hiding system gcc binaries to prevent auto-detection...' && \\
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do \\
             [ -f /usr/bin/\\$f ] && mv /usr/bin/\\$f /usr/bin/\\$f.hidden || true; \\
