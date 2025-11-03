@@ -208,14 +208,30 @@ def get_spack_build_script(compiler_version: str) -> str:
         spack mirror add --scope site slurm-factory-buildcache https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache || true && \\
         echo '==> Installing buildcache keys...' && \\
         spack buildcache keys --install --trust && \\
-        echo '==> Installing GCC compiler from buildcache (will fail if not found - use build-compiler first)...' && \\
-        spack buildcache install 'gcc@{compiler_version}' && \\
+        echo '==> Creating temporary environment to install GCC compiler from buildcache...' && \\
+        mkdir -p /tmp/compiler-install && \\
+        cd /tmp/compiler-install && \\
+        cat > spack.yaml << 'COMPILER_ENV_EOF'
+spack:
+  specs:
+  - gcc@{compiler_version}
+  view: /opt/spack-compiler-view
+  concretizer:
+    unify: false
+    reuse:
+      roots: true
+      from:
+      - type: buildcache
+        path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache
+COMPILER_ENV_EOF
+        echo '==> Installing GCC compiler from buildcache in dedicated environment...' && \\
+        spack -e . install --only-concrete --cache-only --no-check-signature && \\
         echo '==> Hiding system gcc binaries to prevent auto-detection...' && \\
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do \\
             [ -f /usr/bin/\\$f ] && mv /usr/bin/\\$f /usr/bin/\\$f.hidden || true; \\
         done && \\
         echo '==> Detecting newly installed GCC compiler...' && \\
-        spack compiler find --scope site \\$(spack location -i gcc@{compiler_version}) && \\
+        spack compiler find --scope site /opt/spack-compiler-view && \\
         echo '==> Removing any auto-detected system compilers...' && \\
         for compiler in \\$(spack compiler list | grep -v gcc@{compiler_version} | grep gcc@ | awk '{{print \\$1}}'); do \\
             echo \\"Removing \\$compiler\\"; \\
