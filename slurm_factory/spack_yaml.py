@@ -19,12 +19,36 @@ This module generates Spack environment configurations as Python dictionaries,
 allowing for easy parameterization of Slurm versions and GPU support options.
 """
 
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from slurm_factory.constants import COMPILER_TOOLCHAINS, SLURM_VERSIONS
 
 # Template name for relocatable module files (relative to Spack templates directory)
 TEMPLATE_NAME = "modules/relocatable_modulefile.lua"
+
+
+def get_gcc_buildcache_requirements(compiler_version: str) -> List[str]:
+    """
+    Get the GCC requirements that match what's built in compiler bootstrap.
+
+    This ensures consistency between compiler bootstrap and Slurm build configurations,
+    preventing variant mismatches that would cause Spack to build GCC from source
+    instead of using the buildcache.
+
+    Args:
+        compiler_version: GCC version (e.g., "13.4.0")
+
+    Returns:
+        List of Spack requirement strings for GCC package
+
+    """
+    return [
+        f"@{compiler_version}",
+        "+binutils",
+        "+piclibs",
+        "~nvptx",
+        "languages=c,c++,fortran",
+    ]
 
 
 def generate_compiler_bootstrap_config(
@@ -60,11 +84,22 @@ def generate_compiler_bootstrap_config(
     config: Dict[str, Any] = {
         "spack": {
             "specs": [
-                f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran'",
+                # Use binutils@2.44 instead of 2.45 to avoid build failures
+                # 2.44 is stable enough for GCC 14.2 while avoiding 2.45 issues
+                f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran' ^binutils@2.44",
+                # NOTE: gcc-runtime@{gcc_ver} will be built in a second step after gcc is registered
+                # Build autotools in compiler env so they're available in /opt/spack-compiler
+                # but not during Slurm build (which needs different versions for libjwt compatibility)
+                "autoconf@2.72",
+                "automake@1.16.5",
+                "libtool@2.4.7",
             ],
             "concretizer": {
                 "unify": False,  # Allow different gcc versions for build vs runtime
-                "reuse": False,
+                "reuse": {
+                    "roots": True,
+                    "from": [{"type": "buildcache"}],
+                },
             },
             "packages": {
                 "all": {
@@ -76,20 +111,28 @@ def generate_compiler_bootstrap_config(
                     "externals": [],
                     "buildable": True,
                 },
+                # Build autotools from source in compiler env
+                "autoconf": {"buildable": True},
+                "automake": {"buildable": True},
+                "libtool": {"buildable": True},
                 # Build tools as externals for speed
                 "cmake": {"externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}], "buildable": False},
-                "autoconf": {"externals": [{"spec": "autoconf@2.71", "prefix": "/usr"}], "buildable": False},
-                "automake": {
-                    "externals": [{"spec": "automake@1.16.5", "prefix": "/usr"}],
-                    "buildable": False,
-                },
-                "libtool": {"externals": [{"spec": "libtool@2.4.7", "prefix": "/usr"}], "buildable": False},
                 "m4": {"externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}], "buildable": False},
                 "gmake": {"externals": [{"spec": "gmake@4.3", "prefix": "/usr"}], "buildable": False},
+                # Pin binutils to 2.44 to avoid build failures with 2.45 while supporting newer GCC
+                "binutils": {"version": ["2.44"], "buildable": True},
+            },
+            "view": {
+                "/opt/spack-compiler": {
+                    "root": "/opt/spack-compiler",
+                    "select": [f"gcc@{gcc_ver}"],
+                    "link": "all",
+                    "link_type": "symlink",
+                }
             },
             "config": {
                 "install_tree": {
-                    "root": "/opt/spack-compiler",
+                    "root": "/opt/spack-compiler-install",
                     "padded_length": 128,
                 },
                 "build_stage": ["/tmp/spack-stage"],
@@ -97,9 +140,14 @@ def generate_compiler_bootstrap_config(
                 "misc_cache": buildcache_root,
                 "build_jobs": 4,
                 "ccache": True,
+                "binary_index_ttl": 600,
             },
             "mirrors": {
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                "slurm-factory-buildcache": {
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
+                    "signed": False,
+                },
             },
         }
     }
@@ -146,6 +194,7 @@ def generate_module_config(
     gpu_support: bool = False,
     minimal: bool = False,
     compiler_version: str = "13.4.0",
+    enable_hierarchy: bool = False,
 ) -> Dict[str, Any]:
     """
     Generate the Lmod module configuration section for Spack.
@@ -155,6 +204,8 @@ def generate_module_config(
         gpu_support: Whether to include GPU support (NVML, RSMI)
         minimal: Whether to build minimal Slurm (without OpenMPI and extra features)
         compiler_version: GCC compiler version to use
+        enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
+            (default: False for backward compatibility)
 
     Returns:
         Dictionary representing the modules configuration section
@@ -175,15 +226,28 @@ def generate_module_config(
     else:
         build_type = "standard build"
 
+    # Configure module hierarchy
+    # Core/Compiler/MPI hierarchy provides better dependency management
+    # but adds complexity for simple deployments
+    if enable_hierarchy and not minimal:
+        # 3-tier hierarchy: Core -> Compiler -> MPI
+        # Core: packages built with any compiler (e.g., gcc-runtime)
+        # Compiler: packages that depend on a specific compiler (e.g., openmpi)
+        # MPI: packages that depend on both compiler and MPI implementation (e.g., slurm with MPI)
+        hierarchy = ["mpi"]
+    else:
+        # Flat hierarchy for simpler deployment and backward compatibility
+        hierarchy = []
+
     # Base module configuration
     modules_config: Dict[str, Any] = {
         "default": {
             "enable": ["lmod"],
             "lmod": {
                 "core_compilers": [f"gcc@{compiler_version}"],  # Mark gcc as core for relocatable binaries
-                "hierarchy": [],  # Flat hierarchy for simpler deployment
+                "hierarchy": hierarchy,
                 "include": (
-                    ["slurm", "openmpi", "mysql"] if not minimal else ["slurm"]
+                    ["slurm", "openmpi", "mysql-connector-c"] if not minimal else ["slurm"]
                 ),  # Include OpenMPI for full builds
                 "slurm": {
                     "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
@@ -229,7 +293,15 @@ def generate_module_config(
 
     # Configure OpenMPI module behavior based on build type
     if not minimal:
-        modules_config["default"]["lmod"]["openmpi"] = {"environment": {"set": {"OMPI_MCA_plm": "slurm"}}}
+        # Set OpenMPI scheduler integration and autoload behavior for hierarchical modules
+        openmpi_config: Dict[str, Any] = {
+            "environment": {"set": {"OMPI_MCA_plm": "slurm"}},
+        }
+        if enable_hierarchy:
+            # In hierarchical mode, automatically load OpenMPI when compiler module is loaded
+            openmpi_config["autoload"] = "direct"  # type: ignore[assignment]
+
+        modules_config["default"]["lmod"]["openmpi"] = openmpi_config  # type: ignore[index]
 
     return modules_config
 
@@ -246,6 +318,7 @@ def generate_spack_config(
     additional_variants: str = "",
     enable_verification: bool = False,
     compiler_version: str = "13.4.0",
+    enable_hierarchy: bool = False,
 ) -> Dict[str, Any]:
     """
     Generate a Spack environment configuration dictionary.
@@ -262,6 +335,7 @@ def generate_spack_config(
         additional_variants: Additional Spack variants to add to the Slurm spec
         enable_verification: Whether to enable relocatability verification checks
         compiler_version: GCC compiler version to use (always built by Spack)
+        enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
 
     Returns:
         Dictionary representing the Spack environment configuration
@@ -280,20 +354,20 @@ def generate_spack_config(
     # Build Slurm spec with conditional features
     gpu_flags = "+nvml +rsmi" if gpu_support else "~nvml ~rsmi"
 
-    gcc_spec = f"gcc-runtime@{compiler_version} {compiler_spec}"
+    # Spec definitions for packages
     openldap_spec = f"openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl {compiler_spec}"
     curl_spec = (
         f"slurm_factory.curl@8.15.0+nghttp2+libssh2+libssh+gssapi+ldap+librtmp+libidn2 "
         f"libs=shared,static tls=openssl {compiler_spec}"
     )
     specs = [
-        # Build a bootstrapped compiler first (in-DAG)
-        gcc_spec,
+        # Note: gcc and gcc-runtime are installed outside the environment first
+        # All packages below will use %gcc@{compiler_version} which will be available after gcc is installed
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         f"openssl@3.4.1 ^zlib@1.3.1 {compiler_spec}",  # Build OpenSSL with explicit zlib dependency
         f"jansson@2.14 {compiler_spec}",  # JSON library for libjwt
-        # JWT library with all dependencies
-        f"libjwt@1.15.3 ^openssl@3.4.1 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
+        # JWT library with all dependencies - let Spack choose available version
+        f"libjwt ^openssl@3.4.1 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
         openldap_spec,  # Build openldap before curl since curl+ldap needs it
         curl_spec,
         f"patchelf@0.18.0 {compiler_spec}",  # For RPATH fixing during relocatability
@@ -304,10 +378,12 @@ def generate_spack_config(
             f"{gpu_flags} ~cgroup sysconfdir=/etc/slurm {compiler_spec}"
         )
     else:
-        specs.append(f"freeipmi@1.6.9 {compiler_spec}")
+        # Using slurm_factory.freeipmi@1.6.16 for GCC 14 compatibility
+        # (1.6.9 has implicit function declaration errors)
+        specs.append(f"slurm_factory.freeipmi@1.6.16 {compiler_spec}")
         specs.append(f"openmpi@5.0.3 schedulers=slurm fabrics=auto {compiler_spec}")
-        specs.append(f"pmix@5.0.8 ~munge ~python {compiler_spec}")
-        specs.append(f"mysql@8.0.35+client_only {compiler_spec}")
+        specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
+        specs.append(f"mysql-connector-c {compiler_spec}")
         specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
         specs.append(
             f"slurm_factory.slurm@{slurm_package_version} {additional_variants} "
@@ -326,8 +402,44 @@ def generate_spack_config(
                 },
             },
             "concretizer": {
-                "unify": True,  # Unify specs (Spack 1.x feature)
-                "reuse": True,  # Always reuse Spack-built compiler
+                "unify": "true",  # Allow compiler to differ from dependencies
+                "reuse": {
+                    "roots": True,
+                    "from": [{"type": "buildcache"}],
+                },
+            },
+            "config": {
+                "install_tree": {
+                    "root": install_tree_root,
+                    "padded_length": 0,  # Short, portable install paths for relocatability
+                    "projections": {
+                        "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
+                    },
+                },
+                # "build_stage": "/tmp/spack-stage",
+                # "misc_cache": sourcecache_root,
+                # "binary_index_root": binary_index_root,
+                "checksum": True,
+                "deprecated": True,
+                # Spack 1.x performance enhancements
+                "build_jobs": 4,  # Parallel build jobs
+                "ccache": True,  # Enable ccache for faster rebuilds
+                "connect_timeout": 30,  # Network timeout for downloads
+                "verify_ssl": True,  # Security setting
+                "suppress_gpg_warnings": False,  # Show GPG warnings
+                # Enhanced RPATH configuration for Spack 1.x
+                # This ensures binaries are truly relocatable with proper RPATH/RUNPATH
+                "shared_linking": {
+                    "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
+                    "bind": False,  # Don't bind absolute paths - allow relocation
+                    "missing_library_policy": "warn",  # Warn on missing system libraries
+                },
+                "db_lock_timeout": 120,  # Database lock timeout in seconds
+                "bootstrap": {
+                    "enable": True,
+                    "root": "$spack/opt/spack",
+                    "sources": ["github-actions-v0.5", "github-actions-v0.4"],
+                },
             },
             # Force all packages to be buildable from source
             "packages": {
@@ -347,16 +459,13 @@ def generate_spack_config(
                     "require": "@3.12.3",
                 },
                 "autoconf": {
-                    "externals": [{"spec": "autoconf@2.71", "prefix": "/usr"}],
-                    "buildable": False,
+                    "buildable": True,  # Build from source for libjwt compatibility
                 },
                 "automake": {
-                    "externals": [{"spec": "automake@1.16.5", "prefix": "/usr"}],
-                    "buildable": False,
+                    "buildable": True,  # Build from source for libjwt compatibility
                 },
                 "libtool": {
-                    "externals": [{"spec": "libtool@2.4.7", "prefix": "/usr"}],
-                    "buildable": False,
+                    "buildable": True,  # Build from source for libjwt compatibility
                 },
                 "gmake": {"externals": [{"spec": "gmake@4.3", "prefix": "/usr"}], "buildable": False},
                 "m4": {"externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}], "buildable": False},
@@ -429,17 +538,18 @@ def generate_spack_config(
                     "require": [
                         "^openssl@3:",
                         "^jansson",
+                        "^automake@:1.16.3",  # libjwt@1.15.3 incompatible with automake 1.16.5
                     ],  # Ensure it uses Spack-built OpenSSL 3.x and jansson
                 },  # JWT token support - essential for Slurm REST API
                 # MySQL client library for Slurm accounting storage
-                "mysql": {"buildable": True, "variants": "+client_only"},
+                "mysql-connector-c": {"buildable": True},
                 "librdkafka": {
                     "buildable": True,
                 },
                 # PMIx configuration for consistent version
                 "pmix": {
                     "buildable": True,
-                    "version": ["5.0.8"],
+                    "version": ["5.0.5"],
                     "variants": "~munge ~python",  # Removed +shared as it doesn't exist
                 },
                 "libsigsegv": {"buildable": True},
@@ -452,28 +562,15 @@ def generate_spack_config(
                 "libyaml": {"buildable": True},  # Configuration parsing
                 # NOTE: bzip2 and xz are configured as external packages above to avoid library conflicts
                 "zstd": {"buildable": True},  # Fast compression (transitive)
-                # GCC runtime libraries - build to ensure relocatability
+                # GCC compiler - downloaded from buildcache (built separately with build-compiler command)
+                # Mark as external to prevent being pulled in as dependency during concretization
+                # The compiler is registered separately via 'spack compiler add' after bootstrap
+                "gcc": {
+                    "externals": [{"spec": f"gcc@{compiler_version}", "prefix": "/opt/spack-compiler-view"}],
+                    "buildable": False,
+                },
                 "gcc-runtime": {
                     "buildable": True,
-                    "version": [compiler_version],
-                },
-                # GCC compiler configuration - either use system or Spack-built compiler
-                "gcc": {
-                    "buildable": False,
-                    "externals": [
-                        {
-                            "spec": f"gcc@{compiler_version} languages:='c,c++,fortran'",
-                            "prefix": "/opt/spack-compiler",
-                            "extra_attributes": {
-                                "compilers": {
-                                    "c": "/opt/spack-compiler/bin/gcc",
-                                    "cxx": "/opt/spack-compiler/bin/g++",
-                                    "fortran": "/opt/spack-compiler/bin/gfortran",
-                                },
-                                "environment": {},
-                            },
-                        },
-                    ],
                 },
                 "slurm": {
                     "version": [slurm_package_version],
@@ -517,55 +614,22 @@ def generate_spack_config(
                     + (["cuda", "rocm-core", "rocm-smi-lib"] if gpu_support else []),
                 }
             },
-            "config": {
-                "install_tree": {
-                    "root": install_tree_root,
-                    "padded_length": 0,  # Short, portable install paths for relocatability
-                    "projections": {
-                        "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
-                    },
-                },
-                # "build_stage": "/tmp/spack-stage",
-                # "misc_cache": sourcecache_root,
-                # "binary_index_root": binary_index_root,
-                "checksum": True,
-                "deprecated": True,
-                # Spack 1.x performance enhancements
-                "build_jobs": 4,  # Parallel build jobs
-                "ccache": True,  # Disable ccache if not present
-                "connect_timeout": 30,  # Network timeout for downloads
-                "verify_ssl": True,  # Security setting
-                "suppress_gpg_warnings": False,  # Show GPG warnings
-                "shared_linking": {
-                    "type": "rpath",  # Use RPATH for relocatable binaries (Spack 1.x)
-                    "bind": False,  # Don't bind absolute paths - allow relocation
-                    "missing_library_policy": "warn",  # Ignore on missing system
-                },
-            },
             "mirrors": {
                 # Only use spack-public mirror for source downloads, not binaries
                 # In single-stage builds, we build everything from source
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                # Use slurm-factory buildcache for compiler binaries
+                "slurm-factory-buildcache": {
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
+                    "signed": False,
+                },
             },
-            "compilers": [
-                {
-                    "compiler": {
-                        "spec": f"gcc@={compiler_version}",
-                        "paths": {
-                            "cc": "/usr/bin/gcc",
-                            "cxx": "/usr/bin/g++",
-                            "f77": "/usr/bin/gfortran",
-                            "fc": "/usr/bin/gfortran",
-                        },
-                        "operating_system": "ubuntu24.04",
-                        "target": "x86_64",
-                        "modules": [],
-                        "environment": {},
-                        "extra_rpaths": [],
-                    }
-                }
-            ],
-            "modules": generate_module_config(slurm_version, gpu_support, minimal, compiler_version),
+            # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
+            # via spack compiler find (system compiler detection is disabled)
+            "compilers": [],
+            "modules": generate_module_config(
+                slurm_version, gpu_support, minimal, compiler_version, enable_hierarchy
+            ),
         }
     }
 
@@ -602,6 +666,7 @@ def generate_yaml_string(
     minimal: bool = False,
     additional_variants: str = "",
     enable_verification: bool = False,
+    enable_hierarchy: bool = False,
 ) -> str:
     """
     Generate a YAML string representation of the Spack environment configuration.
@@ -613,6 +678,7 @@ def generate_yaml_string(
         minimal: Whether to build minimal Slurm
         additional_variants: Additional Spack variants to include
         enable_verification: Whether to enable relocatability verification checks
+        enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
 
     Returns:
         YAML string representation of the configuration
@@ -627,6 +693,7 @@ def generate_yaml_string(
         minimal=minimal,
         additional_variants=additional_variants,
         enable_verification=enable_verification,
+        enable_hierarchy=enable_hierarchy,
     )
     header = get_comment_header(slurm_version, gpu_support, minimal)
 

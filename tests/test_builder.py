@@ -37,3 +37,8 @@ class TestBuilderModule:
         """Test that the build function exists and is callable."""
         assert hasattr(builder, 'build')
         assert callable(builder.build)
+
+    def test_build_compiler_function_exists(self):
+        """Test that the build_compiler function exists and is callable."""
+        assert hasattr(builder, 'build_compiler')
+        assert callable(builder.build_compiler)
