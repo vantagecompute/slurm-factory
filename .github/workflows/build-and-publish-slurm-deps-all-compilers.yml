@@ -106,11 +106,6 @@ jobs:
             --compiler-version ${{ matrix.compiler_version }} \
             --gpu \
             --publish=deps
-        env:
-          # Pass AWS credentials to the Docker container for buildcache push
-          AWS_ROLE_ARN: ${{ secrets.AWS_ROLE_ARN }}
-          AWS_WEB_IDENTITY_TOKEN_FILE: ${{ env.AWS_WEB_IDENTITY_TOKEN_FILE }}
-          AWS_DEFAULT_REGION: us-east-1
 
       - name: Verify buildcache upload
         run: |

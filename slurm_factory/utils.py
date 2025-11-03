@@ -748,19 +748,24 @@ def publish_compiler_to_buildcache(
 
     aws_env = {}
 
-    # Check for AWS role (GitHub Actions OIDC)
-    if "AWS_ROLE_ARN" in os.environ:
-        aws_env["AWS_ROLE_ARN"] = os.environ["AWS_ROLE_ARN"]
-        if "AWS_WEB_IDENTITY_TOKEN_FILE" in os.environ:
-            aws_env["AWS_WEB_IDENTITY_TOKEN_FILE"] = os.environ["AWS_WEB_IDENTITY_TOKEN_FILE"]
+    # Check for AWS credentials (GitHub Actions OIDC or static credentials)
+    # The configure-aws-credentials action sets these environment variables
+    if "AWS_ACCESS_KEY_ID" in os.environ:
+        # Use temporary credentials from configure-aws-credentials action
+        aws_env["AWS_ACCESS_KEY_ID"] = os.environ["AWS_ACCESS_KEY_ID"]
+        aws_env["AWS_SECRET_ACCESS_KEY"] = os.environ["AWS_SECRET_ACCESS_KEY"]
+        if "AWS_SESSION_TOKEN" in os.environ:
+            aws_env["AWS_SESSION_TOKEN"] = os.environ["AWS_SESSION_TOKEN"]
         if "AWS_DEFAULT_REGION" in os.environ:
             aws_env["AWS_DEFAULT_REGION"] = os.environ["AWS_DEFAULT_REGION"]
-        logger.debug("Using AWS OIDC role authentication")
+        if "AWS_REGION" in os.environ:
+            aws_env["AWS_REGION"] = os.environ["AWS_REGION"]
+        logger.debug("Using AWS credentials from environment (GitHub Actions OIDC or configured credentials)")
     else:
         # Fall back to checking for credentials file
         aws_dir = Path.home() / ".aws"
         if not aws_dir.exists():
-            msg = "AWS credentials not found. Set AWS_ROLE_ARN or configure ~/.aws/ credentials."
+            msg = "AWS credentials not found. Set AWS_ACCESS_KEY_ID or configure ~/.aws/ credentials."
             logger.error(msg)
             console.print(f"[bold red]{escape(msg)}[/bold red]")
             raise SlurmFactoryError(msg)
@@ -776,8 +781,8 @@ def publish_compiler_to_buildcache(
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
 
-        # Mount AWS credentials directory if not using OIDC
-        if "AWS_ROLE_ARN" not in aws_env:
+        # Mount AWS credentials directory if not using environment credentials
+        if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
 
         # Add image and command
@@ -867,19 +872,24 @@ def push_to_buildcache(
 
     aws_env = {}
 
-    # Check for AWS role (GitHub Actions OIDC)
-    if "AWS_ROLE_ARN" in os.environ:
-        aws_env["AWS_ROLE_ARN"] = os.environ["AWS_ROLE_ARN"]
-        if "AWS_WEB_IDENTITY_TOKEN_FILE" in os.environ:
-            aws_env["AWS_WEB_IDENTITY_TOKEN_FILE"] = os.environ["AWS_WEB_IDENTITY_TOKEN_FILE"]
+    # Check for AWS credentials (GitHub Actions OIDC or static credentials)
+    # The configure-aws-credentials action sets these environment variables
+    if "AWS_ACCESS_KEY_ID" in os.environ:
+        # Use temporary credentials from configure-aws-credentials action
+        aws_env["AWS_ACCESS_KEY_ID"] = os.environ["AWS_ACCESS_KEY_ID"]
+        aws_env["AWS_SECRET_ACCESS_KEY"] = os.environ["AWS_SECRET_ACCESS_KEY"]
+        if "AWS_SESSION_TOKEN" in os.environ:
+            aws_env["AWS_SESSION_TOKEN"] = os.environ["AWS_SESSION_TOKEN"]
         if "AWS_DEFAULT_REGION" in os.environ:
             aws_env["AWS_DEFAULT_REGION"] = os.environ["AWS_DEFAULT_REGION"]
-        logger.debug("Using AWS OIDC role authentication")
+        if "AWS_REGION" in os.environ:
+            aws_env["AWS_REGION"] = os.environ["AWS_REGION"]
+        logger.debug("Using AWS credentials from environment (GitHub Actions OIDC or configured credentials)")
     else:
         # Fall back to checking for credentials file
         aws_dir = Path.home() / ".aws"
         if not aws_dir.exists():
-            msg = "AWS credentials not found. Set AWS_ROLE_ARN or configure ~/.aws/ credentials."
+            msg = "AWS credentials not found. Set AWS_ACCESS_KEY_ID or configure ~/.aws/ credentials."
             logger.error(msg)
             console.print(f"[bold red]{escape(msg)}[/bold red]")
             raise SlurmFactoryError(msg)
@@ -908,8 +918,8 @@ def push_to_buildcache(
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
 
-        # Mount AWS credentials directory if not using OIDC
-        if "AWS_ROLE_ARN" not in aws_env:
+        # Mount AWS credentials directory if not using environment credentials
+        if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
 
         # Add image and command
