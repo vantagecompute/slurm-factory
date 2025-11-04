@@ -236,14 +236,20 @@ def get_spack_build_script(compiler_version: str) -> str:
     )
     return textwrap.dedent(f"""\
         source {SPACK_SETUP_SCRIPT}
-        echo '==> Configuring buildcache mirror globally for compiler installation...'
-        spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
-        echo '==> Installing buildcache keys...'
-        spack buildcache keys --install --trust
-        echo '==> Creating temporary environment to install GCC compiler from buildcache...'
-        mkdir -p /tmp/compiler-install
-        cd /tmp/compiler-install
-        cat > spack.yaml << 'COMPILER_ENV_EOF'
+        echo '==> Checking if gcc@{compiler_version} compiler is already registered...'
+        if spack compiler list | grep -q "gcc@{compiler_version}"; then
+            echo '==> gcc@{compiler_version} already registered, skipping installation'
+            spack compiler info gcc@{compiler_version}
+        else
+            echo '==> gcc@{compiler_version} not found, proceeding with installation...'
+            echo '==> Configuring buildcache mirror globally for compiler installation...'
+            spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
+            echo '==> Installing buildcache keys...'
+            spack buildcache keys --install --trust
+            echo '==> Creating temporary environment to install GCC compiler...'
+            mkdir -p /tmp/compiler-install
+            cd /tmp/compiler-install
+            cat > spack.yaml << 'COMPILER_ENV_EOF'
 spack:
   specs:
   - gcc@{compiler_version}
@@ -298,14 +304,20 @@ COMPILER_ENV_EOF
         done
         echo '==> Verifying gcc@{compiler_version} is available...'
         if ! spack compiler list | grep -q "gcc@{compiler_version}"; then
-            echo 'ERROR: gcc@{compiler_version} compiler not found:'
+            echo 'ERROR: gcc@{compiler_version} compiler not found after installation'
+            echo 'Available compilers:'
             spack compiler list
             exit 1
         fi
         echo '==> Configured compilers:'
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
-        spack compiler info gcc@{compiler_version}
+        spack compiler info gcc@{compiler_version} || {{
+            echo 'ERROR: gcc@{compiler_version} not available in compiler info after registration'
+            echo 'Available compilers:'
+            spack compiler list
+            exit 1
+        }}
         echo '==> Testing compiler with simple program...'
         cat > /tmp/test.c << 'CEOF'
 #include <stdio.h>
