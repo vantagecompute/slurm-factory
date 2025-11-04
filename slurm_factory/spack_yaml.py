@@ -93,6 +93,9 @@ def generate_compiler_bootstrap_config(
                 "autoconf@2.72",
                 "automake@1.16.5",
                 "libtool@2.4.7",
+                # Build compiler-wrapper with the new gcc compiler (built in a second step after gcc is registered)
+                # This is needed by Slurm build dependencies and must be available in buildcache
+                # NOTE: compiler-wrapper@1.0 will be built in a second step after gcc is registered
             ],
             "concretizer": {
                 "unify": False,  # Allow different gcc versions for build vs runtime
