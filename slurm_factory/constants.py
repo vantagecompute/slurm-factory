@@ -236,20 +236,15 @@ def get_spack_build_script(compiler_version: str) -> str:
     )
     return textwrap.dedent(f"""\
         source {SPACK_SETUP_SCRIPT}
-        echo '==> Checking if gcc@{compiler_version} compiler is already registered...'
-        if spack compiler list | grep -q "gcc@{compiler_version}"; then
-            echo '==> gcc@{compiler_version} already registered, skipping installation'
-            spack compiler info gcc@{compiler_version}
-        else
-            echo '==> gcc@{compiler_version} not found, proceeding with installation...'
-            echo '==> Configuring buildcache mirror globally for compiler installation...'
-            spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
-            echo '==> Installing buildcache keys...'
-            spack buildcache keys --install --trust
-            echo '==> Creating temporary environment to install GCC compiler...'
-            mkdir -p /tmp/compiler-install
-            cd /tmp/compiler-install
-            cat > spack.yaml << 'COMPILER_ENV_EOF'
+        echo '==> Installing GCC compiler {compiler_version}...'
+        echo '==> Configuring buildcache mirror globally for compiler installation...'
+        spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
+        echo '==> Installing buildcache keys...'
+        spack buildcache keys --install --trust
+        echo '==> Creating temporary environment to install GCC compiler...'
+        mkdir -p /tmp/compiler-install
+        cd /tmp/compiler-install
+        cat > spack.yaml << 'COMPILER_ENV_EOF'
 spack:
   specs:
   - gcc@{compiler_version}
@@ -296,7 +291,6 @@ COMPILER_ENV_EOF
             - /opt/spack-compiler-view/lib" "$PACKAGES_YAML"
         echo '==> Verifying compiler configuration was updated...'
         grep -A 6 "fortran: /opt/spack-compiler-view" "$PACKAGES_YAML" || echo 'WARNING: Could not verify environment section'
-        fi  # Close the "if compiler already registered" check
         echo '==> Removing any auto-detected system compilers...'
         for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
                 grep gcc@ | awk '{{print $1}}'); do
