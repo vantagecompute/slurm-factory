@@ -75,7 +75,8 @@ CONTAINER_SPACK_PROJECT_DIR = "/root/spack-project"
 CONTAINER_SLURM_DIR = "/opt/slurm"
 CONTAINER_BUILD_OUTPUT_DIR = f"{CONTAINER_SLURM_DIR}/build_output"
 CONTAINER_ROOT_DIR = "/root"
-CONTAINER_SPACK_CACHE_DIR = "/root/.cache/spack"
+# NOTE: We do NOT create/use SPACK_CACHE_DIR to avoid cross-build contamination
+# Each container build should start fresh without cached compiler metadata
 
 # Patch files
 SLURM_PATCH_FILES = ["slurm_prefix.patch", "package.py"]
@@ -199,8 +200,7 @@ def get_create_directories_script() -> str:
     return textwrap.dedent(f"""\
         mkdir -p {CONTAINER_SPACK_PROJECT_DIR} \\
                  {CONTAINER_SPACK_TEMPLATES_DIR} \\
-                 {CONTAINER_SLURM_DIR} \\
-                 {CONTAINER_SPACK_CACHE_DIR}
+                 {CONTAINER_SLURM_DIR}
     """).strip()
 
 
@@ -262,49 +262,46 @@ spack:
       - type: buildcache
         path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache
 COMPILER_ENV_EOF
-            echo '==> Concretizing GCC environment...'
-            spack -e . concretize -f
-            echo '==> Attempting to install GCC compiler from buildcache...'
-            if ! spack -e . install --cache-only --no-check-signature; then
-                echo 'WARNING: Failed to install from buildcache, building from source...'
-                echo '==> Installing GCC compiler from source (this may take a while)...'
-                spack -e . install --no-check-signature || {{
-                    echo 'ERROR: Failed to install gcc@{compiler_version} from source'
-                    echo 'This is a critical error - cannot proceed without compiler'
-                    exit 1
-                }}
-            else
-                echo '==> Successfully installed GCC compiler from buildcache'
-            fi
-            echo '==> Hiding system gcc binaries to prevent auto-detection...'
-            for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
-                [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
-            done
-            echo '==> Verifying GCC installation in compiler view...'
-            ls -la /opt/spack-compiler-view/bin/gcc* || {{
-                echo 'ERROR: GCC binaries not found in view'
-                exit 1
-            }}
-            /opt/spack-compiler-view/bin/gcc --version || {{
-                echo 'ERROR: GCC not executable'
-                exit 1
-            }}
-            echo '==> Setting up compiler runtime library path...'
-            export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
-            echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
-            echo '==> Registering newly installed GCC compiler with Spack...'
-            spack compiler find --scope site /opt/spack-compiler-view || {{
-                echo 'ERROR: Failed to auto-detect gcc@{compiler_version} with compiler find'
-                echo 'This may indicate an issue with the compiler installation or view'
-                exit 1
-            }}
-            echo '==> Removing any auto-detected system compilers...'
-            for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
-                    grep gcc@ | awk '{{print $1}}'); do
-                echo "Removing $compiler"
-                spack compiler rm --scope site $compiler 2>/dev/null || true
-            done
-        fi
+        echo '==> Concretizing GCC environment...'
+        spack -e . concretize -f
+        echo '==> Installing GCC compiler from buildcache in dedicated environment...'
+        spack -e . install --cache-only --no-check-signature
+        echo '==> Hiding system gcc binaries to prevent auto-detection...'
+        for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
+            [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
+        done
+        echo '==> Verifying GCC installation in compiler view...'
+        ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
+        /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
+        echo '==> Setting up compiler runtime library path...'
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+        echo '==> Clearing any cached Spack configuration...'
+        rm -rf /root/.spack /root/.cache/spack
+        SPACK_ROOT=$(spack location -r)
+        rm -f "$SPACK_ROOT/etc/spack/packages.yaml" "$SPACK_ROOT/etc/spack/compilers.yaml"
+        echo '==> Detecting newly installed GCC compiler...'
+        spack compiler find --scope site /opt/spack-compiler-view
+        echo '==> Configuring compiler environment with library paths...'
+        SPACK_ROOT=$(spack location -r)
+        PACKAGES_YAML="$SPACK_ROOT/etc/spack/packages.yaml"
+        echo "Modifying compiler configuration at: $PACKAGES_YAML"
+        # Use sed to add environment configuration after the fortran line in the compiler spec
+        # This adds the LD_LIBRARY_PATH to the compiler's environment
+        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/a\\
+        environment:\\
+          prepend_path:\\
+            LD_LIBRARY_PATH:\\
+            - /opt/spack-compiler-view/lib64\\
+            - /opt/spack-compiler-view/lib" "$PACKAGES_YAML"
+        echo '==> Verifying compiler configuration was updated...'
+        grep -A 6 "fortran: /opt/spack-compiler-view" "$PACKAGES_YAML" || echo 'WARNING: Could not verify environment section'
+        echo '==> Removing any auto-detected system compilers...'
+        for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
+                grep gcc@ | awk '{{print $1}}'); do
+            echo "Removing $compiler"
+            spack compiler rm --scope site $compiler 2>/dev/null || true
+        done
         echo '==> Verifying gcc@{compiler_version} is available...'
         if ! spack compiler list | grep -q "gcc@{compiler_version}"; then
             echo 'ERROR: gcc@{compiler_version} compiler not found after installation'
