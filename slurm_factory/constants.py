@@ -549,16 +549,18 @@ RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     spack compiler find --scope site /opt/spack-compiler'
 
-# Build gcc-runtime with the newly registered gcc compiler
-# This ensures gcc-runtime@{gcc_ver} is built with gcc@{gcc_ver}, not the system compiler
+# Build gcc-runtime and compiler-wrapper with the newly registered gcc compiler
+# This ensures both packages are built with gcc@{gcc_ver}, not the system compiler
 # Hide system gcc to prevent Spack from detecting it as external
-# Install OUTSIDE the environment since gcc-runtime is not in the environment specs
+# Install OUTSIDE the environment since these packages are not in the environment specs
 RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true; \\
     done && \\
     source /opt/spack/share/spack/setup-env.sh && \\
     spack install gcc-runtime@{gcc_ver} %gcc@{gcc_ver} && \\
     echo "==> gcc-runtime@{gcc_ver} built successfully with gcc@{gcc_ver}" && \\
+    spack install compiler-wrapper@1.0 %gcc@{gcc_ver} && \\
+    echo "==> compiler-wrapper@1.0 built successfully with gcc@{gcc_ver}" && \\
     for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
     done'

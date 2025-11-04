@@ -93,6 +93,7 @@ def generate_compiler_bootstrap_config(
                 "autoconf@2.72",
                 "automake@1.16.5",
                 "libtool@2.4.7",
+                # NOTE: Both gcc-runtime and compiler-wrapper will be built in a second step after gcc is registered
             ],
             "concretizer": {
                 "unify": False,  # Allow different gcc versions for build vs runtime
