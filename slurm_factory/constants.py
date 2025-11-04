@@ -346,17 +346,37 @@ compiler['flags']['ldflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-co
 with open(compilers_file, 'w') as f:
     yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
+# Verify the write succeeded by reading it back
+with open(compilers_file, 'r') as f:
+    verify_config = yaml.safe_load(f)
+    verify_compiler = verify_config['compilers'][0]['compiler']
+    
+    if 'environment' not in verify_compiler:
+        print("ERROR: environment section was not written to file!")
+        sys.exit(1)
+    if 'extra_rpaths' not in verify_compiler:
+        print("ERROR: extra_rpaths section was not written to file!")
+        sys.exit(1)
+    if 'flags' not in verify_compiler:
+        print("ERROR: flags section was not written to file!")
+        sys.exit(1)
+
 print("✓ Compiler configuration updated with library paths")
-print(f"  LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib")
-print(f"  extra_rpaths: {{compiler.get('extra_rpaths', [])}}")
-print(f"  ldflags: {{compiler.get('flags', {{}}).get('ldflags', 'none')}}")
+print(f"  File: {{compilers_file}}")
+print(f"  LD_LIBRARY_PATH: {{verify_compiler['environment']['prepend_path'].get('LD_LIBRARY_PATH', 'MISSING')}}")
+print(f"  extra_rpaths: {{verify_compiler.get('extra_rpaths', [])}}")
+print(f"  ldflags: {{verify_compiler.get('flags', {{}}).get('ldflags', 'none')}}")
 PYEOF
+        echo '==> Verifying Python script succeeded...'
+        [ $? -eq 0 ] || {{ echo 'ERROR: Python script failed'; exit 1; }}
+        echo '==> Finding which compilers.yaml Spack is using...'
+        spack config --scope site blame compilers | head -20
         echo '==> Reloading Spack compiler cache...'
         spack compiler list --scope site | grep gcc
         echo '==> Verifying updated compiler configuration was applied...'
-        spack compiler info gcc@{compiler_version} | grep -A 5 'environment:' || echo 'No environment section found'
-        spack compiler info gcc@{compiler_version} | grep -A 5 'extra_rpaths:' || echo 'No extra_rpaths section found'
-        spack compiler info gcc@{compiler_version} | grep -A 5 'flags:' || echo 'No flags section found'
+        spack compiler info gcc@{compiler_version} | grep -A 10 'environment:' || echo 'WARNING: No environment section found'
+        spack compiler info gcc@{compiler_version} | grep -A 5 'extra_rpaths:' || echo 'WARNING: No extra_rpaths section found'
+        spack compiler info gcc@{compiler_version} | grep -A 5 'flags:' || echo 'WARNING: No flags section found'
         echo '==> Testing compiler with simple program...'
         cat > /tmp/test.c << 'CEOF'
 #include <stdio.h>
