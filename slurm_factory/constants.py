@@ -329,7 +329,14 @@ CEOF
             exit 1
         }}
         echo '==> Displaying full compiler configuration for debugging...'
-        cat $(spack config --scope site blame compilers | grep 'compilers.yaml' | awk '{{print $NF}}' | head -1) || echo 'Could not read compilers.yaml'
+        SPACK_ROOT=$(spack location -r)
+        if [ -f "$SPACK_ROOT/etc/spack/packages.yaml" ]; then
+            echo "Compiler config in packages.yaml:"
+            grep -A 15 "gcc@{compiler_version}" "$SPACK_ROOT/etc/spack/packages.yaml" || echo "Could not find gcc@{compiler_version} section"
+        else
+            echo 'ERROR: packages.yaml not found'
+            exit 1
+        fi
         echo '==> Ensuring LD_LIBRARY_PATH is set globally...'
         export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
