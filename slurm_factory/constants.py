@@ -296,6 +296,7 @@ COMPILER_ENV_EOF
             - /opt/spack-compiler-view/lib" "$PACKAGES_YAML"
         echo '==> Verifying compiler configuration was updated...'
         grep -A 6 "fortran: /opt/spack-compiler-view" "$PACKAGES_YAML" || echo 'WARNING: Could not verify environment section'
+        fi  # Close the "if compiler already registered" check
         echo '==> Removing any auto-detected system compilers...'
         for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
                 grep gcc@ | awk '{{print $1}}'); do
