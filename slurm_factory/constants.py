@@ -351,8 +351,12 @@ print(f"  LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-vi
 print(f"  extra_rpaths: {{compiler.get('extra_rpaths', [])}}")
 print(f"  ldflags: {{compiler.get('flags', {{}}).get('ldflags', 'none')}}")
 PYEOF
-        echo '==> Updated compiler configuration:'
-        spack compiler info gcc@{compiler_version}
+        echo '==> Reloading Spack compiler cache...'
+        spack compiler list --scope site | grep gcc
+        echo '==> Verifying updated compiler configuration was applied...'
+        spack compiler info gcc@{compiler_version} | grep -A 5 'environment:' || echo 'No environment section found'
+        spack compiler info gcc@{compiler_version} | grep -A 5 'extra_rpaths:' || echo 'No extra_rpaths section found'
+        spack compiler info gcc@{compiler_version} | grep -A 5 'flags:' || echo 'No flags section found'
         echo '==> Testing compiler with simple program...'
         cat > /tmp/test.c << 'CEOF'
 #include <stdio.h>
@@ -364,6 +368,11 @@ CEOF
             ldd /tmp/test 2>&1 || true
             exit 1
         }}
+        echo '==> Displaying full compiler configuration for debugging...'
+        cat $(spack config --scope site blame compilers | grep 'compilers.yaml' | awk '{{print $NF}}' | head -1) || echo 'Could not read compilers.yaml'
+        echo '==> Ensuring LD_LIBRARY_PATH is set globally...'
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
