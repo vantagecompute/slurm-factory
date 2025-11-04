@@ -106,7 +106,7 @@ jobs:
             --slurm-version ${{ matrix.slurm_version }} \
             --compiler-version ${{ matrix.compiler_version }} \
             --gpu \
-            --publish=deps
+            --publish=all
 
       - name: Verify buildcache upload
         run: |

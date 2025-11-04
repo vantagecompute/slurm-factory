@@ -285,13 +285,85 @@ COMPILER_ENV_EOF
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
         spack compiler info gcc@{compiler_version}
-        echo '==> Updating compiler configuration with library paths...'
-        spack config --scope site add "compilers:[0]:compiler:environment:prepend_path:LD_LIBRARY_PATH:/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib"
-        spack config --scope site add "compilers:[0]:compiler:extra_rpaths:[/opt/spack-compiler-view/lib64, /opt/spack-compiler-view/lib]"
+        echo '==> Fixing compiler configuration with library paths...'
+        python3 << 'PYEOF'
+import yaml
+import sys
+import os
+
+# Find the compilers.yaml file in site scope
+spack_root = os.environ.get('SPACK_ROOT', '/opt/spack')
+site_config_dir = os.path.join(spack_root, 'etc', 'spack')
+compilers_file = os.path.join(site_config_dir, 'compilers.yaml')
+
+# Fallback to user scope if site doesn't exist
+if not os.path.exists(compilers_file):
+    compilers_file = os.path.expanduser('~/.spack/linux/compilers.yaml')
+
+if not os.path.exists(compilers_file):
+    print(f"ERROR: compilers.yaml not found at {{compilers_file}}")
+    sys.exit(1)
+
+print(f"Updating compiler configuration in: {{compilers_file}}")
+
+# Load existing configuration
+with open(compilers_file, 'r') as f:
+    config = yaml.safe_load(f)
+
+if not config or 'compilers' not in config or len(config['compilers']) == 0:
+    print("ERROR: No compilers found in configuration")
+    sys.exit(1)
+
+# Update the first compiler entry (should be our gcc@{compiler_version})
+compiler = config['compilers'][0]['compiler']
+
+# Verify it's the right compiler
+if 'spec' in compiler and 'gcc@{compiler_version}' not in compiler['spec']:
+    print(f"WARNING: First compiler is {{compiler.get('spec')}}, not gcc@{compiler_version}")
+
+# Add environment variables for library paths
+if 'environment' not in compiler:
+    compiler['environment'] = {{}}
+if 'prepend_path' not in compiler['environment']:
+    compiler['environment']['prepend_path'] = {{}}
+
+compiler['environment']['prepend_path']['LD_LIBRARY_PATH'] = '/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib'
+
+# Add extra RPATHs for linking
+if 'extra_rpaths' not in compiler:
+    compiler['extra_rpaths'] = []
+compiler['extra_rpaths'].extend(['/opt/spack-compiler-view/lib64', '/opt/spack-compiler-view/lib'])
+
+# Add library directories to compiler flags
+if 'flags' not in compiler:
+    compiler['flags'] = {{}}
+compiler['flags']['cflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib'
+compiler['flags']['cxxflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib'
+compiler['flags']['fflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib'
+compiler['flags']['ldflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib -Wl,-rpath,/opt/spack-compiler-view/lib64 -Wl,-rpath,/opt/spack-compiler-view/lib'
+
+# Write back the configuration
+with open(compilers_file, 'w') as f:
+    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+
+print("✓ Compiler configuration updated with library paths")
+print(f"  LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib")
+print(f"  extra_rpaths: {{compiler.get('extra_rpaths', [])}}")
+print(f"  ldflags: {{compiler.get('flags', {{}}).get('ldflags', 'none')}}")
+PYEOF
         echo '==> Updated compiler configuration:'
         spack compiler info gcc@{compiler_version}
-        echo '==> Testing compiler executable...'
-        spack compiler info gcc@{compiler_version} | grep 'cc =' | awk '{{print $3}}' | xargs -I{{}} sh -c '{{}} --version || echo "ERROR: Compiler not executable"'
+        echo '==> Testing compiler with simple program...'
+        cat > /tmp/test.c << 'CEOF'
+#include <stdio.h>
+int main() {{ printf("Compiler test OK\\n"); return 0; }}
+CEOF
+        /opt/spack-compiler-view/bin/gcc /tmp/test.c -o /tmp/test && /tmp/test || {{
+            echo 'ERROR: Compiler test failed'
+            /opt/spack-compiler-view/bin/gcc -v /tmp/test.c -o /tmp/test 2>&1 || true
+            ldd /tmp/test 2>&1 || true
+            exit 1
+        }}
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
