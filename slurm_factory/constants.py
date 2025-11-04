@@ -75,7 +75,8 @@ CONTAINER_SPACK_PROJECT_DIR = "/root/spack-project"
 CONTAINER_SLURM_DIR = "/opt/slurm"
 CONTAINER_BUILD_OUTPUT_DIR = f"{CONTAINER_SLURM_DIR}/build_output"
 CONTAINER_ROOT_DIR = "/root"
-CONTAINER_SPACK_CACHE_DIR = "/root/.cache/spack"
+# NOTE: We do NOT create/use SPACK_CACHE_DIR to avoid cross-build contamination
+# Each container build should start fresh without cached compiler metadata
 
 # Patch files
 SLURM_PATCH_FILES = ["slurm_prefix.patch", "package.py"]
@@ -199,8 +200,7 @@ def get_create_directories_script() -> str:
     return textwrap.dedent(f"""\
         mkdir -p {CONTAINER_SPACK_PROJECT_DIR} \\
                  {CONTAINER_SPACK_TEMPLATES_DIR} \\
-                 {CONTAINER_SLURM_DIR} \\
-                 {CONTAINER_SPACK_CACHE_DIR}
+                 {CONTAINER_SLURM_DIR}
     """).strip()
 
 
@@ -270,6 +270,10 @@ COMPILER_ENV_EOF
         echo '==> Setting up compiler runtime library path...'
         export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+        echo '==> Clearing any cached Spack configuration...'
+        rm -rf /root/.spack /root/.cache/spack
+        SPACK_ROOT=$(spack location -r)
+        rm -f "$SPACK_ROOT/etc/spack/packages.yaml" "$SPACK_ROOT/etc/spack/compilers.yaml"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
         echo '==> Removing any auto-detected system compilers...'
