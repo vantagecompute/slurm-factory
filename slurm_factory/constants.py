@@ -285,94 +285,33 @@ COMPILER_ENV_EOF
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
         spack compiler info gcc@{compiler_version}
-        echo '==> Fixing compiler configuration with library paths...'
-        python3 << 'PYEOF'
-import yaml
-import sys
-import os
-
-# Find the compilers.yaml file in site scope
-spack_root = os.environ.get('SPACK_ROOT', '/opt/spack')
-site_config_dir = os.path.join(spack_root, 'etc', 'spack')
-compilers_file = os.path.join(site_config_dir, 'compilers.yaml')
-
-# Fallback to user scope if site doesn't exist
-if not os.path.exists(compilers_file):
-    compilers_file = os.path.expanduser('~/.spack/linux/compilers.yaml')
-
-if not os.path.exists(compilers_file):
-    print(f"ERROR: compilers.yaml not found at {{compilers_file}}")
-    sys.exit(1)
-
-print(f"Updating compiler configuration in: {{compilers_file}}")
-
-# Load existing configuration
-with open(compilers_file, 'r') as f:
-    config = yaml.safe_load(f)
-
-if not config or 'compilers' not in config or len(config['compilers']) == 0:
-    print("ERROR: No compilers found in configuration")
-    sys.exit(1)
-
-# Update the first compiler entry (should be our gcc@{compiler_version})
-compiler = config['compilers'][0]['compiler']
-
-# Verify it's the right compiler
-if 'spec' in compiler and 'gcc@{compiler_version}' not in compiler['spec']:
-    print(f"WARNING: First compiler is {{compiler.get('spec')}}, not gcc@{compiler_version}")
-
-# Add environment variables for library paths
-if 'environment' not in compiler:
-    compiler['environment'] = {{}}
-if 'prepend_path' not in compiler['environment']:
-    compiler['environment']['prepend_path'] = {{}}
-
-compiler['environment']['prepend_path']['LD_LIBRARY_PATH'] = '/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib'
-
-# Add extra RPATHs for linking
-if 'extra_rpaths' not in compiler:
-    compiler['extra_rpaths'] = []
-compiler['extra_rpaths'].extend(['/opt/spack-compiler-view/lib64', '/opt/spack-compiler-view/lib'])
-
-# Add library directories to compiler flags
-if 'flags' not in compiler:
-    compiler['flags'] = {{}}
-compiler['flags']['cflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib'
-compiler['flags']['cxxflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib'
-compiler['flags']['fflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib'
-compiler['flags']['ldflags'] = '-L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib -Wl,-rpath,/opt/spack-compiler-view/lib64 -Wl,-rpath,/opt/spack-compiler-view/lib'
-
-# Write back the configuration
-with open(compilers_file, 'w') as f:
-    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-
-# Verify the write succeeded by reading it back
-with open(compilers_file, 'r') as f:
-    verify_config = yaml.safe_load(f)
-    verify_compiler = verify_config['compilers'][0]['compiler']
-    
-    if 'environment' not in verify_compiler:
-        print("ERROR: environment section was not written to file!")
-        sys.exit(1)
-    if 'extra_rpaths' not in verify_compiler:
-        print("ERROR: extra_rpaths section was not written to file!")
-        sys.exit(1)
-    if 'flags' not in verify_compiler:
-        print("ERROR: flags section was not written to file!")
-        sys.exit(1)
-
-print("✓ Compiler configuration updated with library paths")
-print(f"  File: {{compilers_file}}")
-print(f"  LD_LIBRARY_PATH: {{verify_compiler['environment']['prepend_path'].get('LD_LIBRARY_PATH', 'MISSING')}}")
-print(f"  extra_rpaths: {{verify_compiler.get('extra_rpaths', [])}}")
-print(f"  ldflags: {{verify_compiler.get('flags', {{}}).get('ldflags', 'none')}}")
-PYEOF
-        echo '==> Verifying Python script succeeded...'
-        [ $? -eq 0 ] || {{ echo 'ERROR: Python script failed'; exit 1; }}
-        echo '==> Finding which compilers.yaml Spack is using...'
-        spack config --scope site blame compilers | head -20
-        echo '==> Reloading Spack compiler cache...'
-        spack compiler list --scope site | grep gcc
+        echo '==> Fixing compiler configuration with library paths and RPATHs...'
+        # Directly edit compilers.yaml using sed (no Python dependencies needed)
+        COMPILERS_FILE=$(spack location -s)/etc/spack/compilers.yaml
+        echo "Editing: $COMPILERS_FILE"
+        # Backup original
+        cp "$COMPILERS_FILE" "${{COMPILERS_FILE}}.bak"
+        # Add environment, extra_rpaths, and flags sections after the compiler prefix line
+        # This uses sed to insert YAML configuration directly
+        cat > /tmp/compiler_additions.yaml << 'ADDEOF'
+  environment:
+    prepend_path:
+      LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib
+  extra_rpaths:
+  - /opt/spack-compiler-view/lib64
+  - /opt/spack-compiler-view/lib
+  flags:
+    cflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
+    cxxflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
+    fflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
+    ldflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib -Wl,-rpath,/opt/spack-compiler-view/lib64
+      -Wl,-rpath,/opt/spack-compiler-view/lib
+ADDEOF
+        # Insert after the 'prefix:' line in the compiler configuration
+        sed -i "/prefix: \\/opt\\/spack-compiler-view/r /tmp/compiler_additions.yaml" "$COMPILERS_FILE"
+        echo "✓ Compiler configuration file updated"
+        echo "==> Verifying configuration file was modified..."
+        cat "$COMPILERS_FILE"
         echo '==> Verifying updated compiler configuration was applied...'
         spack compiler info gcc@{compiler_version} | grep -A 10 'environment:' || echo 'WARNING: No environment section found'
         spack compiler info gcc@{compiler_version} | grep -A 5 'extra_rpaths:' || echo 'WARNING: No extra_rpaths section found'
