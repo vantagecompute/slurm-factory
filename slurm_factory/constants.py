@@ -261,6 +261,12 @@ COMPILER_ENV_EOF
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
             [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
         done
+        echo '==> Verifying GCC installation in compiler view...'
+        ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
+        /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
+        echo '==> Setting up library paths for compiler...'
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
         echo '==> Removing any auto-detected system compilers...'
@@ -277,6 +283,63 @@ COMPILER_ENV_EOF
         fi
         echo '==> Configured compilers:'
         spack compiler list
+        echo '==> Compiler info for gcc@{compiler_version}:'
+        spack compiler info gcc@{compiler_version}
+        echo '==> Fixing compiler configuration with library paths and RPATHs...'
+        # Directly edit packages.yaml using sed (no Python dependencies needed)
+        # NOTE: In Spack v1.0.0, compilers are stored in packages.yaml instead of compilers.yaml
+        SPACK_ROOT=$(spack location -r)
+        COMPILERS_FILE="$SPACK_ROOT/etc/spack/packages.yaml"
+        echo "Editing: $COMPILERS_FILE"
+        # Backup original
+        cp "$COMPILERS_FILE" "${{COMPILERS_FILE}}.bak"
+        # Add environment, extra_rpaths, and flags sections inside extra_attributes
+        # This uses sed to insert YAML configuration directly
+        cat > /tmp/compiler_additions.yaml << 'ADDEOF'
+        environment:
+          prepend_path:
+            LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib
+        extra_rpaths:
+        - /opt/spack-compiler-view/lib64
+        - /opt/spack-compiler-view/lib
+        flags:
+          cflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
+          cxxflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
+          fflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
+          ldflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib -Wl,-rpath,/opt/spack-compiler-view/lib64 -Wl,-rpath,/opt/spack-compiler-view/lib
+ADDEOF
+        # Insert before 'compilers:' line (which is inside extra_attributes) so the new sections are part of extra_attributes
+        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/r /tmp/compiler_additions.yaml" "$COMPILERS_FILE"
+        echo "✓ Compiler configuration file updated"
+        echo "==> Verifying configuration file was modified..."
+        grep -A 20 "gcc@{compiler_version}" "$COMPILERS_FILE" || echo "Could not find gcc@{compiler_version} in $COMPILERS_FILE"
+        echo '==> Verifying updated compiler configuration was applied...'
+        spack compiler info gcc@{compiler_version} | grep -A 10 'environment:' || echo 'WARNING: No environment section found'
+        spack compiler info gcc@{compiler_version} | grep -A 5 'extra_rpaths:' || echo 'WARNING: No extra_rpaths section found'
+        spack compiler info gcc@{compiler_version} | grep -A 5 'flags:' || echo 'WARNING: No flags section found'
+        echo '==> Testing compiler with simple program...'
+        cat > /tmp/test.c << 'CEOF'
+#include <stdio.h>
+int main() {{ printf("Compiler test OK\\n"); return 0; }}
+CEOF
+        /opt/spack-compiler-view/bin/gcc /tmp/test.c -o /tmp/test && /tmp/test || {{
+            echo 'ERROR: Compiler test failed'
+            /opt/spack-compiler-view/bin/gcc -v /tmp/test.c -o /tmp/test 2>&1 || true
+            ldd /tmp/test 2>&1 || true
+            exit 1
+        }}
+        echo '==> Displaying full compiler configuration for debugging...'
+        SPACK_ROOT=$(spack location -r)
+        if [ -f "$SPACK_ROOT/etc/spack/packages.yaml" ]; then
+            echo "Compiler config in packages.yaml:"
+            grep -A 15 "gcc@{compiler_version}" "$SPACK_ROOT/etc/spack/packages.yaml" || echo "Could not find gcc@{compiler_version} section"
+        else
+            echo 'ERROR: packages.yaml not found'
+            exit 1
+        fi
+        echo '==> Ensuring LD_LIBRARY_PATH is set globally...'
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
@@ -486,19 +549,10 @@ RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     spack compiler find --scope site /opt/spack-compiler'
 
-# Build gcc-runtime with the newly registered gcc compiler
-# This ensures gcc-runtime@{gcc_ver} is built with gcc@{gcc_ver}, not the system compiler
-# Hide system gcc to prevent Spack from detecting it as external
-# Install OUTSIDE the environment since gcc-runtime is not in the environment specs
-RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
-        [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true; \\
-    done && \\
-    source /opt/spack/share/spack/setup-env.sh && \\
-    spack install gcc-runtime@{gcc_ver} %gcc@{gcc_ver} && \\
-    echo "==> gcc-runtime@{gcc_ver} built successfully with gcc@{gcc_ver}" && \\
-    for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
-        [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
-    done'
+# NOTE: We do NOT build gcc-runtime or compiler-wrapper here!
+# They MUST be built during the Slurm build phase with the target compiler,
+# otherwise they will be built with the system compiler and have wrong linkage.
+# Spack will automatically build them as dependencies when needed.
 
 # Verify compiler installation
 RUN /opt/spack-compiler/bin/gcc --version && \\

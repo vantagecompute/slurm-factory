@@ -793,7 +793,9 @@ def publish_compiler_to_buildcache(
                 f"spack -e . buildcache push --unsigned --update-index "
                 f"--without-build-dependencies s3-buildcache && "
                 f"spack buildcache push --unsigned --update-index "
-                f"--without-build-dependencies s3-buildcache gcc-runtime@{compiler_version}",
+                f"--without-build-dependencies s3-buildcache gcc-runtime@{compiler_version} && "
+                f"spack buildcache push --unsigned --update-index "
+                f"--without-build-dependencies s3-buildcache compiler-wrapper@1.0",
             ]
         )
 

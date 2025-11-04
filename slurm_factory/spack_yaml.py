@@ -93,6 +93,7 @@ def generate_compiler_bootstrap_config(
                 "autoconf@2.72",
                 "automake@1.16.5",
                 "libtool@2.4.7",
+                # NOTE: Both gcc-runtime and compiler-wrapper will be built in a second step after gcc is registered
             ],
             "concretizer": {
                 "unify": False,  # Allow different gcc versions for build vs runtime
@@ -139,7 +140,7 @@ def generate_compiler_bootstrap_config(
                 "source_cache": sourcecache_root,
                 "misc_cache": buildcache_root,
                 "build_jobs": 4,
-                "ccache": True,
+                "ccache": False,  # Disabled - system ccache incompatible with Spack-built compilers
                 "binary_index_ttl": 600,
             },
             "mirrors": {
@@ -396,7 +397,7 @@ def generate_spack_config(
                 "deprecated": True,
                 # Spack 1.x performance enhancements
                 "build_jobs": 4,  # Parallel build jobs
-                "ccache": True,  # Enable ccache for faster rebuilds
+                "ccache": False,  # Disabled - system ccache incompatible with Spack-built compilers
                 "connect_timeout": 30,  # Network timeout for downloads
                 "verify_ssl": True,  # Security setting
                 "suppress_gpg_warnings": False,  # Show GPG warnings
