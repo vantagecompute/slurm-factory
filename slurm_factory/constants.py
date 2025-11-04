@@ -261,6 +261,12 @@ COMPILER_ENV_EOF
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
             [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
         done
+        echo '==> Verifying GCC installation in compiler view...'
+        ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
+        /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
+        echo '==> Setting up library paths for compiler...'
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
         echo '==> Removing any auto-detected system compilers...'
@@ -277,6 +283,15 @@ COMPILER_ENV_EOF
         fi
         echo '==> Configured compilers:'
         spack compiler list
+        echo '==> Compiler info for gcc@{compiler_version}:'
+        spack compiler info gcc@{compiler_version}
+        echo '==> Updating compiler configuration with library paths...'
+        spack config --scope site add "compilers:[0]:compiler:environment:prepend_path:LD_LIBRARY_PATH:/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib"
+        spack config --scope site add "compilers:[0]:compiler:extra_rpaths:[/opt/spack-compiler-view/lib64, /opt/spack-compiler-view/lib]"
+        echo '==> Updated compiler configuration:'
+        spack compiler info gcc@{compiler_version}
+        echo '==> Testing compiler executable...'
+        spack compiler info gcc@{compiler_version} | grep 'cc =' | awk '{{print $3}}' | xargs -I{{}} sh -c '{{}} --version || echo "ERROR: Compiler not executable"'
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
