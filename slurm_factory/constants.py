@@ -281,14 +281,16 @@ COMPILER_ENV_EOF
         SPACK_ROOT=$(spack location -r)
         PACKAGES_YAML="$SPACK_ROOT/etc/spack/packages.yaml"
         echo "Modifying compiler configuration at: $PACKAGES_YAML"
-        # Use sed to add environment configuration after the fortran line in the compiler spec
-        # This adds the LD_LIBRARY_PATH to the compiler's environment
-        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/a\\
-        environment:\\
-          prepend_path:\\
-            LD_LIBRARY_PATH:\\
-            - /opt/spack-compiler-view/lib64\\
-            - /opt/spack-compiler-view/lib" "$PACKAGES_YAML"
+        # Create a temporary file with the environment configuration
+        cat > /tmp/compiler_env.yaml << 'ENV_EOF'
+        environment:
+          prepend_path:
+            LD_LIBRARY_PATH:
+            - /opt/spack-compiler-view/lib64
+            - /opt/spack-compiler-view/lib
+ENV_EOF
+        # Insert the environment configuration after the fortran line
+        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/r /tmp/compiler_env.yaml" "$PACKAGES_YAML"
         echo '==> Verifying compiler configuration was updated...'
         grep -A 6 "fortran: /opt/spack-compiler-view" "$PACKAGES_YAML" || echo 'WARNING: Could not verify environment section'
         echo '==> Removing any auto-detected system compilers...'
