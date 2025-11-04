@@ -37,6 +37,19 @@ Quick reference guide for implementing and using package signing. Includes:
 
 **Use this for**: Quick lookups during implementation and debugging.
 
+### [IMPLEMENTATION_ROADMAP.md](./IMPLEMENTATION_ROADMAP.md)
+
+Detailed roadmap of all code changes needed for signing implementation. Includes:
+
+- Complete list of files to create/modify
+- Line-by-line change specifications
+- Code snippets for each modification
+- GitHub workflow updates
+- Test coverage requirements
+- Summary statistics and effort estimates
+
+**Use this for**: Tracking implementation progress and code review.
+
 ## Project Documentation
 
 For user-facing documentation, see the [docusaurus](../docusaurus/) directory which contains:
@@ -63,8 +76,9 @@ When adding new documentation to this directory:
 ```
 docs/
 ├── README.md                                    # This file
-├── BUILDCACHE_SIGNING_IMPLEMENTATION_PLAN.md   # Signing implementation plan
-└── SIGNING_QUICK_REFERENCE.md                  # Signing quick reference
+├── BUILDCACHE_SIGNING_IMPLEMENTATION_PLAN.md   # Signing implementation plan (778 lines)
+├── SIGNING_QUICK_REFERENCE.md                  # Signing quick reference (290 lines)
+└── IMPLEMENTATION_ROADMAP.md                   # Code changes roadmap (327 lines)
 ```
 
 ## See Also
