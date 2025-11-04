@@ -279,32 +279,17 @@ COMPILER_ENV_EOF
         echo '==> Configuring compiler environment with library paths...'
         SPACK_ROOT=$(spack location -r)
         PACKAGES_YAML="$SPACK_ROOT/etc/spack/packages.yaml"
-        # Add environment section to compiler configuration for runtime libraries
-        # This ensures GCC can find its own runtime libraries during builds
-        python3 -c "
-import yaml
-with open('$PACKAGES_YAML', 'r') as f:
-    config = yaml.safe_load(f)
-# Find the gcc@{compiler_version} compiler entry
-for pkg_name, pkg_config in config.get('packages', {{}}).items():
-    if pkg_name.startswith('gcc'):
-        for compiler_entry in pkg_config.get('compilers', []):
-            if 'gcc@{compiler_version}' in str(compiler_entry.get('spec', '')):
-                # Add environment configuration
-                if 'extra_attributes' not in compiler_entry:
-                    compiler_entry['extra_attributes'] = {{}}
-                compiler_entry['extra_attributes']['environment'] = {{
-                    'prepend_path': {{
-                        'LD_LIBRARY_PATH': [
-                            '/opt/spack-compiler-view/lib64',
-                            '/opt/spack-compiler-view/lib'
-                        ]
-                    }}
-                }}
-with open('$PACKAGES_YAML', 'w') as f:
-    yaml.dump(config, f, default_flow_style=False, sort_keys=False)
-print('Added LD_LIBRARY_PATH to compiler environment')
-"
+        echo "Modifying compiler configuration at: $PACKAGES_YAML"
+        # Use sed to add environment configuration after the fortran line in the compiler spec
+        # This adds the LD_LIBRARY_PATH to the compiler's environment
+        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/a\\
+        environment:\\
+          prepend_path:\\
+            LD_LIBRARY_PATH:\\
+            - /opt/spack-compiler-view/lib64\\
+            - /opt/spack-compiler-view/lib" "$PACKAGES_YAML"
+        echo '==> Verifying compiler configuration was updated...'
+        grep -A 6 "fortran: /opt/spack-compiler-view" "$PACKAGES_YAML" || echo 'WARNING: Could not verify environment section'
         echo '==> Removing any auto-detected system compilers...'
         for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
                 grep gcc@ | awk '{{print $1}}'); do
