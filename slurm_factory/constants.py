@@ -302,6 +302,17 @@ CEOF
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
+        echo '==> Verifying compiler is still available in environment...'
+        spack compiler list || {{
+            echo 'ERROR: No compilers found in environment'
+            exit 1
+        }}
+        spack compiler info gcc@{compiler_version} || {{
+            echo 'ERROR: gcc@{compiler_version} not found in environment scope'
+            echo 'Available compilers:'
+            spack compiler list
+            exit 1
+        }}
         rm -f spack.lock
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
         spack concretize -j $(nproc) -f --fresh
