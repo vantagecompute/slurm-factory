@@ -164,6 +164,9 @@ def get_install_system_deps_script() -> str:
         tar \\
         gawk \\
         gettext \\
+        libmd-dev \\
+        libbsd-dev \\
+        libsigsegv-dev \\
         file \\
         lmod \\
         ca-certificates \\
@@ -264,7 +267,7 @@ COMPILER_ENV_EOF
         echo '==> Verifying GCC installation in compiler view...'
         ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
         /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
-        echo '==> Setting up library paths for compiler...'
+        echo '==> Setting up compiler runtime library path...'
         export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Detecting newly installed GCC compiler...'
@@ -285,38 +288,6 @@ COMPILER_ENV_EOF
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
         spack compiler info gcc@{compiler_version}
-        echo '==> Fixing compiler configuration with library paths and RPATHs...'
-        # Directly edit packages.yaml using sed (no Python dependencies needed)
-        # NOTE: In Spack v1.0.0, compilers are stored in packages.yaml instead of compilers.yaml
-        SPACK_ROOT=$(spack location -r)
-        COMPILERS_FILE="$SPACK_ROOT/etc/spack/packages.yaml"
-        echo "Editing: $COMPILERS_FILE"
-        # Backup original
-        cp "$COMPILERS_FILE" "${{COMPILERS_FILE}}.bak"
-        # Add environment, extra_rpaths, and flags sections inside extra_attributes
-        # This uses sed to insert YAML configuration directly
-        cat > /tmp/compiler_additions.yaml << 'ADDEOF'
-        environment:
-          prepend_path:
-            LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib
-        extra_rpaths:
-        - /opt/spack-compiler-view/lib64
-        - /opt/spack-compiler-view/lib
-        flags:
-          cflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
-          cxxflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
-          fflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
-          ldflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib -Wl,-rpath,/opt/spack-compiler-view/lib64 -Wl,-rpath,/opt/spack-compiler-view/lib
-ADDEOF
-        # Insert before 'compilers:' line (which is inside extra_attributes) so the new sections are part of extra_attributes
-        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/r /tmp/compiler_additions.yaml" "$COMPILERS_FILE"
-        echo "✓ Compiler configuration file updated"
-        echo "==> Verifying configuration file was modified..."
-        grep -A 20 "gcc@{compiler_version}" "$COMPILERS_FILE" || echo "Could not find gcc@{compiler_version} in $COMPILERS_FILE"
-        echo '==> Verifying updated compiler configuration was applied...'
-        spack compiler info gcc@{compiler_version} | grep -A 10 'environment:' || echo 'WARNING: No environment section found'
-        spack compiler info gcc@{compiler_version} | grep -A 5 'extra_rpaths:' || echo 'WARNING: No extra_rpaths section found'
-        spack compiler info gcc@{compiler_version} | grep -A 5 'flags:' || echo 'WARNING: No flags section found'
         echo '==> Testing compiler with simple program...'
         cat > /tmp/test.c << 'CEOF'
 #include <stdio.h>
@@ -328,18 +299,6 @@ CEOF
             ldd /tmp/test 2>&1 || true
             exit 1
         }}
-        echo '==> Displaying full compiler configuration for debugging...'
-        SPACK_ROOT=$(spack location -r)
-        if [ -f "$SPACK_ROOT/etc/spack/packages.yaml" ]; then
-            echo "Compiler config in packages.yaml:"
-            grep -A 15 "gcc@{compiler_version}" "$SPACK_ROOT/etc/spack/packages.yaml" || echo "Could not find gcc@{compiler_version} section"
-        else
-            echo 'ERROR: packages.yaml not found'
-            exit 1
-        fi
-        echo '==> Ensuring LD_LIBRARY_PATH is set globally...'
-        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
-        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
@@ -752,8 +711,6 @@ WORKDIR {CONTAINER_SPACK_PROJECT_DIR}
 RUN /bin/bash <<'EOFBASH'
 {spack_build_script}
 EOFBASH
-
-
 
 # ========================================================================
 # Stage {
