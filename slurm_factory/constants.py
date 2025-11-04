@@ -294,12 +294,9 @@ COMPILER_ENV_EOF
             echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
             echo '==> Registering newly installed GCC compiler with Spack...'
             spack compiler find --scope site /opt/spack-compiler-view || {{
-                echo 'ERROR: Failed to register gcc@{compiler_version} as a Spack compiler'
-                echo 'Attempting to add compiler manually...'
-                spack compiler add --scope site /opt/spack-compiler-view/bin/gcc || {{
-                    echo 'ERROR: Manual compiler registration also failed'
-                    exit 1
-                }}
+                echo 'ERROR: Failed to auto-detect gcc@{compiler_version} with compiler find'
+                echo 'This may indicate an issue with the compiler installation or view'
+                exit 1
             }}
             echo '==> Removing any auto-detected system compilers...'
             for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
@@ -319,7 +316,7 @@ COMPILER_ENV_EOF
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
         spack compiler info gcc@{compiler_version} || {{
-            echo 'ERROR: gcc@{compiler_version} not found after installation'
+            echo 'ERROR: gcc@{compiler_version} not available in compiler info after registration'
             echo 'Available compilers:'
             spack compiler list
             exit 1
