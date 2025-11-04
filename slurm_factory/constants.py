@@ -277,21 +277,8 @@ COMPILER_ENV_EOF
         rm -f "$SPACK_ROOT/etc/spack/packages.yaml" "$SPACK_ROOT/etc/spack/compilers.yaml"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
-        echo '==> Configuring compiler environment with library paths...'
-        SPACK_ROOT=$(spack location -r)
-        PACKAGES_YAML="$SPACK_ROOT/etc/spack/packages.yaml"
-        echo "Modifying compiler configuration at: $PACKAGES_YAML"
-        # Create a temporary file with the environment configuration
-        # Note: LD_LIBRARY_PATH should be a colon-separated string, not a list
-        cat > /tmp/compiler_env.yaml << 'ENV_EOF'
-        environment:
-          prepend_path:
-            LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib
-ENV_EOF
-        # Insert the environment configuration after the fortran line
-        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/r /tmp/compiler_env.yaml" "$PACKAGES_YAML"
-        echo '==> Verifying compiler configuration was updated...'
-        grep -A 6 "fortran: /opt/spack-compiler-view" "$PACKAGES_YAML" || echo 'WARNING: Could not verify environment section'
+        echo '==> LD_LIBRARY_PATH is already configured globally for this session'
+        echo "Current LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
         echo '==> Removing any auto-detected system compilers...'
         for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
                 grep gcc@ | awk '{{print $1}}'); do
