@@ -75,7 +75,8 @@ CONTAINER_SPACK_PROJECT_DIR = "/root/spack-project"
 CONTAINER_SLURM_DIR = "/opt/slurm"
 CONTAINER_BUILD_OUTPUT_DIR = f"{CONTAINER_SLURM_DIR}/build_output"
 CONTAINER_ROOT_DIR = "/root"
-CONTAINER_SPACK_CACHE_DIR = "/root/.cache/spack"
+# NOTE: We do NOT create/use SPACK_CACHE_DIR to avoid cross-build contamination
+# Each container build should start fresh without cached compiler metadata
 
 # Patch files
 SLURM_PATCH_FILES = ["slurm_prefix.patch", "package.py"]
@@ -164,11 +165,14 @@ def get_install_system_deps_script() -> str:
         tar \\
         gawk \\
         gettext \\
+        libmd-dev \\
+        libbsd-dev \\
+        libsigsegv-dev \\
         file \\
         lmod \\
         ca-certificates \\
         wget && \\
-        python3 -m pip install --break-system-packages boto3 && \\
+        python3 -m pip install --break-system-packages boto3 pyyaml && \\
         apt-get clean && rm -rf /var/lib/apt/lists/*
     """).strip()
 
@@ -196,8 +200,7 @@ def get_create_directories_script() -> str:
     return textwrap.dedent(f"""\
         mkdir -p {CONTAINER_SPACK_PROJECT_DIR} \\
                  {CONTAINER_SPACK_TEMPLATES_DIR} \\
-                 {CONTAINER_SLURM_DIR} \\
-                 {CONTAINER_SPACK_CACHE_DIR}
+                 {CONTAINER_SLURM_DIR}
     """).strip()
 
 
@@ -233,17 +236,18 @@ def get_spack_build_script(compiler_version: str) -> str:
     )
     return textwrap.dedent(f"""\
         source {SPACK_SETUP_SCRIPT}
+        echo '==> Installing GCC compiler {compiler_version}...'
         echo '==> Configuring buildcache mirror globally for compiler installation...'
         spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
         echo '==> Installing buildcache keys...'
         spack buildcache keys --install --trust
-        echo '==> Creating temporary environment to install GCC compiler from buildcache...'
+        echo '==> Creating temporary environment to install GCC compiler...'
         mkdir -p /tmp/compiler-install
         cd /tmp/compiler-install
         cat > spack.yaml << 'COMPILER_ENV_EOF'
 spack:
   specs:
-  - gcc@{compiler_version}
+  - gcc@{compiler_version} languages=c,c++,fortran
   view: /opt/spack-compiler-view
   concretizer:
     unify: false
@@ -264,11 +268,17 @@ COMPILER_ENV_EOF
         echo '==> Verifying GCC installation in compiler view...'
         ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
         /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
-        echo '==> Setting up library paths for compiler...'
+        echo '==> Setting up compiler runtime library path...'
         export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+        echo '==> Clearing any cached Spack configuration...'
+        rm -rf /root/.spack /root/.cache/spack
+        SPACK_ROOT=$(spack location -r)
+        rm -f "$SPACK_ROOT/etc/spack/packages.yaml" "$SPACK_ROOT/etc/spack/compilers.yaml"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
+        echo '==> LD_LIBRARY_PATH is already configured globally for this session'
+        echo "Current LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
         echo '==> Removing any auto-detected system compilers...'
         for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
                 grep gcc@ | awk '{{print $1}}'); do
@@ -277,46 +287,20 @@ COMPILER_ENV_EOF
         done
         echo '==> Verifying gcc@{compiler_version} is available...'
         if ! spack compiler list | grep -q "gcc@{compiler_version}"; then
-            echo 'ERROR: gcc@{compiler_version} compiler not found:'
+            echo 'ERROR: gcc@{compiler_version} compiler not found after installation'
+            echo 'Available compilers:'
             spack compiler list
             exit 1
         fi
         echo '==> Configured compilers:'
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
-        spack compiler info gcc@{compiler_version}
-        echo '==> Fixing compiler configuration with library paths and RPATHs...'
-        # Directly edit packages.yaml using sed (no Python dependencies needed)
-        # NOTE: In Spack v1.0.0, compilers are stored in packages.yaml instead of compilers.yaml
-        SPACK_ROOT=$(spack location -r)
-        COMPILERS_FILE="$SPACK_ROOT/etc/spack/packages.yaml"
-        echo "Editing: $COMPILERS_FILE"
-        # Backup original
-        cp "$COMPILERS_FILE" "${{COMPILERS_FILE}}.bak"
-        # Add environment, extra_rpaths, and flags sections inside extra_attributes
-        # This uses sed to insert YAML configuration directly
-        cat > /tmp/compiler_additions.yaml << 'ADDEOF'
-        environment:
-          prepend_path:
-            LD_LIBRARY_PATH: /opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib
-        extra_rpaths:
-        - /opt/spack-compiler-view/lib64
-        - /opt/spack-compiler-view/lib
-        flags:
-          cflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
-          cxxflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
-          fflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib
-          ldflags: -L/opt/spack-compiler-view/lib64 -L/opt/spack-compiler-view/lib -Wl,-rpath,/opt/spack-compiler-view/lib64 -Wl,-rpath,/opt/spack-compiler-view/lib
-ADDEOF
-        # Insert before 'compilers:' line (which is inside extra_attributes) so the new sections are part of extra_attributes
-        sed -i "/fortran: \\/opt\\/spack-compiler-view\\/bin\\/gfortran/r /tmp/compiler_additions.yaml" "$COMPILERS_FILE"
-        echo "✓ Compiler configuration file updated"
-        echo "==> Verifying configuration file was modified..."
-        grep -A 20 "gcc@{compiler_version}" "$COMPILERS_FILE" || echo "Could not find gcc@{compiler_version} in $COMPILERS_FILE"
-        echo '==> Verifying updated compiler configuration was applied...'
-        spack compiler info gcc@{compiler_version} | grep -A 10 'environment:' || echo 'WARNING: No environment section found'
-        spack compiler info gcc@{compiler_version} | grep -A 5 'extra_rpaths:' || echo 'WARNING: No extra_rpaths section found'
-        spack compiler info gcc@{compiler_version} | grep -A 5 'flags:' || echo 'WARNING: No flags section found'
+        spack compiler info gcc@{compiler_version} || {{
+            echo 'ERROR: gcc@{compiler_version} not available in compiler info after registration'
+            echo 'Available compilers:'
+            spack compiler list
+            exit 1
+        }}
         echo '==> Testing compiler with simple program...'
         cat > /tmp/test.c << 'CEOF'
 #include <stdio.h>
@@ -328,21 +312,20 @@ CEOF
             ldd /tmp/test 2>&1 || true
             exit 1
         }}
-        echo '==> Displaying full compiler configuration for debugging...'
-        SPACK_ROOT=$(spack location -r)
-        if [ -f "$SPACK_ROOT/etc/spack/packages.yaml" ]; then
-            echo "Compiler config in packages.yaml:"
-            grep -A 15 "gcc@{compiler_version}" "$SPACK_ROOT/etc/spack/packages.yaml" || echo "Could not find gcc@{compiler_version} section"
-        else
-            echo 'ERROR: packages.yaml not found'
-            exit 1
-        fi
-        echo '==> Ensuring LD_LIBRARY_PATH is set globally...'
-        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
-        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
+        echo '==> Verifying compiler is still available in environment...'
+        spack compiler list || {{
+            echo 'ERROR: No compilers found in environment'
+            exit 1
+        }}
+        spack compiler info gcc@{compiler_version} || {{
+            echo 'ERROR: gcc@{compiler_version} not found in environment scope'
+            echo 'Available compilers:'
+            spack compiler list
+            exit 1
+        }}
         rm -f spack.lock
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
         spack concretize -j $(nproc) -f --fresh
@@ -752,8 +735,6 @@ WORKDIR {CONTAINER_SPACK_PROJECT_DIR}
 RUN /bin/bash <<'EOFBASH'
 {spack_build_script}
 EOFBASH
-
-
 
 # ========================================================================
 # Stage {
