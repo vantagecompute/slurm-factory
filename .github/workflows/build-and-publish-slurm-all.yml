@@ -105,6 +105,10 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "Setting up GPG signing..."
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY is not set"
+            exit 1
+          fi
           echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --pinentry-mode loopback --import
           if [ $? -ne 0 ]; then
             echo "Error: Failed to import GPG private key"
@@ -223,7 +227,9 @@ jobs:
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
-          echo "curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub | spack gpg trust" >> $GITHUB_STEP_SUMMARY
+          echo "# Import and trust the GPG signing key" >> $GITHUB_STEP_SUMMARY
+          echo "curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub -o vantage-key.pub" >> $GITHUB_STEP_SUMMARY
+          echo "spack gpg trust vantage-key.pub" >> $GITHUB_STEP_SUMMARY
           echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
