@@ -777,6 +777,17 @@ def publish_compiler_to_buildcache(
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
 
+        # Pass GPG environment variables if available (for signing buildcache packages)
+        if "GPG_KEY_ID" in os.environ:
+            cmd.extend(["-e", f"GPG_KEY_ID={os.environ['GPG_KEY_ID']}"])
+        if "GPG_PASSPHRASE" in os.environ:
+            cmd.extend(["-e", f"GPG_PASSPHRASE={os.environ['GPG_PASSPHRASE']}"])
+        
+        # Mount GPG home directory if it exists (for accessing signing keys)
+        gpg_home = Path.home() / ".gnupg"
+        if gpg_home.exists():
+            cmd.extend(["-v", f"{gpg_home}:/root/.gnupg:ro"])
+
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
@@ -915,6 +926,17 @@ def push_to_buildcache(
         # Add AWS environment variables
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
+
+        # Pass GPG environment variables if available (for signing buildcache packages)
+        if "GPG_KEY_ID" in os.environ:
+            cmd.extend(["-e", f"GPG_KEY_ID={os.environ['GPG_KEY_ID']}"])
+        if "GPG_PASSPHRASE" in os.environ:
+            cmd.extend(["-e", f"GPG_PASSPHRASE={os.environ['GPG_PASSPHRASE']}"])
+        
+        # Mount GPG home directory if it exists (for accessing signing keys)
+        gpg_home = Path.home() / ".gnupg"
+        if gpg_home.exists():
+            cmd.extend(["-v", f"{gpg_home}:/root/.gnupg:ro"])
 
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:
