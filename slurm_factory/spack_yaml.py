@@ -93,10 +93,11 @@ def generate_compiler_bootstrap_config(
                 "autoconf@2.72",
                 "automake@1.16.5",
                 "libtool@2.4.7",
-                # NOTE: Both gcc-runtime and compiler-wrapper will be built in a second step after gcc is registered
+                # NOTE: Both gcc-runtime and compiler-wrapper will be built in a second step
+                # after gcc is registered
             ],
             "concretizer": {
-                "unify": False,  # Allow different gcc versions for build vs runtime
+                "unify": "when_possible",
                 "reuse": {
                     "roots": True,
                     "from": [{"type": "buildcache"}],
@@ -147,7 +148,7 @@ def generate_compiler_bootstrap_config(
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
-                    "signed": True,
+                    "signed": False,
                 },
             },
         }
@@ -347,7 +348,8 @@ def generate_spack_config(
         # Note: gcc and gcc-runtime are installed outside the environment first
         # All packages below will use %gcc@{compiler_version} which will be available after gcc is installed
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
-        f"slurm_factory.openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",  # Build OpenSSL with explicit zlib dependency
+        # Build OpenSSL with explicit zlib dependency
+        f"slurm_factory.openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",
         f"jansson@2.14 {compiler_spec}",  # JSON library for libjwt
         # JWT library with all dependencies - let Spack choose available version
         f"libjwt ^openssl@3.6.0 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
@@ -463,7 +465,10 @@ def generate_spack_config(
                 # Use system build tools to avoid compiler wrapper issues during configure
                 "libmd": {"externals": [{"spec": "libmd@1.1.0", "prefix": "/usr"}], "buildable": False},
                 "libbsd": {"externals": [{"spec": "libbsd@0.12.1", "prefix": "/usr"}], "buildable": False},
-                "libsigsegv": {"externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}], "buildable": False},
+                "libsigsegv": {
+                    "externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}],
+                    "buildable": False,
+                },
                 "tar": {"externals": [{"spec": "tar@1.34", "prefix": "/usr"}], "buildable": False},
                 # Build xz and bzip2 from source to avoid library version conflicts
                 "xz": {"buildable": True},
@@ -537,7 +542,6 @@ def generate_spack_config(
                     "version": ["5.0.5"],
                     "variants": "~munge ~python",  # Removed +shared as it doesn't exist
                 },
-                "libsigsegv": {"buildable": True},
                 "hdf5": {"buildable": True},
                 # Runtime-linked libraries: build with Spack for true relocatability
                 # These may be linked by Slurm or its dependencies at runtime
@@ -612,7 +616,7 @@ def generate_spack_config(
                 # Use slurm-factory buildcache for compiler binaries
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
-                    "signed": True,
+                    "signed": False,
                 },
             },
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected

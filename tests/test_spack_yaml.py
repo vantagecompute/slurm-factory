@@ -120,14 +120,15 @@ class TestSpackConfigGeneration:
         packages = config["spack"]["packages"]
         
         # Test external build tools that should not be built (using system versions)
-        external_tools = ["cmake", "python", "gmake", "m4", "pkgconf", "diffutils", "findutils", "gettext", "tar"]
+        external_tools = ["cmake", "python", "gmake", "m4", "pkgconf", "diffutils", "findutils", "tar"]
         for tool in external_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is False
             assert "externals" in packages[tool]
         
         # Test autotools are buildable (built from source for libjwt compatibility)
-        buildable_tools = ["autoconf", "automake", "libtool"]
+        # gettext is also buildable to avoid GLIBCXX compatibility issues
+        buildable_tools = ["autoconf", "automake", "libtool", "gettext"]
         for tool in buildable_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is True
