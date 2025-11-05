@@ -172,7 +172,7 @@ def get_install_system_deps_script() -> str:
         lmod \\
         ca-certificates \\
         wget && \\
-        python3 -m pip install --break-system-packages boto3 && \\
+        python3 -m pip install --break-system-packages boto3 pyyaml && \\
         apt-get clean && rm -rf /var/lib/apt/lists/*
     """).strip()
 
