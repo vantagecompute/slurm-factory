@@ -28,14 +28,14 @@ def test_gcc_languages_variant_in_build_script():
     
     print("✓ GCC spec includes languages=c,c++,fortran variant")
     
-    # Also check for other compiler versions
-    for version in ["14.3.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0"]:
+    # Test all supported compiler versions from COMPILER_TOOLCHAINS
+    for version in constants.COMPILER_TOOLCHAINS.keys():
         script = constants.get_spack_build_script(version)
         assert f"gcc@{version} languages=c,c++,fortran" in script, \
             f"GCC spec for version {version} should include explicit languages variant"
         print(f"✓ GCC {version} spec includes languages variant")
     
-    print("\n✅ All tests passed!")
+    print(f"\n✅ All {len(constants.COMPILER_TOOLCHAINS)} supported GCC versions tested!")
     print("This fix ensures that GCC specs have the languages variant set,")
     print("which prevents _cc_path(), _cxx_path(), and _fortran_path() from returning None.")
 
