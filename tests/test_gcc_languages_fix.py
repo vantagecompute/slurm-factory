@@ -17,7 +17,12 @@ from slurm_factory import constants
 
 
 def _assert_gcc_has_languages_variant(version: str, script: str) -> None:
-    """Helper to check if GCC spec includes languages variant."""
+    """Helper to check if GCC spec includes languages variant.
+    
+    Note: String matching is appropriate here since we're testing that the generated
+    shell script contains the correct Spack spec string that will be executed.
+    We want to ensure the exact spec format is correct in the build script.
+    """
     expected = f"gcc@{version} languages=c,c++,fortran"
     assert expected in script, \
         f"GCC spec for version {version} should include explicit languages variant"
