@@ -85,7 +85,11 @@ jobs:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "Setting up GPG signing..."
-          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --pinentry-mode loopback --import
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to import GPG private key"
+            exit 1
+          fi
           echo "GPG key imported successfully"
           gpg --list-secret-keys
 
@@ -146,7 +150,17 @@ jobs:
           
           # Trust the GPG signing key
           echo "Importing GPG public key..."
-          curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub | spack gpg trust
+          curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub -o /tmp/vantage-key.pub
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to download GPG public key"
+            exit 1
+          fi
+          spack gpg trust /tmp/vantage-key.pub
+          if [ $? -ne 0 ]; then
+            echo "Error: Failed to trust GPG public key"
+            exit 1
+          fi
+          rm /tmp/vantage-key.pub
           
           # List available packages
           echo "Available packages in buildcache:"
