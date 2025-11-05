@@ -65,6 +65,10 @@ INSTANCE_NAME_PREFIX = "slurm-factory"
 BUILD_TIMEOUT = 3600  # 1 hour for full build
 DOCKER_BUILD_TIMEOUT = 600  # 10 minutes for image build
 
+# Spack buildcache configuration
+SLURM_FACTORY_SPACK_CACHE_BASE_URL = "https://slurm-factory-spack-binary-cache.vantagecompute.ai"
+SLURM_FACTORY_GPG_PUBLIC_KEY_URL = f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/keys/vantage-slurm-factory.pub"
+
 # Spack repository paths
 SPACK_SETUP_SCRIPT = "/opt/spack/share/spack/setup-env.sh"
 
@@ -729,6 +733,14 @@ RUN mkdir -p {CONTAINER_SPACK_TEMPLATES_DIR}/modules
 RUN cat > {CONTAINER_SPACK_TEMPLATES_DIR}/modules/relocatable_modulefile.lua << 'MODULE_TEMPLATE_EOF'
 {module_template_content}
 MODULE_TEMPLATE_EOF
+
+# Trust Slurm Factory GPG public key for verifying signed buildcache packages
+RUN bash -c 'source {SPACK_SETUP_SCRIPT} && \\
+    wget -q {SLURM_FACTORY_GPG_PUBLIC_KEY_URL} -O /tmp/vantage-slurm-factory.pub && \\
+    spack gpg trust /tmp/vantage-slurm-factory.pub && \\
+    rm /tmp/vantage-slurm-factory.pub && \\
+    echo "Trusted GPG keys:" && \\
+    spack gpg list'
 
 WORKDIR {CONTAINER_SPACK_PROJECT_DIR}
 
