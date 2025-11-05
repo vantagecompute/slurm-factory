@@ -217,6 +217,13 @@ def build_compiler(
         str | None,
         typer.Option("--signing-key", help="GPG key ID for signing buildcache packages (e.g., '0xKEYID')"),
     ] = None,
+    gpg_private_key: Annotated[
+        str | None,
+        typer.Option(
+            "--gpg-private-key",
+            help="Base64-encoded GPG private key to import into Docker container for signing",
+        ),
+    ] = None,
 ):
     """
     Build a GCC compiler toolchain for use in Slurm builds.
@@ -269,7 +276,7 @@ def build_compiler(
         if signing_key:
             console.print(f"[bold blue]Using GPG signing key: {signing_key}[/bold blue]")
 
-    builder_build_compiler(ctx, compiler_version, no_cache, publish, signing_key)
+    builder_build_compiler(ctx, compiler_version, no_cache, publish, signing_key, gpg_private_key)
 
 
 @app.command("build")

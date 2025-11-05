@@ -79,6 +79,30 @@ jobs:
           aws-region: us-east-1
           role-duration-seconds: 10800  # 3 hours for long-running builds
 
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID secret is not set"
+            exit 1
+          fi
+          
+          # Import the private key
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          
+          # List keys to verify import
+          echo "Imported GPG keys:"
+          gpg --list-secret-keys
+          
+          # Trust the key (required for signing)
+          echo "$GPG_KEY_ID:6:" | gpg --import-ownertrust
+
       - name: Build compiler and publish to buildcache
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}

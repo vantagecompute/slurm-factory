@@ -293,13 +293,14 @@ def create_compiler_package(
     no_cache: bool = False,
     publish: bool = False,
     signing_key: str | None = None,
+    gpg_private_key: str | None = None,
 ) -> None:
     """Create compiler package in a Docker container."""
     console.print("[bold blue]Creating compiler package in Docker container...[/bold blue]")
 
     logger.debug(
         f"Building compiler package: compiler_version={compiler_version}, "
-        f"no_cache={no_cache}, publish={publish}"
+        f"no_cache={no_cache}, publish={publish}, has_gpg_key={gpg_private_key is not None}"
     )
 
     try:
@@ -367,6 +368,7 @@ def create_compiler_package(
                 compiler_version=compiler_version,
                 verbose=verbose,
                 signing_key=signing_key,
+                gpg_private_key=gpg_private_key,
             )
 
         console.print("[bold green]✓ Compiler package built successfully[/bold green]")
@@ -723,6 +725,7 @@ def publish_compiler_to_buildcache(
     compiler_version: str = "13.4.0",
     verbose: bool = False,
     signing_key: str | None = None,
+    gpg_private_key: str | None = None,
 ) -> None:
     """
     Publish compiler binaries to S3 buildcache using spack buildcache push.
@@ -736,6 +739,7 @@ def publish_compiler_to_buildcache(
         compiler_version: GCC compiler version
         verbose: Whether to show detailed output
         signing_key: Optional GPG key ID for signing packages (e.g., "0xKEYID")
+        gpg_private_key: Optional GPG private key (base64 encoded) to import into container
 
     """
     console.print("[bold blue]Publishing compiler to S3 buildcache...[/bold blue]")
@@ -795,23 +799,41 @@ def publish_compiler_to_buildcache(
         if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
 
-        # Add image and command
-        cmd.extend(
+        # Build the bash script to run in the container
+        bash_script_parts = ["source /opt/spack/share/spack/setup-env.sh"]
+
+        # If GPG private key is provided, import it before running buildcache commands
+        if gpg_private_key:
+            logger.debug("Importing GPG private key into container")
+            bash_script_parts.extend(
+                [
+                    # Decode and import the GPG key
+                    f'echo "{gpg_private_key}" | base64 -d | gpg --import',
+                    # Trust the imported key
+                    'gpg --list-keys --with-colons | grep "^pub" | cut -d: -f5 | '
+                    'xargs -I {} sh -c \'echo "{}:6:" | gpg --import-ownertrust\'',
+                ]
+            )
+
+        # Add the buildcache push commands
+        bash_script_parts.extend(
             [
-                image_tag,
-                "bash",
-                "-c",
-                f"source /opt/spack/share/spack/setup-env.sh && "
-                f"cd /root/compiler-bootstrap && "
-                f"spack mirror add --scope site s3-buildcache {s3_mirror_url} && "
+                "cd /root/compiler-bootstrap",
+                f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 f"spack -e . buildcache push {signing_flags} --update-index "
-                f"--without-build-dependencies s3-buildcache && "
+                f"--without-build-dependencies s3-buildcache",
                 f"spack buildcache push {signing_flags} --update-index "
-                f"--without-build-dependencies s3-buildcache gcc-runtime@{compiler_version} && "
+                f"--without-build-dependencies s3-buildcache gcc-runtime@{compiler_version}",
                 f"spack buildcache push {signing_flags} --update-index "
                 f"--without-build-dependencies s3-buildcache compiler-wrapper@1.0",
             ]
         )
+
+        # Join the script parts with &&
+        bash_script = " && ".join(bash_script_parts)
+
+        # Add image and command
+        cmd.extend([image_tag, "bash", "-c", bash_script])
 
         if verbose:
             console.print("[dim]Running spack buildcache push in container with AWS credentials[/dim]")
