@@ -790,11 +790,11 @@ def publish_compiler_to_buildcache(
                 f"source /opt/spack/share/spack/setup-env.sh && "
                 f"cd /root/compiler-bootstrap && "
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url} && "
-                f"spack -e . buildcache push --unsigned --update-index "
+                f"spack -e . buildcache push --update-index "
                 f"--without-build-dependencies s3-buildcache && "
-                f"spack buildcache push --unsigned --update-index "
+                f"spack buildcache push --update-index "
                 f"--without-build-dependencies s3-buildcache gcc-runtime@{compiler_version} && "
-                f"spack buildcache push --unsigned --update-index "
+                f"spack buildcache push --update-index "
                 f"--without-build-dependencies s3-buildcache compiler-wrapper@1.0",
             ]
         )
@@ -899,15 +899,15 @@ def push_to_buildcache(
         # Determine what to push based on publish_mode
         if publish_mode == "slurm":
             # Push only slurm package
-            push_cmd = "spack buildcache push --unsigned --update-index s3-buildcache slurm"
+            push_cmd = "spack buildcache push --update-index s3-buildcache slurm"
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
             push_cmd = (
-                "spack -e . buildcache push --unsigned --update-index --only dependencies s3-buildcache"
+                "spack -e . buildcache push --update-index --only dependencies s3-buildcache"
             )
         else:  # all
             # Push everything
-            push_cmd = "spack -e . buildcache push --unsigned --update-index s3-buildcache"
+            push_cmd = "spack -e . buildcache push --update-index s3-buildcache"
 
         # Build docker run command with AWS environment variables
         cmd = ["docker", "run", "--rm"]

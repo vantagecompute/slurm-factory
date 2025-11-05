@@ -99,7 +99,20 @@ jobs:
           aws-region: us-east-1
           role-duration-seconds: 10800  # 3 hours for long-running builds
 
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "Setting up GPG signing..."
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          echo "GPG key imported successfully"
+          gpg --list-secret-keys
+
       - name: Build Slurm dependencies and publish to buildcache
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.compiler_version }}..."
           uv run slurm-factory build \
@@ -158,6 +171,10 @@ jobs:
           spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
           spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
           
+          # Trust the GPG signing key
+          echo "Importing GPG public key..."
+          curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub | spack gpg trust
+          
           # List available packages
           echo "Available packages in buildcache:"
           spack buildcache list --allarch | head -30
@@ -165,8 +182,8 @@ jobs:
           # Try to install a common dependency from buildcache only (e.g., openssl, munge)
           echo ""
           echo "Installing sample dependencies from buildcache..."
-          spack install --no-check-signature --cache-only openssl@3: 2>&1 | tail -30 || echo "Note: openssl may not be in buildcache yet"
-          spack install --no-check-signature --cache-only munge 2>&1 | tail -30 || echo "Note: munge may not be in buildcache yet"
+          spack install --cache-only openssl@3: 2>&1 | tail -30 || echo "Note: openssl may not be in buildcache yet"
+          spack install --cache-only munge 2>&1 | tail -30 || echo "Note: munge may not be in buildcache yet"
           
           echo ""
           echo "Buildcache test completed!"
@@ -192,7 +209,8 @@ jobs:
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
-          echo "spack install --no-check-signature <dependency>" >> $GITHUB_STEP_SUMMARY
+          echo "curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub | spack gpg trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   summary:

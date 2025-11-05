@@ -147,7 +147,7 @@ def generate_compiler_bootstrap_config(
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
-                    "signed": False,
+                    "signed": True,
                 },
             },
         }
@@ -612,7 +612,7 @@ def generate_spack_config(
                 # Use slurm-factory buildcache for compiler binaries
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
-                    "signed": False,
+                    "signed": True,
                 },
             },
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected

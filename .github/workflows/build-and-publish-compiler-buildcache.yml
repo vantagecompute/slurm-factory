@@ -79,7 +79,20 @@ jobs:
           aws-region: us-east-1
           role-duration-seconds: 10800  # 3 hours for long-running builds
 
+      - name: Import GPG signing key
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "Setting up GPG signing..."
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
+          echo "GPG key imported successfully"
+          gpg --list-secret-keys
+
       - name: Build compiler and publish to buildcache
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "🔨 Building GCC ${{ matrix.compiler_version }} compiler..."
           uv run slurm-factory build-compiler \
@@ -131,6 +144,10 @@ jobs:
           spack mirror remove slurm-factory-buildcache 2>/dev/null || true
           spack mirror add slurm-factory-buildcache "$MIRROR_URL"
           
+          # Trust the GPG signing key
+          echo "Importing GPG public key..."
+          curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub | spack gpg trust
+          
           # List available packages
           echo "Available packages in buildcache:"
           spack buildcache list --allarch | head -20
@@ -138,7 +155,7 @@ jobs:
           # Try to install GCC from buildcache only
           echo ""
           echo "Installing GCC ${{ matrix.compiler_version }} from buildcache..."
-          spack install --no-check-signature --cache-only gcc@${{ matrix.compiler_version }} 2>&1 | tail -50
+          spack install --cache-only gcc@${{ matrix.compiler_version }} 2>&1 | tail -50
           
           # Verify installation
           echo ""
@@ -180,5 +197,6 @@ jobs:
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "spack mirror add slurm-factory-buildcache ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
-          echo "spack install --no-check-signature gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub | spack gpg trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
