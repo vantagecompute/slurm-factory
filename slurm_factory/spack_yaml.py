@@ -385,7 +385,7 @@ def generate_spack_config(
             "config": {
                 "install_tree": {
                     "root": install_tree_root,
-                    "padded_length": 0,  # Short, portable install paths for relocatability
+                    "padded_length": 128,  # Padding for relocatability when installing from buildcache
                     "projections": {
                         "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
                     },
