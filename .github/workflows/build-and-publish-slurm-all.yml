@@ -100,14 +100,22 @@ jobs:
           role-duration-seconds: 10800  # 3 hours for long-running builds
 
       - name: Build Slurm dependencies and publish to buildcache
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
         run: |
           echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.compiler_version }}..."
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          echo "Using GPG signing key: $GPG_KEY_ID"
           uv run slurm-factory build \
             --slurm-version ${{ matrix.slurm_version }} \
             --compiler-version ${{ matrix.compiler_version }} \
             --gpu \
             --no-cache \
-            --publish=all
+            --publish=all \
+            --signing-key "$GPG_KEY_ID"
 
       - name: Verify buildcache upload
         run: |

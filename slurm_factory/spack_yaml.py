@@ -147,7 +147,7 @@ def generate_compiler_bootstrap_config(
                 "spack-public": {"url": "https://mirror.spack.io", "signed": False},
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
-                    "signed": False,
+                    "signed": True,
                 },
             },
         }
@@ -385,7 +385,12 @@ def generate_spack_config(
             "config": {
                 "install_tree": {
                     "root": install_tree_root,
-                    "padded_length": 0,  # Short, portable install paths for relocatability
+                    # Padding enables buildcache relocation from shorter to longer paths.
+                    # Value is in bytes - reserves space in binaries for install prefix path.
+                    # 128 bytes allows ~50 character path length increase during relocation.
+                    # Fixes CannotGrowString error when extracting packages built with short prefixes.
+                    # Must match or exceed the padding used when creating the buildcache.
+                    "padded_length": 128,
                     "projections": {
                         "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
                     },
@@ -452,7 +457,13 @@ def generate_spack_config(
                     "externals": [{"spec": "findutils@4.9.0", "prefix": "/usr"}],
                     "buildable": False,
                 },
-                "gettext": {"externals": [{"spec": "gettext@0.21", "prefix": "/usr"}], "buildable": False},
+                # Build gettext from source to avoid libstdc++ compatibility issues with older compilers
+                # System gettext's msgfmt may require newer GLIBCXX versions than available in GCC 10.x
+                "gettext": {"buildable": True},
+                # Use system build tools to avoid compiler wrapper issues during configure
+                "libmd": {"externals": [{"spec": "libmd@1.1.0", "prefix": "/usr"}], "buildable": False},
+                "libbsd": {"externals": [{"spec": "libbsd@0.12.1", "prefix": "/usr"}], "buildable": False},
+                "libsigsegv": {"externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}], "buildable": False},
                 "tar": {"externals": [{"spec": "tar@1.34", "prefix": "/usr"}], "buildable": False},
                 # Build xz and bzip2 from source to avoid library version conflicts
                 "xz": {"buildable": True},
@@ -582,6 +593,9 @@ def generate_spack_config(
                         "diffutils",
                         "findutils",
                         "gettext",
+                        "libmd",
+                        "libbsd",
+                        "libsigsegv",
                         "tar",
                         "bison",
                         "flex",
@@ -598,7 +612,7 @@ def generate_spack_config(
                 # Use slurm-factory buildcache for compiler binaries
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
-                    "signed": False,
+                    "signed": True,
                 },
             },
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
