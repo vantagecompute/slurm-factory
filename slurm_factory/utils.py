@@ -795,6 +795,11 @@ def publish_compiler_to_buildcache(
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
 
+        # If GPG private key is provided, pass it as an environment variable
+        if gpg_private_key:
+            cmd.extend(["-e", f"GPG_PRIVATE_KEY={gpg_private_key}"])
+            logger.debug("GPG private key will be imported into container")
+
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
@@ -804,12 +809,11 @@ def publish_compiler_to_buildcache(
 
         # If GPG private key is provided, import it before running buildcache commands
         if gpg_private_key:
-            logger.debug("Importing GPG private key into container")
             bash_script_parts.extend(
                 [
-                    # Decode and import the GPG key
-                    f'echo "{gpg_private_key}" | base64 -d | gpg --import',
-                    # Trust the imported key
+                    # Decode and import the GPG key from environment variable
+                    'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --import',
+                    # Trust the imported key (set ultimate trust)
                     'gpg --list-keys --with-colons | grep "^pub" | cut -d: -f5 | '
                     'xargs -I {} sh -c \'echo "{}:6:" | gpg --import-ownertrust\'',
                 ]
