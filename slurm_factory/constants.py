@@ -247,7 +247,7 @@ def get_spack_build_script(compiler_version: str) -> str:
         cat > spack.yaml << 'COMPILER_ENV_EOF'
 spack:
   specs:
-  - gcc@{compiler_version}
+  - gcc@{compiler_version} languages=c,c++,fortran
   view: /opt/spack-compiler-view
   concretizer:
     unify: false
