@@ -213,6 +213,10 @@ def build_compiler(
     publish: Annotated[
         bool, typer.Option("--publish", help="Publish compiler binaries to S3 buildcache after build")
     ] = False,
+    signing_key: Annotated[
+        str | None,
+        typer.Option("--signing-key", help="GPG key ID for signing buildcache packages (e.g., '0xKEYID')"),
+    ] = None,
 ):
     """
     Build a GCC compiler toolchain for use in Slurm builds.
@@ -235,6 +239,7 @@ def build_compiler(
         slurm-factory build-compiler --compiler-version 14.2.0    # Build gcc 14.2
         slurm-factory build-compiler --compiler-version 10.5.0    # Build gcc 10.5 for RHEL 8
         slurm-factory build-compiler --publish                    # Build and publish to S3 buildcache
+        slurm-factory build-compiler --publish --signing-key 0xKEYID  # Build and publish with signing
         slurm-factory build-compiler --no-cache                   # Build without Docker cache
 
     """
@@ -261,8 +266,10 @@ def build_compiler(
 
     if publish:
         console.print("[bold blue]Will publish compiler to S3 buildcache after build[/bold blue]")
+        if signing_key:
+            console.print(f"[bold blue]Using GPG signing key: {signing_key}[/bold blue]")
 
-    builder_build_compiler(ctx, compiler_version, no_cache, publish)
+    builder_build_compiler(ctx, compiler_version, no_cache, publish, signing_key)
 
 
 @app.command("build")
@@ -311,6 +318,10 @@ def build(
     enable_hierarchy: Annotated[
         bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
     ] = False,
+    signing_key: Annotated[
+        str | None,
+        typer.Option("--signing-key", help="GPG key ID for signing buildcache packages (e.g., '0xKEYID')"),
+    ] = None,
 ):
     """
     Build a specific Slurm version.
@@ -413,6 +424,8 @@ def build(
 
     if publish != "none":
         console.print(f"[bold cyan]Will publish to buildcache: {publish}[/bold cyan]")
+        if signing_key:
+            console.print(f"[bold blue]Using GPG signing key: {signing_key}[/bold blue]")
 
     if enable_hierarchy:
         console.print("[bold cyan]Enabling Core/Compiler/MPI module hierarchy[/bold cyan]")
@@ -428,6 +441,7 @@ def build(
         publish_s3,
         publish,
         enable_hierarchy,
+        signing_key,
     )
 
 

@@ -35,6 +35,7 @@ def build_compiler(
     compiler_version: str = "13.4.0",
     no_cache: bool = False,
     publish: bool = False,
+    signing_key: str | None = None,
 ):
     """Build a GCC compiler toolchain in a Docker container."""
     console = Console()
@@ -96,6 +97,7 @@ def build_compiler(
             verbose=verbose,
             no_cache=no_cache,
             publish=publish,
+            signing_key=signing_key,
         )
         logger.debug("Compiler package creation completed")
         console.print("[bold green]✓ Compiler package created successfully[/bold green]")
@@ -124,6 +126,7 @@ def build(
     enable_hierarchy: Annotated[
         bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
     ] = False,
+    signing_key: str | None = None,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -194,6 +197,7 @@ def build(
             publish_s3=publish_s3,
             publish=publish,
             enable_hierarchy=enable_hierarchy,
+            signing_key=signing_key,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")

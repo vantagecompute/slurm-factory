@@ -292,6 +292,7 @@ def create_compiler_package(
     verbose: bool = False,
     no_cache: bool = False,
     publish: bool = False,
+    signing_key: str | None = None,
 ) -> None:
     """Create compiler package in a Docker container."""
     console.print("[bold blue]Creating compiler package in Docker container...[/bold blue]")
@@ -365,6 +366,7 @@ def create_compiler_package(
                 cache_dir=cache_dir,
                 compiler_version=compiler_version,
                 verbose=verbose,
+                signing_key=signing_key,
             )
 
         console.print("[bold green]✓ Compiler package built successfully[/bold green]")
@@ -395,6 +397,7 @@ def create_slurm_package(
     publish_s3: bool = False,
     publish: str = "none",
     enable_hierarchy: bool = False,
+    signing_key: str | None = None,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
@@ -509,6 +512,7 @@ def create_slurm_package(
                 compiler_version=compiler_version,
                 publish_mode=publish,
                 verbose=verbose,
+                signing_key=signing_key,
             )
 
         console.print("[bold green]✓ Slurm package built successfully[/bold green]")
@@ -718,6 +722,7 @@ def publish_compiler_to_buildcache(
     cache_dir: str,
     compiler_version: str = "13.4.0",
     verbose: bool = False,
+    signing_key: str | None = None,
 ) -> None:
     """
     Publish compiler binaries to S3 buildcache using spack buildcache push.
@@ -730,6 +735,7 @@ def publish_compiler_to_buildcache(
         cache_dir: Base cache directory (not used, kept for compatibility)
         compiler_version: GCC compiler version
         verbose: Whether to show detailed output
+        signing_key: Optional GPG key ID for signing packages (e.g., "0xKEYID")
 
     """
     console.print("[bold blue]Publishing compiler to S3 buildcache...[/bold blue]")
@@ -770,23 +776,20 @@ def publish_compiler_to_buildcache(
     try:
         console.print(f"[dim]Pushing packages to {s3_mirror_url} using spack buildcache push...[/dim]")
 
+        # Determine signing flags
+        if signing_key:
+            signing_flags = f"--key {signing_key}"
+            logger.debug(f"Using GPG signing key: {signing_key}")
+        else:
+            signing_flags = "--unsigned"
+            logger.debug("Publishing unsigned packages")
+
         # Build docker run command with AWS environment variables
         cmd = ["docker", "run", "--rm"]
 
         # Add AWS environment variables
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
-
-        # Pass GPG environment variables if available (for signing buildcache packages)
-        if "GPG_KEY_ID" in os.environ:
-            cmd.extend(["-e", f"GPG_KEY_ID={os.environ['GPG_KEY_ID']}"])
-        if "GPG_PASSPHRASE" in os.environ:
-            cmd.extend(["-e", f"GPG_PASSPHRASE={os.environ['GPG_PASSPHRASE']}"])
-        
-        # Mount GPG home directory if it exists (for accessing signing keys)
-        gpg_home = Path.home() / ".gnupg"
-        if gpg_home.exists():
-            cmd.extend(["-v", f"{gpg_home}:/root/.gnupg:ro"])
 
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:
@@ -801,11 +804,11 @@ def publish_compiler_to_buildcache(
                 f"source /opt/spack/share/spack/setup-env.sh && "
                 f"cd /root/compiler-bootstrap && "
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url} && "
-                f"spack -e . buildcache push --update-index "
+                f"spack -e . buildcache push {signing_flags} --update-index "
                 f"--without-build-dependencies s3-buildcache && "
-                f"spack buildcache push --update-index "
+                f"spack buildcache push {signing_flags} --update-index "
                 f"--without-build-dependencies s3-buildcache gcc-runtime@{compiler_version} && "
-                f"spack buildcache push --update-index "
+                f"spack buildcache push {signing_flags} --update-index "
                 f"--without-build-dependencies s3-buildcache compiler-wrapper@1.0",
             ]
         )
@@ -854,6 +857,7 @@ def push_to_buildcache(
     compiler_version: str,
     publish_mode: str = "all",
     verbose: bool = False,
+    signing_key: str | None = None,
 ) -> None:
     """
     Push Slurm specs to buildcache using spack buildcache push.
@@ -867,6 +871,7 @@ def push_to_buildcache(
         compiler_version: GCC compiler version
         publish_mode: What to publish - "slurm", "deps", or "all"
         verbose: Whether to show detailed output
+        signing_key: Optional GPG key ID for signing packages (e.g., "0xKEYID")
 
     """
     console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
@@ -907,18 +912,26 @@ def push_to_buildcache(
     try:
         console.print(f"[dim]Pushing packages to {s3_mirror_url}...[/dim]")
 
+        # Determine signing flags
+        if signing_key:
+            signing_flags = f"--key {signing_key}"
+            logger.debug(f"Using GPG signing key: {signing_key}")
+        else:
+            signing_flags = "--unsigned"
+            logger.debug("Publishing unsigned packages")
+
         # Determine what to push based on publish_mode
         if publish_mode == "slurm":
             # Push only slurm package
-            push_cmd = "spack buildcache push --update-index s3-buildcache slurm"
+            push_cmd = f"spack buildcache push {signing_flags} --update-index s3-buildcache slurm"
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
             push_cmd = (
-                "spack -e . buildcache push --update-index --only dependencies s3-buildcache"
+                f"spack -e . buildcache push {signing_flags} --update-index --only dependencies s3-buildcache"
             )
         else:  # all
             # Push everything
-            push_cmd = "spack -e . buildcache push --update-index s3-buildcache"
+            push_cmd = f"spack -e . buildcache push {signing_flags} --update-index s3-buildcache"
 
         # Build docker run command with AWS environment variables
         cmd = ["docker", "run", "--rm"]
@@ -926,17 +939,6 @@ def push_to_buildcache(
         # Add AWS environment variables
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
-
-        # Pass GPG environment variables if available (for signing buildcache packages)
-        if "GPG_KEY_ID" in os.environ:
-            cmd.extend(["-e", f"GPG_KEY_ID={os.environ['GPG_KEY_ID']}"])
-        if "GPG_PASSPHRASE" in os.environ:
-            cmd.extend(["-e", f"GPG_PASSPHRASE={os.environ['GPG_PASSPHRASE']}"])
-        
-        # Mount GPG home directory if it exists (for accessing signing keys)
-        gpg_home = Path.home() / ".gnupg"
-        if gpg_home.exists():
-            cmd.extend(["-v", f"{gpg_home}:/root/.gnupg:ro"])
 
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:

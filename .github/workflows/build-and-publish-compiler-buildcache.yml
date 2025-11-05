@@ -79,33 +79,20 @@ jobs:
           aws-region: us-east-1
           role-duration-seconds: 10800  # 3 hours for long-running builds
 
-      - name: Import GPG signing key
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: |
-          echo "Setting up GPG signing..."
-          if [ -z "$GPG_PRIVATE_KEY" ]; then
-            echo "Error: GPG_PRIVATE_KEY is not set"
-            exit 1
-          fi
-          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --pinentry-mode loopback --import
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to import GPG private key"
-            exit 1
-          fi
-          echo "GPG key imported successfully"
-          gpg --list-secret-keys
-
       - name: Build compiler and publish to buildcache
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "🔨 Building GCC ${{ matrix.compiler_version }} compiler..."
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          echo "Using GPG signing key: $GPG_KEY_ID"
           uv run slurm-factory build-compiler \
             --compiler-version ${{ matrix.compiler_version }} \
-            --publish
+            --publish \
+            --signing-key "$GPG_KEY_ID"
 
       - name: Verify buildcache upload
         run: |
@@ -152,20 +139,6 @@ jobs:
           spack mirror remove slurm-factory-buildcache 2>/dev/null || true
           spack mirror add slurm-factory-buildcache "$MIRROR_URL"
           
-          # Trust the GPG signing key
-          echo "Importing GPG public key..."
-          curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub -o /tmp/vantage-key.pub
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to download GPG public key"
-            exit 1
-          fi
-          spack gpg trust /tmp/vantage-key.pub
-          if [ $? -ne 0 ]; then
-            echo "Error: Failed to trust GPG public key"
-            exit 1
-          fi
-          rm /tmp/vantage-key.pub
-          
           # List available packages
           echo "Available packages in buildcache:"
           spack buildcache list --allarch | head -20
@@ -173,7 +146,7 @@ jobs:
           # Try to install GCC from buildcache only
           echo ""
           echo "Installing GCC ${{ matrix.compiler_version }} from buildcache..."
-          spack install --cache-only gcc@${{ matrix.compiler_version }} 2>&1 | tail -50
+          spack install --no-check-signature --cache-only gcc@${{ matrix.compiler_version }} 2>&1 | tail -50
           
           # Verify installation
           echo ""
@@ -215,8 +188,5 @@ jobs:
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "spack mirror add slurm-factory-buildcache ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
-          echo "# Import and trust the GPG signing key" >> $GITHUB_STEP_SUMMARY
-          echo "curl -sL https://slurm-factory-spack-binary-cache.vantagecompute.ai/keys/vantage-slurm-factory.pub -o vantage-key.pub" >> $GITHUB_STEP_SUMMARY
-          echo "spack gpg trust vantage-key.pub" >> $GITHUB_STEP_SUMMARY
-          echo "spack install gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "spack install --no-check-signature gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
