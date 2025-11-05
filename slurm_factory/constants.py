@@ -287,7 +287,7 @@ COMPILER_ENV_EOF
         spack compiler info gcc@{compiler_version}
         echo '==> Fixing compiler configuration to prevent None values in compiler paths...'
         # Fix any None values in compiler configuration that cause deprecation warnings
-        # In Spack v1.0.0, compilers are stored in packages.yaml with extra_attributes
+        # In Spack v1.0.0, compilers registered with --scope site are stored in packages.yaml
         SPACK_ROOT=$(spack location -r)
         COMPILERS_FILE="$SPACK_ROOT/etc/spack/packages.yaml"
         echo "Editing: $COMPILERS_FILE"
@@ -298,91 +298,79 @@ COMPILER_ENV_EOF
 import yaml
 import sys
 import os
-import glob
 
 compiler_version = '{compiler_version}'
-fixed = False
+compiler_file = os.environ.get('COMPILERS_FILE')
 
-# Try to fix compiler configuration in multiple possible locations
-config_files = [
-    os.environ.get('COMPILERS_FILE', '/opt/spack/etc/spack/packages.yaml'),
-    '/opt/spack/etc/spack/linux/compilers.yaml',
-    '/opt/spack/etc/spack/compilers.yaml',
-]
+if not compiler_file:
+    print("ERROR: COMPILERS_FILE environment variable not set", file=sys.stderr)
+    sys.exit(1)
 
-for compiler_file in config_files:
-    if not os.path.exists(compiler_file):
-        continue
+if not os.path.exists(compiler_file):
+    print(f"WARNING: Compiler file does not exist: {{compiler_file}}", file=sys.stderr)
+    sys.exit(0)
+
+def fix_compiler_paths(paths_dict, base_path='/opt/spack-compiler-view/bin'):
+    '''Fix None or 'None' string values in compiler paths.'''
+    changed = False
+    if paths_dict.get('cc') is None or paths_dict.get('cc') == 'None':
+        paths_dict['cc'] = base_path + '/gcc'
+        changed = True
+    if paths_dict.get('cxx') is None or paths_dict.get('cxx') == 'None':
+        paths_dict['cxx'] = base_path + '/g++'
+        changed = True
+    if paths_dict.get('f77') is None or paths_dict.get('f77') == 'None':
+        paths_dict['f77'] = base_path + '/gfortran'
+        changed = True
+    if paths_dict.get('fc') is None or paths_dict.get('fc') == 'None':
+        paths_dict['fc'] = base_path + '/gfortran'
+        changed = True
+    return changed
+
+try:
+    with open(compiler_file, 'r') as f:
+        config = yaml.safe_load(f)
     
-    try:
-        with open(compiler_file, 'r') as f:
-            config = yaml.safe_load(f)
-        
-        if config is None:
-            continue
-        
-        # Handle packages.yaml format (extra_attributes with compilers)
-        if 'packages' in config and 'gcc' in config['packages']:
-            gcc_config = config['packages']['gcc']
-            if 'externals' in gcc_config:
-                for external in gcc_config['externals']:
-                    if 'extra_attributes' in external:
-                        compilers = external['extra_attributes'].get('compilers', [])
-                        for compiler in compilers:
-                            if 'compiler' in compiler:
-                                comp = compiler['compiler']
-                                spec = comp.get('spec', '')
-                                if f'gcc@{{compiler_version}}' in spec:
-                                    # Ensure all paths are set to strings, not None
-                                    if 'paths' in comp:
-                                        paths = comp['paths']
-                                        # Set paths explicitly, converting None to proper path
-                                        base_path = '/opt/spack-compiler-view/bin'
-                                        if paths.get('cc') is None or paths.get('cc') == 'None':
-                                            paths['cc'] = base_path + '/gcc'
-                                        if paths.get('cxx') is None or paths.get('cxx') == 'None':
-                                            paths['cxx'] = base_path + '/g++'
-                                        if paths.get('f77') is None or paths.get('f77') == 'None':
-                                            paths['f77'] = base_path + '/gfortran'
-                                        if paths.get('fc') is None or paths.get('fc') == 'None':
-                                            paths['fc'] = base_path + '/gfortran'
-                                        print(f"Fixed compiler paths in {{compiler_file}}: {{paths}}", file=sys.stderr)
+    if config is None:
+        print(f"WARNING: Empty config file: {{compiler_file}}", file=sys.stderr)
+        sys.exit(0)
+    
+    fixed = False
+    
+    # Handle packages.yaml format (extra_attributes with compilers)
+    # This is where Spack v1.0.0 stores compilers registered with --scope site
+    if 'packages' in config and 'gcc' in config['packages']:
+        gcc_config = config['packages']['gcc']
+        if 'externals' in gcc_config:
+            for external in gcc_config['externals']:
+                if 'extra_attributes' in external:
+                    compilers = external['extra_attributes'].get('compilers', [])
+                    for compiler in compilers:
+                        if 'compiler' in compiler:
+                            comp = compiler['compiler']
+                            spec = comp.get('spec', '')
+                            if f'gcc@{{compiler_version}}' in spec:
+                                # Fix both None values and 'None' strings in compiler paths
+                                if 'paths' in comp:
+                                    if fix_compiler_paths(comp['paths']):
+                                        print(f"Fixed compiler paths: {{comp['paths']}}", file=sys.stderr)
                                         fixed = True
-        
-        # Handle compilers.yaml format (standard compilers list)
-        if 'compilers' in config:
-            for compiler_entry in config['compilers']:
-                if 'compiler' in compiler_entry:
-                    comp = compiler_entry['compiler']
-                    spec = comp.get('spec', '')
-                    if f'gcc@{{compiler_version}}' in spec or f'gcc@={{compiler_version}}' in spec:
-                        if 'paths' in comp:
-                            paths = comp['paths']
-                            base_path = '/opt/spack-compiler-view/bin'
-                            if paths.get('cc') is None or paths.get('cc') == 'None':
-                                paths['cc'] = base_path + '/gcc'
-                            if paths.get('cxx') is None or paths.get('cxx') == 'None':
-                                paths['cxx'] = base_path + '/g++'
-                            if paths.get('f77') is None or paths.get('f77') == 'None':
-                                paths['f77'] = base_path + '/gfortran'
-                            if paths.get('fc') is None or paths.get('fc') == 'None':
-                                paths['fc'] = base_path + '/gfortran'
-                            print(f"Fixed compiler paths in {{compiler_file}}: {{paths}}", file=sys.stderr)
-                            fixed = True
-        
+    
+    if fixed:
         # Write back the fixed configuration
         with open(compiler_file, 'w') as f:
             yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        print("✓ Compiler configuration fixed for None values", file=sys.stderr)
+    else:
+        print("No None values found in compiler paths (or compiler not found in config)", file=sys.stderr)
         
-    except Exception as e:
-        print(f"Warning: Error processing {{compiler_file}}: {{e}}", file=sys.stderr)
-        continue
-
-if fixed:
-    print("✓ Compiler configuration fixed for None values", file=sys.stderr)
-else:
-    print("Warning: Could not find compiler configuration to fix. Continuing anyway...", file=sys.stderr)
+except Exception as e:
+    print(f"Warning: Error processing {{compiler_file}}: {{e}}", file=sys.stderr)
+    import traceback
+    traceback.print_exc(file=sys.stderr)
+    print("Continuing anyway...", file=sys.stderr)
 PYEOF
+        export COMPILERS_FILE
         python3 /tmp/fix_compiler_config.py
         echo '==> Adding library paths and RPATHs to compiler configuration...'
         # Add environment, extra_rpaths, and flags sections inside extra_attributes
