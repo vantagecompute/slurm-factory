@@ -16,24 +16,21 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from slurm_factory import constants
 
 
+def _assert_gcc_has_languages_variant(version: str, script: str) -> None:
+    """Helper to check if GCC spec includes languages variant."""
+    expected = f"gcc@{version} languages=c,c++,fortran"
+    assert expected in script, \
+        f"GCC spec for version {version} should include explicit languages variant"
+    print(f"✓ GCC {version} spec includes languages variant")
+
+
 def test_gcc_languages_variant_in_build_script():
     """Test that GCC spec includes explicit languages variant"""
-    
-    # Get the build script for GCC 13.4.0
-    script = constants.get_spack_build_script("13.4.0")
-    
-    # Check that the GCC spec includes the languages variant
-    assert "gcc@13.4.0 languages=c,c++,fortran" in script, \
-        "GCC spec should include explicit languages variant"
-    
-    print("✓ GCC spec includes languages=c,c++,fortran variant")
     
     # Test all supported compiler versions from COMPILER_TOOLCHAINS
     for version in constants.COMPILER_TOOLCHAINS.keys():
         script = constants.get_spack_build_script(version)
-        assert f"gcc@{version} languages=c,c++,fortran" in script, \
-            f"GCC spec for version {version} should include explicit languages variant"
-        print(f"✓ GCC {version} spec includes languages variant")
+        _assert_gcc_has_languages_variant(version, script)
     
     print(f"\n✅ All {len(constants.COMPILER_TOOLCHAINS)} supported GCC versions tested!")
     print("This fix ensures that GCC specs have the languages variant set,")
