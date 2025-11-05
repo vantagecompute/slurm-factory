@@ -93,8 +93,8 @@ jobs:
             exit 1
           fi
           
-          # Import the private key
-          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          # Import the private key (base64 decode first)
+          echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --import
           
           # List keys to verify import
           echo "Imported GPG keys:"
