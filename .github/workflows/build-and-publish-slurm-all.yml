@@ -99,13 +99,34 @@ jobs:
           aws-region: us-east-1
           role-duration-seconds: 10800  # 3 hours for long-running builds
 
+      - name: Validate GPG secrets
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID secret is not set"
+            exit 1
+          fi
+          echo "✓ GPG secrets are configured"
+          echo "  GPG_KEY_ID: $GPG_KEY_ID"
+
       - name: Build Slurm dependencies and publish to buildcache
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
         run: |
           echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.compiler_version }}..."
           if [ -z "$GPG_KEY_ID" ]; then
             echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY is not set. Signed packages are required for publishing."
             exit 1
           fi
           echo "Using GPG signing key: $GPG_KEY_ID"
@@ -115,7 +136,8 @@ jobs:
             --gpu \
             --no-cache \
             --publish=all \
-            --signing-key "$GPG_KEY_ID"
+            --signing-key "$GPG_KEY_ID" \
+            --gpg-private-key "$GPG_PRIVATE_KEY"
 
       - name: Verify buildcache upload
         run: |

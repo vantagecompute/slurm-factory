@@ -329,6 +329,13 @@ def build(
         str | None,
         typer.Option("--signing-key", help="GPG key ID for signing buildcache packages (e.g., '0xKEYID')"),
     ] = None,
+    gpg_private_key: Annotated[
+        str | None,
+        typer.Option(
+            "--gpg-private-key",
+            help="Base64-encoded GPG private key to import into Docker container for signing",
+        ),
+    ] = None,
 ):
     """
     Build a specific Slurm version.
@@ -449,6 +456,7 @@ def build(
         publish,
         enable_hierarchy,
         signing_key,
+        gpg_private_key,
     )
 
 

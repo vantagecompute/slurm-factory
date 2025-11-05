@@ -400,6 +400,7 @@ def create_slurm_package(
     publish: str = "none",
     enable_hierarchy: bool = False,
     signing_key: str | None = None,
+    gpg_private_key: str | None = None,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
@@ -515,6 +516,7 @@ def create_slurm_package(
                 publish_mode=publish,
                 verbose=verbose,
                 signing_key=signing_key,
+                gpg_private_key=gpg_private_key,
             )
 
         console.print("[bold green]✓ Slurm package built successfully[/bold green]")
@@ -811,11 +813,11 @@ def publish_compiler_to_buildcache(
         if gpg_private_key:
             bash_script_parts.extend(
                 [
-                    # Decode and import the GPG key from environment variable
-                    'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --import',
+                    # Decode and import the GPG key from environment variable (batch mode, no TTY)
+                    'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --no-tty --import',
                     # Trust the imported key (set ultimate trust)
                     'gpg --list-keys --with-colons | grep "^pub" | cut -d: -f5 | '
-                    'xargs -I {} sh -c \'echo "{}:6:" | gpg --import-ownertrust\'',
+                    'xargs -I {} sh -c \'echo "{}:6:" | gpg --batch --no-tty --import-ownertrust\'',
                 ]
             )
 
@@ -884,6 +886,7 @@ def push_to_buildcache(
     publish_mode: str = "all",
     verbose: bool = False,
     signing_key: str | None = None,
+    gpg_private_key: str | None = None,
 ) -> None:
     """
     Push Slurm specs to buildcache using spack buildcache push.
@@ -898,6 +901,7 @@ def push_to_buildcache(
         publish_mode: What to publish - "slurm", "deps", or "all"
         verbose: Whether to show detailed output
         signing_key: Optional GPG key ID for signing packages (e.g., "0xKEYID")
+        gpg_private_key: Optional GPG private key (base64 encoded) to import into container
 
     """
     console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
@@ -966,23 +970,45 @@ def push_to_buildcache(
         for key, value in aws_env.items():
             cmd.extend(["-e", f"{key}={value}"])
 
+        # If GPG private key is provided, pass it as an environment variable
+        if gpg_private_key:
+            cmd.extend(["-e", f"GPG_PRIVATE_KEY={gpg_private_key}"])
+            logger.debug("GPG private key will be imported into container")
+
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
 
-        # Add image and command
-        cmd.extend(
+        # Build the bash script to run in the container
+        bash_script_parts = ["source /opt/spack/share/spack/setup-env.sh"]
+
+        # If GPG private key is provided, import it before running buildcache commands
+        if gpg_private_key:
+            bash_script_parts.extend(
+                [
+                    # Decode and import the GPG key from environment variable (batch mode, no TTY)
+                    'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --no-tty --import',
+                    # Trust the imported key (set ultimate trust)
+                    'gpg --list-keys --with-colons | grep "^pub" | cut -d: -f5 | '
+                    'xargs -I {} sh -c \'echo "{}:6:" | gpg --batch --no-tty --import-ownertrust\'',
+                ]
+            )
+
+        # Add spack environment and buildcache commands
+        bash_script_parts.extend(
             [
-                image_tag,
-                "bash",
-                "-c",
-                f"source /opt/spack/share/spack/setup-env.sh && "
-                f"cd /root/spack-project && "
-                f"spack env activate . && "
-                f"spack mirror add --scope site s3-buildcache {s3_mirror_url} && "
-                f"{push_cmd}",
+                "cd /root/spack-project",
+                "spack env activate .",
+                f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
+                push_cmd,
             ]
         )
+
+        # Join the script parts with &&
+        bash_script = " && ".join(bash_script_parts)
+
+        # Add image and command
+        cmd.extend([image_tag, "bash", "-c", bash_script])
 
         if verbose:
             console.print("[dim]Running spack buildcache push in container with AWS credentials[/dim]")

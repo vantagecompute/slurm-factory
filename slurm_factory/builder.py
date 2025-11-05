@@ -129,6 +129,7 @@ def build(
         bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
     ] = False,
     signing_key: str | None = None,
+    gpg_private_key: str | None = None,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -200,6 +201,7 @@ def build(
             publish=publish,
             enable_hierarchy=enable_hierarchy,
             signing_key=signing_key,
+            gpg_private_key=gpg_private_key,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")
