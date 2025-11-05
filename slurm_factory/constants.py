@@ -168,7 +168,7 @@ def get_install_system_deps_script() -> str:
         lmod \\
         ca-certificates \\
         wget && \\
-        python3 -m pip install --break-system-packages boto3 && \\
+        python3 -m pip install --break-system-packages boto3 pyyaml && \\
         apt-get clean && rm -rf /var/lib/apt/lists/*
     """).strip()
 
@@ -268,7 +268,7 @@ COMPILER_ENV_EOF
         export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Detecting newly installed GCC compiler...'
-        spack compiler find --scope site /opt/spack-compiler-view
+        spack compiler find --scope site /opt/spack-compiler-view/bin
         echo '==> Removing any auto-detected system compilers...'
         for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
                 grep gcc@ | awk '{{print $1}}'); do
@@ -285,14 +285,63 @@ COMPILER_ENV_EOF
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
         spack compiler info gcc@{compiler_version}
-        echo '==> Fixing compiler configuration with library paths and RPATHs...'
-        # Directly edit packages.yaml using sed (no Python dependencies needed)
-        # NOTE: In Spack v1.0.0, compilers are stored in packages.yaml instead of compilers.yaml
+        echo '==> Fixing compiler configuration to prevent None values in compiler paths...'
+        # Fix any None values in compiler configuration that cause deprecation warnings
+        # In Spack v1.0.0, compilers are stored in packages.yaml with extra_attributes
         SPACK_ROOT=$(spack location -r)
         COMPILERS_FILE="$SPACK_ROOT/etc/spack/packages.yaml"
         echo "Editing: $COMPILERS_FILE"
         # Backup original
         cp "$COMPILERS_FILE" "${{COMPILERS_FILE}}.bak"
+        # Use Python to fix None values in compiler paths
+        cat > /tmp/fix_compiler_config.py << 'PYEOF'
+import yaml
+import sys
+import os
+
+compiler_file = os.environ.get('COMPILERS_FILE', '/opt/spack/etc/spack/packages.yaml')
+compiler_version = '{compiler_version}'
+try:
+    with open(compiler_file, 'r') as f:
+        config = yaml.safe_load(f)
+    
+    # Find and fix the gcc@compiler_version compiler configuration
+    if 'packages' in config and 'gcc' in config['packages']:
+        gcc_config = config['packages']['gcc']
+        if 'externals' in gcc_config:
+            for external in gcc_config['externals']:
+                if 'extra_attributes' in external:
+                    compilers = external['extra_attributes'].get('compilers', [])
+                    for compiler in compilers:
+                        if 'compiler' in compiler:
+                            comp = compiler['compiler']
+                            spec = comp.get('spec', '')
+                            if f'gcc@{{compiler_version}}' in spec:
+                                # Ensure all paths are set to strings, not None
+                                if 'paths' in comp:
+                                    paths = comp['paths']
+                                    # Set paths explicitly, converting None to proper path
+                                    base_path = '/opt/spack-compiler-view/bin'
+                                    if paths.get('cc') is None or paths.get('cc') == 'None':
+                                        paths['cc'] = base_path + '/gcc'
+                                    if paths.get('cxx') is None or paths.get('cxx') == 'None':
+                                        paths['cxx'] = base_path + '/g++'
+                                    if paths.get('f77') is None or paths.get('f77') == 'None':
+                                        paths['f77'] = base_path + '/gfortran'
+                                    if paths.get('fc') is None or paths.get('fc') == 'None':
+                                        paths['fc'] = base_path + '/gfortran'
+                                    print(f"Fixed compiler paths: {{paths}}", file=sys.stderr)
+    
+    # Write back the fixed configuration
+    with open(compiler_file, 'w') as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+    print("✓ Compiler configuration fixed for None values", file=sys.stderr)
+except Exception as e:
+    print(f"Warning: Could not fix compiler configuration: {{e}}", file=sys.stderr)
+    print("Continuing anyway...", file=sys.stderr)
+PYEOF
+        python3 /tmp/fix_compiler_config.py
+        echo '==> Adding library paths and RPATHs to compiler configuration...'
         # Add environment, extra_rpaths, and flags sections inside extra_attributes
         # This uses sed to insert YAML configuration directly
         cat > /tmp/compiler_additions.yaml << 'ADDEOF'
