@@ -385,7 +385,12 @@ def generate_spack_config(
             "config": {
                 "install_tree": {
                     "root": install_tree_root,
-                    "padded_length": 0,  # Short, portable install paths for relocatability
+                    # Padding enables buildcache relocation from shorter to longer paths.
+                    # Value is in bytes - reserves space in binaries for install prefix path.
+                    # 128 bytes allows ~50 character path length increase during relocation.
+                    # Fixes CannotGrowString error when extracting packages built with short prefixes.
+                    # Must match or exceed the padding used when creating the buildcache.
+                    "padded_length": 128,
                     "projections": {
                         "all": "{name}-{version}-{hash:7}"  # Short paths for better relocatability
                     },
