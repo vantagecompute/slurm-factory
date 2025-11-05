@@ -298,47 +298,90 @@ COMPILER_ENV_EOF
 import yaml
 import sys
 import os
+import glob
 
-compiler_file = os.environ.get('COMPILERS_FILE', '/opt/spack/etc/spack/packages.yaml')
 compiler_version = '{compiler_version}'
-try:
-    with open(compiler_file, 'r') as f:
-        config = yaml.safe_load(f)
+fixed = False
+
+# Try to fix compiler configuration in multiple possible locations
+config_files = [
+    os.environ.get('COMPILERS_FILE', '/opt/spack/etc/spack/packages.yaml'),
+    '/opt/spack/etc/spack/linux/compilers.yaml',
+    '/opt/spack/etc/spack/compilers.yaml',
+]
+
+for compiler_file in config_files:
+    if not os.path.exists(compiler_file):
+        continue
     
-    # Find and fix the gcc@compiler_version compiler configuration
-    if 'packages' in config and 'gcc' in config['packages']:
-        gcc_config = config['packages']['gcc']
-        if 'externals' in gcc_config:
-            for external in gcc_config['externals']:
-                if 'extra_attributes' in external:
-                    compilers = external['extra_attributes'].get('compilers', [])
-                    for compiler in compilers:
-                        if 'compiler' in compiler:
-                            comp = compiler['compiler']
-                            spec = comp.get('spec', '')
-                            if f'gcc@{{compiler_version}}' in spec:
-                                # Ensure all paths are set to strings, not None
-                                if 'paths' in comp:
-                                    paths = comp['paths']
-                                    # Set paths explicitly, converting None to proper path
-                                    base_path = '/opt/spack-compiler-view/bin'
-                                    if paths.get('cc') is None or paths.get('cc') == 'None':
-                                        paths['cc'] = base_path + '/gcc'
-                                    if paths.get('cxx') is None or paths.get('cxx') == 'None':
-                                        paths['cxx'] = base_path + '/g++'
-                                    if paths.get('f77') is None or paths.get('f77') == 'None':
-                                        paths['f77'] = base_path + '/gfortran'
-                                    if paths.get('fc') is None or paths.get('fc') == 'None':
-                                        paths['fc'] = base_path + '/gfortran'
-                                    print(f"Fixed compiler paths: {{paths}}", file=sys.stderr)
-    
-    # Write back the fixed configuration
-    with open(compiler_file, 'w') as f:
-        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+    try:
+        with open(compiler_file, 'r') as f:
+            config = yaml.safe_load(f)
+        
+        if config is None:
+            continue
+        
+        # Handle packages.yaml format (extra_attributes with compilers)
+        if 'packages' in config and 'gcc' in config['packages']:
+            gcc_config = config['packages']['gcc']
+            if 'externals' in gcc_config:
+                for external in gcc_config['externals']:
+                    if 'extra_attributes' in external:
+                        compilers = external['extra_attributes'].get('compilers', [])
+                        for compiler in compilers:
+                            if 'compiler' in compiler:
+                                comp = compiler['compiler']
+                                spec = comp.get('spec', '')
+                                if f'gcc@{{compiler_version}}' in spec:
+                                    # Ensure all paths are set to strings, not None
+                                    if 'paths' in comp:
+                                        paths = comp['paths']
+                                        # Set paths explicitly, converting None to proper path
+                                        base_path = '/opt/spack-compiler-view/bin'
+                                        if paths.get('cc') is None or paths.get('cc') == 'None':
+                                            paths['cc'] = base_path + '/gcc'
+                                        if paths.get('cxx') is None or paths.get('cxx') == 'None':
+                                            paths['cxx'] = base_path + '/g++'
+                                        if paths.get('f77') is None or paths.get('f77') == 'None':
+                                            paths['f77'] = base_path + '/gfortran'
+                                        if paths.get('fc') is None or paths.get('fc') == 'None':
+                                            paths['fc'] = base_path + '/gfortran'
+                                        print(f"Fixed compiler paths in {{compiler_file}}: {{paths}}", file=sys.stderr)
+                                        fixed = True
+        
+        # Handle compilers.yaml format (standard compilers list)
+        if 'compilers' in config:
+            for compiler_entry in config['compilers']:
+                if 'compiler' in compiler_entry:
+                    comp = compiler_entry['compiler']
+                    spec = comp.get('spec', '')
+                    if f'gcc@{{compiler_version}}' in spec or f'gcc@={{compiler_version}}' in spec:
+                        if 'paths' in comp:
+                            paths = comp['paths']
+                            base_path = '/opt/spack-compiler-view/bin'
+                            if paths.get('cc') is None or paths.get('cc') == 'None':
+                                paths['cc'] = base_path + '/gcc'
+                            if paths.get('cxx') is None or paths.get('cxx') == 'None':
+                                paths['cxx'] = base_path + '/g++'
+                            if paths.get('f77') is None or paths.get('f77') == 'None':
+                                paths['f77'] = base_path + '/gfortran'
+                            if paths.get('fc') is None or paths.get('fc') == 'None':
+                                paths['fc'] = base_path + '/gfortran'
+                            print(f"Fixed compiler paths in {{compiler_file}}: {{paths}}", file=sys.stderr)
+                            fixed = True
+        
+        # Write back the fixed configuration
+        with open(compiler_file, 'w') as f:
+            yaml.dump(config, f, default_flow_style=False, sort_keys=False)
+        
+    except Exception as e:
+        print(f"Warning: Error processing {{compiler_file}}: {{e}}", file=sys.stderr)
+        continue
+
+if fixed:
     print("✓ Compiler configuration fixed for None values", file=sys.stderr)
-except Exception as e:
-    print(f"Warning: Could not fix compiler configuration: {{e}}", file=sys.stderr)
-    print("Continuing anyway...", file=sys.stderr)
+else:
+    print("Warning: Could not find compiler configuration to fix. Continuing anyway...", file=sys.stderr)
 PYEOF
         python3 /tmp/fix_compiler_config.py
         echo '==> Adding library paths and RPATHs to compiler configuration...'
