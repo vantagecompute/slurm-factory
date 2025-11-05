@@ -101,7 +101,10 @@ jobs:
           gpg --list-secret-keys
           
           # Trust the key (required for signing)
-          echo "$GPG_KEY_ID:6:" | gpg --import-ownertrust
+          # Remove 0x prefix if present and get the fingerprint
+          KEY_FP=$(gpg --list-keys --with-colons | grep "^fpr" | head -1 | cut -d: -f10)
+          echo "${KEY_FP}:6:" | gpg --import-ownertrust
+          echo "Trusted key: ${KEY_FP}"
 
       - name: Build compiler and publish to buildcache
         env:
