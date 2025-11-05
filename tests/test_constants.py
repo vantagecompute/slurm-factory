@@ -26,7 +26,6 @@ from slurm_factory.constants import (
     CONTAINER_SLURM_DIR,
     CONTAINER_BUILD_OUTPUT_DIR,
     CONTAINER_ROOT_DIR,
-    CONTAINER_SPACK_CACHE_DIR,
     INSTANCE_NAME_PREFIX,
     BUILD_TIMEOUT,
     DOCKER_BUILD_TIMEOUT,
@@ -110,7 +109,6 @@ class TestContainerPaths:
             CONTAINER_SLURM_DIR,
             CONTAINER_BUILD_OUTPUT_DIR,
             CONTAINER_ROOT_DIR,
-            CONTAINER_SPACK_CACHE_DIR,
         ]
         
         for path in paths:
@@ -200,7 +198,7 @@ class TestScriptTemplates:
         assert compiler_version in script
         
         # Test that it creates a dedicated compiler environment
-        assert "Creating temporary environment to install GCC compiler from buildcache" in script
+        assert "Creating temporary environment to install GCC compiler" in script
         assert "mkdir -p /tmp/compiler-install" in script
         assert "cd /tmp/compiler-install" in script
         
@@ -283,8 +281,8 @@ class TestScriptTemplates:
         # Verify old code is not present
         assert "spack -e . compiler find --scope site" not in dockerfile
         
-        # Test that gcc-runtime installation is present
-        assert "spack install gcc-runtime@13.4.0 %gcc@13.4.0" in dockerfile
+        # Verify note about gcc-runtime not being built in compiler stage
+        assert "We do NOT build gcc-runtime or compiler-wrapper here!" in dockerfile
 
 
 class TestConstantTypes:
@@ -324,7 +322,6 @@ class TestConstantValidation:
             CONTAINER_SLURM_DIR,
             CONTAINER_BUILD_OUTPUT_DIR,
             CONTAINER_ROOT_DIR,
-            CONTAINER_SPACK_CACHE_DIR,
             SPACK_SETUP_SCRIPT,
         ]
         
@@ -346,7 +343,6 @@ class TestConstantValidation:
             CONTAINER_SLURM_DIR,
             CONTAINER_BUILD_OUTPUT_DIR,
             CONTAINER_ROOT_DIR,
-            CONTAINER_SPACK_CACHE_DIR,
         ]
         
         for path in path_constants:

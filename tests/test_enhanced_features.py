@@ -132,11 +132,12 @@ class TestEnhancedRPATH:
         assert shared_linking["missing_library_policy"] == "warn"
 
     def test_ccache_enabled(self):
-        """Test that ccache is enabled for faster rebuilds."""
+        """Test that ccache is disabled (incompatible with Spack-built compilers)."""
         config = generate_spack_config()
         spack_config = config["spack"]["config"]
         
-        assert spack_config["ccache"] is True
+        # ccache is disabled because system ccache is incompatible with Spack-built compilers
+        assert spack_config["ccache"] is False
 
     def test_additional_config_options(self):
         """Test additional Spack 1.x config options."""

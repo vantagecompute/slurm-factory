@@ -36,6 +36,7 @@ def build_compiler(
     no_cache: bool = False,
     publish: bool = False,
     signing_key: str | None = None,
+    gpg_private_key: str | None = None,
 ):
     """Build a GCC compiler toolchain in a Docker container."""
     console = Console()
@@ -46,7 +47,7 @@ def build_compiler(
 
     logger.debug(
         f"Starting compiler build with parameters: compiler_version={compiler_version}, "
-        f"no_cache={no_cache}, publish={publish}"
+        f"no_cache={no_cache}, publish={publish}, has_gpg_key={gpg_private_key is not None}"
     )
     logger.debug(f"Verbose mode: {verbose}")
 
@@ -98,6 +99,7 @@ def build_compiler(
             no_cache=no_cache,
             publish=publish,
             signing_key=signing_key,
+            gpg_private_key=gpg_private_key,
         )
         logger.debug("Compiler package creation completed")
         console.print("[bold green]✓ Compiler package created successfully[/bold green]")

@@ -269,7 +269,8 @@ COMPILER_ENV_EOF
         ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
         /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
         echo '==> Setting up compiler runtime library path...'
-        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:\\
+/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Clearing any cached Spack configuration...'
         rm -rf /root/.spack /root/.cache/spack
