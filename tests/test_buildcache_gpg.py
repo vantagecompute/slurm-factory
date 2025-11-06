@@ -85,6 +85,10 @@ class TestGPGKeyImport:
             assert "GPG_TTY" in bash_script
             assert "allow-loopback-pinentry" in bash_script
             assert "gpg-agent.conf" in bash_script
+            assert "gpg.conf" in bash_script
+            assert "private-keys-v1.d" in bash_script
+            assert "chmod 700" in bash_script
+            assert "chmod 1777 /tmp" in bash_script
             assert "--batch" in bash_script
             assert "--yes" in bash_script
             assert "--pinentry-mode loopback" in bash_script
@@ -128,6 +132,10 @@ class TestGPGKeyImport:
             assert "GPG_TTY" in bash_script
             assert "allow-loopback-pinentry" in bash_script
             assert "gpg-agent.conf" in bash_script
+            assert "gpg.conf" in bash_script
+            assert "private-keys-v1.d" in bash_script
+            assert "chmod 700" in bash_script
+            assert "chmod 1777 /tmp" in bash_script
             assert "--batch" in bash_script
             assert "--yes" in bash_script
             assert "--pinentry-mode loopback" in bash_script

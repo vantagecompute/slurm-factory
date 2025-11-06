@@ -813,10 +813,18 @@ def publish_compiler_to_buildcache(
         if gpg_private_key:
             bash_script_parts.extend(
                 [
+                    # Ensure /tmp has proper permissions for GPG temp files
+                    'chmod 1777 /tmp 2>/dev/null || true',
                     # Configure GPG for non-interactive use
                     'export GPG_TTY=$(tty)',
-                    'mkdir -p /opt/spack/opt/spack/gpg',
+                    # Create full GPG directory structure with correct permissions
+                    'mkdir -p /opt/spack/opt/spack/gpg/private-keys-v1.d',
+                    'chmod 700 /opt/spack/opt/spack/gpg',
+                    'chmod 700 /opt/spack/opt/spack/gpg/private-keys-v1.d',
+                    # Configure GPG agent for non-interactive use
                     'echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
+                    # Configure GPG for batch mode with loopback pinentry
+                    'echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf',
                     'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg reloadagent /bye || true',
                     # Import GPG key into Spack's GPG keyring with batch mode
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
@@ -991,10 +999,18 @@ def push_to_buildcache(
         if gpg_private_key:
             bash_script_parts.extend(
                 [
+                    # Ensure /tmp has proper permissions for GPG temp files
+                    'chmod 1777 /tmp 2>/dev/null || true',
                     # Configure GPG for non-interactive use
                     'export GPG_TTY=$(tty)',
-                    'mkdir -p /opt/spack/opt/spack/gpg',
+                    # Create full GPG directory structure with correct permissions
+                    'mkdir -p /opt/spack/opt/spack/gpg/private-keys-v1.d',
+                    'chmod 700 /opt/spack/opt/spack/gpg',
+                    'chmod 700 /opt/spack/opt/spack/gpg/private-keys-v1.d',
+                    # Configure GPG agent for non-interactive use
                     'echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
+                    # Configure GPG for batch mode with loopback pinentry
+                    'echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf',
                     'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg reloadagent /bye || true',
                     # Import GPG key into Spack's GPG keyring with batch mode
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
