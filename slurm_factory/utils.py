@@ -817,7 +817,7 @@ def publish_compiler_to_buildcache(
                     'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --no-tty --import',
                     # Trust the imported key (set ultimate trust using fingerprint)
                     'gpg --list-keys --with-colons | grep "^fpr" | head -1 | cut -d: -f10 | '
-                    'xargs -I {} sh -c \'echo "{}:6:" | gpg --batch --no-tty --import-ownertrust\'',
+                    "xargs -I {} sh -c 'echo \"{}:6:\" | gpg --batch --no-tty --import-ownertrust'",
                 ]
             )
 
@@ -990,7 +990,7 @@ def push_to_buildcache(
                     'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --batch --no-tty --import',
                     # Trust the imported key (set ultimate trust using fingerprint)
                     'gpg --list-keys --with-colons | grep "^fpr" | head -1 | cut -d: -f10 | '
-                    'xargs -I {} sh -c \'echo "{}:6:" | gpg --batch --no-tty --import-ownertrust\'',
+                    "xargs -I {} sh -c 'echo \"{}:6:\" | gpg --batch --no-tty --import-ownertrust'",
                 ]
             )
 
