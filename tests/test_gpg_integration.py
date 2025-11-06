@@ -12,7 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Integration tests for GPG signing in Docker containers.
+"""
+Integration tests for GPG signing in Docker containers.
 
 These tests verify that GPG signing actually works in a real Docker container,
 not just mocked subprocess calls.
@@ -20,8 +21,6 @@ not just mocked subprocess calls.
 
 import base64
 import subprocess
-import tempfile
-from pathlib import Path
 
 import pytest
 
@@ -266,7 +265,8 @@ gpg --homedir /tmp/gpg --batch --gen-key /tmp/gpg-gen.txt 2>&1 || echo "Key gene
 
 # Try to sign something
 echo "test" > /tmp/test.txt
-gpg --homedir /tmp/gpg --batch --yes --clearsign /tmp/test.txt 2>&1 && echo "SUCCESS" || echo "FAILED_AS_EXPECTED"
+gpg --homedir /tmp/gpg --batch --yes --clearsign /tmp/test.txt 2>&1 && \
+    echo "SUCCESS" || echo "FAILED_AS_EXPECTED"
 """
 
         result = subprocess.run(
