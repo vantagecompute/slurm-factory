@@ -78,11 +78,11 @@ setenv("SLURM_ROOT", prefix)
 
 ```bash
 # Default location
-module load slurm/25.05-gcc13.4.0
+module load slurm/25.11-gcc13.4.0
 
 # Custom location
 export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.05-gcc13.4.0
+module load slurm/25.11-gcc13.4.0
 ```
 
 ## Package Structure
@@ -109,7 +109,7 @@ slurm-{version}-gcc{compiler}-software.tar.gz (2-25GB depending on options)
 
 **Package naming examples:**
 
-- `slurm-25.05-gcc13.4.0-software.tar.gz` - Slurm 25.05 with GCC 13.4.0
+- `slurm-25.11-gcc13.4.0-software.tar.gz` - Slurm 25.11 with GCC 13.4.0
 - `slurm-24.11-gcc10.5.0-software.tar.gz` - Slurm 24.11 with GCC 10.5.0  
 - `slurm-23.11-gcc7.5.0-software.tar.gz` - Slurm 23.11 with GCC 7.5.0
 
@@ -134,19 +134,19 @@ Older compilers add build time for initial toolchain bootstrap, but use cached b
 
 ```bash
 # CPU-optimized with default compiler (recommended)
-slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.11
 
 # Specific compiler for RHEL 8 compatibility
-slurm-factory build --slurm-version 25.05 --compiler-version 10.5.0
+slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
 
 # With GPU support (CUDA/ROCm)
-slurm-factory build --slurm-version 25.05 --gpu
+slurm-factory build --slurm-version 25.11 --gpu
 
 # Minimal (Slurm only, no OpenMPI)
-slurm-factory build --slurm-version 25.05 --minimal
+slurm-factory build --slurm-version 25.11 --minimal
 
 # Combined: RHEL 8 with GPU support
-slurm-factory build --slurm-version 25.05 --compiler-version 10.5.0 --gpu
+slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu
 ```
 
 ## Docker Integration

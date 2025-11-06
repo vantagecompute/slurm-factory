@@ -185,10 +185,10 @@ class TestDockerfileBuildScript:
         
     def test_dockerfile_includes_correct_build_script(self):
         """Test that generated Dockerfile includes the corrected build script."""
-        spack_yaml = generate_yaml_string("25.05", compiler_version="13.4.0")
+        spack_yaml = generate_yaml_string("25.11", compiler_version="13.4.0")
         dockerfile = get_dockerfile(
             spack_yaml_content=spack_yaml,
-            version="25.05",
+            version="25.11",
             compiler_version="13.4.0",
         )
         
@@ -208,10 +208,10 @@ class TestCompilerBootstrapIntegration:
 
     def test_full_dockerfile_generation(self):
         """Test complete Dockerfile generation with compiler bootstrap."""
-        spack_yaml = generate_yaml_string("25.05", compiler_version="13.4.0")
+        spack_yaml = generate_yaml_string("25.11", compiler_version="13.4.0")
         dockerfile = get_dockerfile(
             spack_yaml_content=spack_yaml,
-            version="25.05",
+            version="25.11",
             compiler_version="13.4.0",
         )
         

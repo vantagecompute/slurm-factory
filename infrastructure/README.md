@@ -211,7 +211,7 @@ aws s3 sync \
 ```bash
 # Build Slurm using compiler from buildcache
 uv run slurm-factory build \
-  --slurm-version 25.05 \
+  --slurm-version 25.11 \
   --compiler-version 11.5.0 \
   --use-buildcache \
   --enable-buildcache \
@@ -251,7 +251,7 @@ s3://slurm-factory-spack-binary-cache/
 │   ├── 13.4.0/
 │   └── ...
 └── slurm/
-    ├── 25.05/
+    ├── 25.11/
     │   ├── 11.5.0/
     │   └── 13.4.0/
     └── ...

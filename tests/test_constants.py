@@ -44,17 +44,16 @@ class TestSlurmVersions:
 
     def test_slurm_versions_available(self):
         """Test that all expected Slurm versions are available."""
-        expected_versions = ["25.05", "24.11", "23.11", "23.02"]
+        expected_versions = ["25.11", "24.11", "23.11"]
         for version in expected_versions:
             assert version in SLURM_VERSIONS
 
     def test_slurm_versions_mapping(self):
         """Test that version mappings are correct."""
         # Test known mappings (updated for actual format)
-        assert SLURM_VERSIONS["25.05"] == "25-05-4-1"
+        assert SLURM_VERSIONS["25.11"] == "25-11-0-1"
         assert SLURM_VERSIONS["24.11"] == "24-11-6-1"
         assert SLURM_VERSIONS["23.11"] == "23-11-11-1"
-        assert SLURM_VERSIONS["23.02"] == "23-02-7-1"
 
     def test_all_versions_are_strings(self):
         """Test that all version values are strings."""
@@ -83,18 +82,16 @@ class TestSlurmVersion:
 
     def test_slurm_version_values(self):
         """Test SlurmVersion enum values."""
-        assert SlurmVersion.v25_05 == "25.05"
+        assert SlurmVersion.v25_11 == "25.11"
         assert SlurmVersion.v24_11 == "24.11"
         assert SlurmVersion.v23_11 == "23.11"
-        assert SlurmVersion.v23_02 == "23.02"
 
     def test_slurm_version_str_conversion(self):
         """Test string conversion of SlurmVersion."""
         # For str Enums, the value should be accessible directly
-        assert SlurmVersion.v25_05 == "25.05"
+        assert SlurmVersion.v25_11 == "25.11"
         assert SlurmVersion.v24_11 == "24.11"
         assert SlurmVersion.v23_11 == "23.11"
-        assert SlurmVersion.v23_02 == "23.02"
 
 
 class TestContainerPaths:
@@ -157,7 +154,7 @@ class TestScriptTemplates:
 
     def test_get_package_tarball_script(self):
         """Test package tarball script generation."""
-        version = "25.05"
+        version = "25.11"
         compiler_version = "13.3.0"
         modulerc_script = "test modulerc script"
         
@@ -234,7 +231,7 @@ class TestScriptTemplates:
 
     def test_get_dockerfile(self):
         """Test Dockerfile generation."""
-        spack_yaml_content = "spack:\n  specs:\n    - slurm@25.05"
+        spack_yaml_content = "spack:\n  specs:\n    - slurm@25.11"
         dockerfile = get_dockerfile(spack_yaml_content)
         
         # Test that it returns a string

@@ -103,7 +103,7 @@ class TestGPGKeyImport:
             # Call the function with GPG key
             push_to_buildcache(
                 image_tag="test:latest",
-                version="25.05",
+                version="25.11",
                 compiler_version="10.5.0",
                 publish_mode="all",
                 verbose=True,
@@ -217,7 +217,7 @@ class TestGPGKeyImport:
             # Call the function without GPG key
             push_to_buildcache(
                 image_tag="test:latest",
-                version="25.05",
+                version="25.11",
                 compiler_version="10.5.0",
                 publish_mode="all",
                 verbose=False,

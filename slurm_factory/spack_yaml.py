@@ -191,7 +191,7 @@ def generate_compiler_bootstrap_yaml(
 
 
 def generate_module_config(
-    slurm_version: str = "25.05",
+    slurm_version: str = "25.11",
     gpu_support: bool = False,
     compiler_version: str = "13.4.0",
     enable_hierarchy: bool = False,
@@ -200,7 +200,7 @@ def generate_module_config(
     Generate the Lmod module configuration section for Spack.
 
     Args:
-        slurm_version: Slurm version to build (25.05, 24.11, 23.11, 23.02)
+        slurm_version: Slurm version to build (25.11, 24.11, 23.11, 23.02)
         gpu_support: Whether to include GPU support (NVML, RSMI)
         compiler_version: GCC compiler version to use
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
@@ -300,7 +300,7 @@ def generate_module_config(
 
 
 def generate_spack_config(
-    slurm_version: str = "25.05",
+    slurm_version: str = "25.11",
     gpu_support: bool = False,
     install_tree_root: str = "/opt/slurm/software",
     view_root: str = "/opt/slurm/view",  # Use separate view directory
@@ -312,7 +312,7 @@ def generate_spack_config(
     Generate a Spack environment configuration dictionary.
 
     Args:
-        slurm_version: Slurm version to build (25.05, 24.11, 23.11, 23.02)
+        slurm_version: Slurm version to build (25.11, 24.11, 23.11, 23.02)
         gpu_support: Whether to include GPU support (NVML, RSMI)
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view
@@ -652,7 +652,7 @@ def get_comment_header(slurm_version: str, gpu_support: bool) -> str:
 
 
 def generate_yaml_string(
-    slurm_version: str = "25.05",
+    slurm_version: str = "25.11",
     compiler_version: str = "13.4.0",
     gpu_support: bool = False,
     enable_verification: bool = False,
@@ -690,21 +690,21 @@ def generate_yaml_string(
 
 
 # Convenience functions for common configurations
-def cpu_only_config(slurm_version: str = "25.05", enable_verification: bool = False) -> Dict[str, Any]:
+def cpu_only_config(slurm_version: str = "25.11", enable_verification: bool = False) -> Dict[str, Any]:
     """Generate CPU-only configuration (default, optimized for size)."""
     return generate_spack_config(
         slurm_version=slurm_version, gpu_support=False, enable_verification=enable_verification
     )
 
 
-def gpu_enabled_config(slurm_version: str = "25.05", enable_verification: bool = False) -> Dict[str, Any]:
+def gpu_enabled_config(slurm_version: str = "25.11", enable_verification: bool = False) -> Dict[str, Any]:
     """Generate GPU-enabled configuration (larger, includes CUDA/ROCm)."""
     return generate_spack_config(
         slurm_version=slurm_version, gpu_support=True, enable_verification=enable_verification
     )
 
 
-def verification_config(slurm_version: str = "25.05", gpu_support: bool = False) -> Dict[str, Any]:
+def verification_config(slurm_version: str = "25.11", gpu_support: bool = False) -> Dict[str, Any]:
     """Generate configuration with verification enabled (for CI and pre-release checks)."""
     return generate_spack_config(
         slurm_version=slurm_version, gpu_support=gpu_support, enable_verification=True
@@ -713,14 +713,14 @@ def verification_config(slurm_version: str = "25.05", gpu_support: bool = False)
 
 if __name__ == "__main__":
     # Example usage - generate configurations for testing
-    print("=== CPU-only Slurm 25.05 (default gcc 13.4.0) ===")
-    print(generate_yaml_string("25.05", gpu_support=False))
+    print("=== CPU-only Slurm 25.11 (default gcc 13.4.0) ===")
+    print(generate_yaml_string("25.11", gpu_support=False))
 
-    print("\n=== GPU-enabled Slurm 25.05 (default gcc 13.4.0) ===")
-    print(generate_yaml_string("25.05", gpu_support=True))
+    print("\n=== GPU-enabled Slurm 25.11 (default gcc 13.4.0) ===")
+    print(generate_yaml_string("25.11", gpu_support=True))
 
-    print("\n=== Slurm 25.05 with gcc 10.5.0 for RHEL 8 compatibility ===")
-    print(generate_yaml_string("25.05", compiler_version="10.5.0", gpu_support=False))
+    print("\n=== Slurm 25.11 with gcc 10.5.0 for RHEL 8 compatibility ===")
+    print(generate_yaml_string("25.11", compiler_version="10.5.0", gpu_support=False))
 
-    print("\n=== CPU-only Slurm 25.05 with Verification (CI) ===")
-    print(generate_yaml_string("25.05", gpu_support=False, enable_verification=True))
+    print("\n=== CPU-only Slurm 25.11 with Verification (CI) ===")
+    print(generate_yaml_string("25.11", gpu_support=False, enable_verification=True))

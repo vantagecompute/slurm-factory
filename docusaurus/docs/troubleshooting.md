@@ -14,7 +14,7 @@ newgrp docker
 **Build fails with cache errors:**
 ```bash
 slurm-factory clean --full
-slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.11
 ```
 
 **Out of disk space:**
@@ -53,7 +53,7 @@ ls /usr/share/lmod/lmod/modulefiles/slurm/
 module list
 
 # Load module
-module load slurm/25.05
+module load slurm/25.11
 
 # Verify paths
 which srun
@@ -115,17 +115,17 @@ export DOCKER_BUILDKIT=1
 **Large package sizes:**
 ```bash
 # Use minimal build
-slurm-factory build --slurm-version 25.05 --minimal
+slurm-factory build --slurm-version 25.11 --minimal
 
 # Skip GPU if not needed
-slurm-factory build --slurm-version 25.05  # no --gpu
+slurm-factory build --slurm-version 25.11  # no --gpu
 ```
 
 ## Getting Help
 
 ```bash
 # Verbose mode for debugging
-slurm-factory --verbose build --slurm-version 25.05
+slurm-factory --verbose build --slurm-version 25.11
 
 # Check build logs
 docker logs <container-id>

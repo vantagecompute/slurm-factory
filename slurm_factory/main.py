@@ -284,7 +284,7 @@ def build(
     ctx: typer.Context,
     slurm_version: Annotated[
         SlurmVersion, typer.Option("--slurm-version", help="Slurm version to build")
-    ] = SlurmVersion.v25_05,
+    ] = SlurmVersion.v25_11,
     compiler_version: Annotated[
         str,
         typer.Option(
@@ -340,7 +340,7 @@ def build(
     """
     Build a specific Slurm version.
 
-    Available versions: 25.05 (default), 24.11, 23.11, 23.02
+    Available versions: 25.11 (default), 25.11, 24.11, 23.11
 
     Compiler toolchains (--compiler-version) - all built with Spack for relocatability:
     - 14.2.0: GCC 14.2, glibc 2.39, latest stable
@@ -383,7 +383,7 @@ def build(
     - Professional Lmod modules with hierarchy support
 
     Examples:
-        slurm-factory build                                    # Build default CPU version (25.05, gcc 13.4.0)
+        slurm-factory build                                    # Build default CPU version (25.11, gcc 13.4.0)
         slurm-factory build --slurm-version 24.11             # Build specific version
         slurm-factory build --compiler-version 14.2.0         # Build with gcc 14.2
         slurm-factory build --compiler-version 12.5.0         # Build with gcc 12 - Ubuntu 22.04 compatibility

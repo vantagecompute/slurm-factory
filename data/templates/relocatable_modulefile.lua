@@ -170,7 +170,7 @@ end
 local version = "{{ spec.version }}"
 local name = "{{ spec.name }}"
 {% else -%}
-local version = "25.05"
+local version = "25.11"
 local name = "slurm"
 {% endif -%}
 

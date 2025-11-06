@@ -25,7 +25,7 @@ Slurm Factory supports multiple Slurm and GCC compiler combinations. All combina
 
 ### Slurm Versions
 
-- **25.05** (Latest)
+- **25.11** (Latest)
 - **24.11** (LTS)
 - **23.11** (Stable)
 - **23.02** (Legacy)
@@ -45,9 +45,9 @@ Slurm Factory supports multiple Slurm and GCC compiler combinations. All combina
 
 | Slurm Version | GCC Version | Build Type | Use Case |
 |---------------|-------------|------------|----------|
-| 25.05 | 13.4.0 | GPU | Latest features with GPU support |
+| 25.11 | 13.4.0 | GPU | Latest features with GPU support |
 | 24.11 | 13.4.0 | Default | Long-term support production |
-| 25.05 | 14.2.0 | Default | Bleeding edge |
+| 25.11 | 14.2.0 | Default | Bleeding edge |
 | 23.11 | 12.5.0 | Default | Conservative production |
 
 All version combinations are available in the buildcache at:
@@ -75,15 +75,15 @@ spack mirror add slurm-factory-compilers \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
 
 spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.05/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
 # Install Slurm from cache (takes minutes!)
-spack install --no-check-signature slurm@25.05%gcc@13.4.0
+spack install --no-check-signature slurm@25.11%gcc@13.4.0
 
 # Load and verify
-spack load slurm@25.05
+spack load slurm@25.11
 sinfo --version
-# Output: slurm 25.05.0
+# Output: slurm 25.11.0
 ```
 
 ### Method 2: Building Locally
@@ -102,16 +102,16 @@ pip install slurm-factory
 slurm-factory build-compiler --compiler-version 13.4.0
 
 # Build Slurm with that compiler (~35-45 minutes)
-slurm-factory build --slurm-version 25.05 --compiler-version 13.4.0
+slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
 
 # Extract the tarball
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-gcc13.4.0-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
 
 # Run installation script
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 
 # Load the module
-module load slurm/25.05
+module load slurm/25.11
 ```
 
 ## Two Primary Commands
@@ -141,22 +141,22 @@ Build complete Slurm packages with all dependencies:
 
 ```bash
 # Standard build (CPU-optimized, ~2-5GB)
-slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.11
 
 # GPU support (includes CUDA/ROCm, ~15-25GB)
-slurm-factory build --slurm-version 25.05 --gpu
+slurm-factory build --slurm-version 25.11 --gpu
 
 # Minimal build (no OpenMPI/extras, ~1-2GB)
-slurm-factory build --slurm-version 25.05 --minimal
+slurm-factory build --slurm-version 25.11 --minimal
 
 # Use specific compiler version
-slurm-factory build --slurm-version 25.05 --compiler-version 14.2.0
+slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
 
 # Publish to buildcache (requires AWS credentials)
-slurm-factory build --slurm-version 25.05 --publish=all
+slurm-factory build --slurm-version 25.11 --publish=all
 ```
 
-**Supported Versions**: 25.05, 24.11, 23.11, 23.02
+**Supported Versions**: 25.11, 24.11, 23.11, 23.02
 
 **Output**: Tarball at `~/.slurm-factory/builds/slurm-{version}-gcc{compiler}-software.tar.gz`
 
@@ -175,7 +175,7 @@ Pre-built packages are available at `slurm-factory-spack-binary-cache.vantagecom
 #### Slurm Packages
 
 - **URL**: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache`
-- **Slurm Versions**: 25.05, 24.11, 23.11, 23.02
+- **Slurm Versions**: 25.11, 24.11, 23.11, 23.02
 - **Compiler Combinations**: Each Slurm version × each GCC version
 - **Includes**: All dependencies (OpenMPI, OpenSSL, Munge, PMIx, HDF5, etc.)
 
@@ -192,8 +192,8 @@ Pre-built packages are available at `slurm-factory-spack-binary-cache.vantagecom
 ```bash
 # Install latest Slurm with recommended compiler
 spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.05/13.4.0/buildcache
-spack install --no-check-signature slurm@25.05
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+spack install --no-check-signature slurm@25.11
 
 # Install legacy Slurm with older compiler
 spack mirror add slurm-factory \

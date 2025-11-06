@@ -117,7 +117,7 @@ def build(
     ctx: typer.Context,
     slurm_version: Annotated[
         SlurmVersion, typer.Option("--slurm-version", help="Slurm version to build")
-    ] = SlurmVersion.v25_05,
+    ] = SlurmVersion.v25_11,
     compiler_version: str = "13.4.0",
     gpu: bool = False,
     verify: bool = False,
