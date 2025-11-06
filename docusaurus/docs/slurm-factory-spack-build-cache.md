@@ -161,8 +161,8 @@ Each Slurm buildcache includes:
 - And 40+ more dependencies
 
 GPU builds additionally include:
-- **CUDA** - NVIDIA CUDA toolkit
-- **ROCm** - AMD ROCm platform (select versions)
+- **CUDA** - NVIDIA CUDA toolkit (11.8+, 12.x)
+- **ROCm** - AMD ROCm platform (5.7+, 6.x for select builds)
 
 ## Build Cache Benefits
 

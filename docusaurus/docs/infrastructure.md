@@ -416,7 +416,9 @@ aws cloudwatch put-metric-alarm \
 
 ## Cost Optimization
 
-### Current Costs (Estimated)
+### Current Costs (Estimated - as of January 2025)
+
+> **Note**: These are approximate estimates based on typical usage patterns. For current pricing, consult the [AWS Pricing Calculator](https://calculator.aws/) and your actual usage metrics.
 
 | Service | Monthly Cost | Notes |
 |---------|-------------|-------|

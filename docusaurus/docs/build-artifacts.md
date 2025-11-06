@@ -140,20 +140,6 @@ slurm-{slurm_version}-gcc{compiler_version}-software.tar.gz
 
 ## Distribution
 
-### Tarball Naming Convention
-
-Tarballs follow this naming pattern:
-
-```text
-slurm-{slurm_version}-gcc{compiler_version}-software.tar.gz
-```
-
-**Examples:**
-
-- `slurm-25.11-gcc13.4.0-software.tar.gz` - Slurm 25.11 with GCC 13.4.0 (default)
-- `slurm-24.11-gcc11.5.0-software.tar.gz` - Slurm 24.11 with GCC 11.5.0
-- `slurm-23.11-gcc7.5.0-software.tar.gz` - Slurm 23.11 with GCC 7.5.0 (RHEL 7)
-
 ### S3 Distribution
 
 **Tarballs**: Stored in public S3 bucket for direct download
