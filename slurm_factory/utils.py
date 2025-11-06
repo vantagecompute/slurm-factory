@@ -815,39 +815,36 @@ def publish_compiler_to_buildcache(
                 [
                     # Ensure /tmp has proper permissions for GPG temp files
                     'chmod 1777 /tmp',
-                    # Configure GPG for non-interactive use
-                    'export GPG_TTY=$(tty)',
                     # Create full GPG directory structure with correct permissions
                     'mkdir -p /opt/spack/opt/spack/gpg/private-keys-v1.d',
                     'chmod 700 /opt/spack/opt/spack/gpg',
                     'chmod 700 /opt/spack/opt/spack/gpg/private-keys-v1.d',
-                    # Configure GPG agent for non-interactive use
-                    'echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
-                    # Configure GPG for batch mode with loopback pinentry
-                    'echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf',
+                    # Configure GPG agent for non-interactive use with no passphrase prompt
+                    'cat > /opt/spack/opt/spack/gpg/gpg-agent.conf << EOF\nallow-loopback-pinentry\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000\nEOF',
+                    # Configure GPG for batch mode with loopback pinentry and no tty
+                    'cat > /opt/spack/opt/spack/gpg/gpg.conf << EOF\nuse-agent\npinentry-mode loopback\nbatch\nyes\nno-tty\nEOF',
                     # Kill any existing agent to ensure clean state
                     'gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true',
-                    # Start agent with our configuration
-                    'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye || true',
                     # Import GPG key into Spack's GPG keyring with batch mode
-                    'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
-                    'gpg --homedir /opt/spack/opt/spack/gpg --batch --yes '
-                    '--pinentry-mode loopback --no-tty --import /tmp/private.key',
-                    'rm -f /tmp/private.key',
+                    'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --passphrase "" --import 2>&1 | grep -v "cannot open" || true',
+                    # Start GPG agent with our configuration  
+                    'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye 2>&1 | grep -v "cannot open" || true',
+                    # Preset the passphrase as empty to avoid any prompts
+                    f'echo "" | gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --quick-add-key {signing_key} default sign 0 2>&1 | grep -v "cannot open\\|already exists" || true',
                 ]
             )
 
         # Add the buildcache push commands
+        # Note: We only push packages that are installed in the environment.
+        # gcc-runtime and compiler-wrapper are NOT built during compiler phase,
+        # they are built later as dependencies during the Slurm build phase.
         bash_script_parts.extend(
             [
                 "cd /root/compiler-bootstrap",
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
+                # Push all packages in the environment (gcc and its dependencies)
                 f"spack -e . buildcache push {signing_flags} --update-index "
                 f"--without-build-dependencies s3-buildcache",
-                f"spack buildcache push {signing_flags} --update-index "
-                f"--without-build-dependencies s3-buildcache gcc-runtime@{compiler_version}",
-                f"spack buildcache push {signing_flags} --update-index "
-                f"--without-build-dependencies s3-buildcache compiler-wrapper@1.0",
             ]
         )
 

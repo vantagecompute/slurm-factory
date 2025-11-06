@@ -112,7 +112,6 @@ jobs:
           echo "Using GPG signing key: $GPG_KEY_ID"
           uv run slurm-factory build-compiler \
             --compiler-version ${{ matrix.compiler_version }} \
-            --no-cache \
             --publish \
             --signing-key "$GPG_KEY_ID" \
             --gpg-private-key "$GPG_PRIVATE_KEY"
