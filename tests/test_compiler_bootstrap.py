@@ -109,6 +109,11 @@ class TestSlurmEnvironmentConfig:
         assert gcc_package_config["externals"][0]["spec"] == f"gcc@{compiler_version}"
         assert gcc_package_config["externals"][0]["prefix"] == "/opt/spack-compiler-view"
         assert gcc_package_config["buildable"] is False
+        
+        # gcc-runtime should be buildable during Slurm build phase
+        gcc_runtime_config = slurm_config["spack"]["packages"]["gcc-runtime"]
+        assert gcc_runtime_config["buildable"] is True
+        assert gcc_runtime_config["version"] == [compiler_version]
             
     def test_slurm_env_prevents_system_gcc(self):
         """Test that Slurm environment uses buildcache GCC, not system GCC."""
