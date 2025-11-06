@@ -189,6 +189,27 @@ const config: Config = {
               title: 'Slurm Factory Spack Repository Documentation',
               description: 'Spack repository documentation for Slurm Factory'
             },
+            {
+              filename: 'llms-slurm-factory-spack-build-cache.txt',
+              includePatterns: ['docs/slurm-factory-spack-build-cache.md'],
+              fullContent: true,
+              title: 'Slurm Factory Spack Build Cache Documentation',
+              description: 'Spack build cache documentation for Slurm Factory'
+            },
+            {
+              filename: 'llms-infrastructure.txt',
+              includePatterns: ['docs/infrastructure.md'],
+              fullContent: true,
+              title: 'Slurm Factory Infrastructure Documentation',
+              description: 'Infrastructure documentation for Slurm Factory'
+            },
+            {
+              filename: 'llms-github-actions.txt',
+              includePatterns: ['docs/github-actions.md'],
+              fullContent: true,
+              title: 'Slurm Factory GitHub Actions Documentation',
+              description: 'GitHub Actions CI/CD documentation for Slurm Factory'
+            },
           ],
         },
     ],
