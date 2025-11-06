@@ -1,84 +1,154 @@
-
 # Slurm Factory Overview
 
-Slurm Factory is a **modern Python CLI tool** built with Typer that automates building optimized, relocatable Slurm workload manager packages using Docker containers and the Spack package manager. It features a modular architecture with comprehensive exception handling and intelligent caching.
+Slurm Factory is a **modern Python CLI tool** built with Typer that automates building optimized, relocatable Slurm workload manager packages using Docker containers and the Spack package manager. It features a modular architecture with comprehensive exception handling, intelligent multi-layer caching, and seamless integration with a public binary cache for 10-15x faster installations.
 
 ## What is Slurm Factory?
 
-Slurm Factory simplifies the complex process of building and packaging Slurm for HPC environments by:
+Slurm Factory simplifies the complex process of building and packaging Slurm for HPC environments through:
 
-- **Modern CLI Interface** with Typer framework providing auto-completion and rich help
-- **Modular Architecture** with comprehensive error handling and type safety
-- **Automating the build process** with one-command package creation using Docker containers
-- **Creating relocatable packages** that can be deployed to any filesystem path
-- **Optimizing performance** with CPU-specific optimizations and optional GPU support
-- **Ensuring reproducibility** through Docker container isolation and version-controlled dependencies
-- **Supporting multiple versions** of Slurm (25.11, 24.11, 23.11, 23.02)
+- **Modern CLI Interface** - Typer framework with auto-completion, rich help, and type-safe validation
+- **Modular Architecture** - Comprehensive error handling, type safety, and separation of concerns
+- **Public Binary Cache** - Pre-built packages at `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- **Automated Build Process** - One-command package creation using Docker containers
+- **Relocatable Packages** - Deploy to any filesystem path without recompilation
+- **Performance Optimization** - CPU-specific optimizations and optional GPU support
+- **Reproducibility** - Docker container isolation and version-controlled dependencies
+- **Multi-Version Support** - Slurm versions 25.11, 24.11, 23.11, 23.02
+- **Flexible Compilers** - GCC 7.5.0 through 15.2.0 for maximum compatibility
+
+## Build System Architecture
+
+```mermaid
+graph TB
+    subgraph "User Layer"
+        CLI[CLI Commands<br/>build / build-compiler]
+    end
+    
+    subgraph "Application Layer"
+        Config[Pydantic Config]
+        Builder[Build Orchestrator]
+        SpackYAML[Dynamic spack.yaml]
+    end
+    
+    subgraph "Execution Layer"
+        Docker[Docker Container]
+        Spack[Spack v1.0.0]
+        CustomRepo[Custom Spack Repo]
+    end
+    
+    subgraph "Storage Layer"
+        LocalCache[Local Caches<br/>buildcache + sourcecache]
+        S3Cache[S3 Buildcache<br/>Public CDN]
+        Outputs[Tarballs<br/>~/.slurm-factory/builds/]
+    end
+    
+    CLI --> Config
+    CLI --> Builder
+    Builder --> SpackYAML
+    Builder --> Docker
+    Docker --> Spack
+    Spack --> CustomRepo
+    Spack --> LocalCache
+    LocalCache -.Pull.-> S3Cache
+    Spack --> Outputs
+    Builder -.Publish.-> S3Cache
+    
+    style CLI fill:#4CAF50
+    style Outputs fill:#2196F3
+    style S3Cache fill:#FF9800
+```
 
 ## Key Features
 
 ### 🏗️ **Modern Python Architecture**
-- **Typer CLI**: Auto-completion, rich help, and type-safe command validation
+- **Typer CLI**: Auto-completion, rich help text, and type-safe command validation
 - **Pydantic Configuration**: Type-safe settings with environment variable support
 - **Custom Exception Hierarchy**: Structured error handling with actionable messages
-- **Rich Console Output**: Colored progress indicators and user-friendly status
+- **Rich Console Output**: Colored progress indicators and user-friendly status messages
+- **Logging System**: Comprehensive logging with debug and verbose modes
 
 ### 📦 **Relocatable Packages**
-- **Runtime Path Configuration**: Deploy to any filesystem location
+- **Runtime Path Configuration**: Deploy to any filesystem location (`/opt`, `/shared`, custom)
 - **Environment Variable Overrides**: Customize installation paths at module load time
-- **Portable Modules**: LMod modules that work across different environments
+- **Portable Modules**: Lmod modules that work across different environments
 - **Self-Contained**: No external dependencies required at runtime
+- **RPATH/RUNPATH**: Binaries find libraries without `LD_LIBRARY_PATH`
 
-### ⚡ **Intelligent Build System**
-- **Multi-Layer Caching**: Binary packages, source archives, and compiler cache
-- **Container Optimization**: Base image reuse and persistent cache mounts
+### ⚡ **Public Binary Cache**
+- **Global CDN**: CloudFront-distributed buildcache at `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- **Pre-built Packages**: Compilers and Slurm packages for all version combinations
+- **10-15x Speedup**: Install in 5-15 minutes instead of 45-90 minutes
+- **GPG Signed**: All packages signed for integrity verification
+- **No Docker Required**: Install directly with Spack from buildcache
+
+### ⚡ **Intelligent Multi-Layer Caching**
+- **Docker Layer Cache**: Reuse base images and build layers
+- **Binary Package Cache**: Reuse compiled packages across builds
+- **Source Archive Cache**: Downloaded sources stored locally
+- **Compiler Cache**: Pre-built GCC toolchains
 - **Fast Rebuilds**: 5-15 minutes for subsequent builds (vs 45-90 minutes initial)
+
+### 🔧 **Comprehensive Build System**
+- **Two Build Commands**: `build-compiler` for GCC toolchains, `build` for Slurm packages
 - **Dependency Classification**: External tools vs runtime libraries for optimal sizing
-
-### 🔧 **Comprehensive Exception Handling**
-
-- **SlurmFactoryError**: Base exception with context-aware error messages
-- **Specific Error Types**: Build, configuration, and Spack-specific exceptions
-- **Debugging Support**: Verbose logging and detailed error context
-- **Recovery Guidance**: Actionable solutions for common issues
+- **Multiple Build Types**: CPU-only, GPU-enabled, minimal variants
+- **Compiler Flexibility**: GCC 7.5.0 through 15.2.0 for cross-distro compatibility
+- **Automated Publishing**: Push to S3 buildcache and tarball repositories
 
 ## Package Types
 
-| Type | Size | Features | Use Case |
-|------|------|----------|----------|
-| **Default** | 2-5GB | CPU-optimized with OpenMPI | Standard HPC clusters |
-| **GPU** | 15-25GB | CUDA/ROCm support | GPU-accelerated workloads |
-| **Minimal** | 1-2GB | Basic Slurm only | Resource-constrained environments |
+| Type | Size | Features | Build Time | Cache Time | Use Case |
+|------|------|----------|------------|------------|----------|
+| **Default (CPU)** | 2-5GB | CPU-optimized with OpenMPI, PMIx | 45-90 min | 5-15 min | Standard HPC clusters |
+| **GPU** | 15-25GB | CUDA/ROCm support | 90-180 min | 15-25 min | GPU-accelerated workloads |
+| **Minimal** | 1-2GB | Basic Slurm only | 20-30 min | 3-5 min | Resource-constrained environments |
 
 ## CLI Examples
 
+### Using the Public Buildcache (Fastest)
+
 ```bash
-# Build latest Slurm with default settings (Slurm 25.11, GCC 13.4.0)
-slurm-factory build
+# Install Spack
+git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+source spack/share/spack/setup-env.sh
 
-# Build specific Slurm version with default compiler
-slurm-factory build --slurm-version 24.11
+# Add buildcache mirrors
+spack mirror add slurm-factory-compilers \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
 
-# Build with specific compiler for older distributions
-slurm-factory build --compiler-version 10.5.0
+spack mirror add slurm-factory-slurm \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# Build for RHEL 7 compatibility
-slurm-factory build --compiler-version 7.5.0 --slurm-version 23.11
+# Install from cache (5-15 minutes!)
+spack install --no-check-signature slurm@25.11%gcc@13.4.0
 
-# Build specific combination
-slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
+# Load and verify
+spack load slurm@25.11
+sinfo --version
+```
 
-# Build with GPU support and verbose output
-slurm-factory --verbose build --gpu
+### Building Locally with slurm-factory CLI
 
-# Build minimal package (no OpenMPI, smaller size)
-slurm-factory build --minimal
+```bash
+# Install slurm-factory
+pip install slurm-factory
 
-# Build with custom project name for isolated caching
-slurm-factory --project-name production build --slurm-version 24.11
+# Build compiler toolchain (one-time, optional)
+slurm-factory build-compiler --compiler-version 13.4.0
 
-# Clean up build artifacts
-slurm-factory clean --full
+# Build Slurm (uses buildcache for dependencies)
+slurm-factory build --slurm-version 25.11
+
+# Build with specific options
+slurm-factory build --slurm-version 24.11 --compiler-version 10.5.0  # RHEL 8
+slurm-factory build --slurm-version 25.11 --gpu                       # GPU support
+slurm-factory build --slurm-version 25.11 --minimal                   # Minimal build
+
+# Build and publish to buildcache (requires AWS credentials)
+slurm-factory build --slurm-version 25.11 --publish=all
+
+# Verbose output for debugging
+slurm-factory --verbose build --slurm-version 25.11
 ```
 
 ## Supported Versions
@@ -111,15 +181,42 @@ All GCC compiler versions are built by Spack for maximum relocatability and cros
 
 ## Use Cases
 
-- **Research Computing Centers**: Standardize Slurm deployments across multiple clusters
-- **Cloud HPC Providers**: Rapidly provision clusters with consistent software stacks  
-- **Educational Institutions**: Provide reproducible HPC environments for teaching
-- **Industry HPC**: Deploy compliance-ready solutions with full audit trails
+- **Research Computing Centers**: Standardize Slurm deployments across multiple heterogeneous clusters
+- **Cloud HPC Providers**: Rapidly provision clusters with consistent, tested software stacks  
+- **Educational Institutions**: Provide reproducible HPC environments for teaching and research
+- **Industry HPC**: Deploy compliance-ready solutions with full audit trails and security
 - **CI/CD Pipelines**: Automated testing and validation of HPC software stacks
+- **Air-Gapped Installations**: Download buildcache once, deploy offline in secure environments
+- **Container Deployments**: Base images for Kubernetes, Singularity, or Docker-based HPC
+
+## Infrastructure
+
+Slurm Factory is supported by a comprehensive AWS infrastructure:
+
+### Components
+
+- **S3 Buildcache Bucket**: `slurm-factory-spack-buildcache-4b670`
+- **CloudFront Distribution**: Global CDN for fast buildcache access
+- **Route53 DNS**: `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- **GitHub OIDC**: Secure, keyless authentication for CI/CD
+- **AWS CDK**: Infrastructure as code for reproducible deployments
+
+### CI/CD
+
+Three GitHub Actions workflows maintain the buildcache:
+
+1. **Compiler Buildcache**: Build and publish GCC toolchains
+2. **Slurm Dependencies**: Build Slurm packages for all compiler combinations
+3. **Tarball Publishing**: Create and publish relocatable tarballs
+
+All workflows run on self-hosted runners with GPG signing and automated testing.
+
+See [Infrastructure](./infrastructure.md) and [GitHub Actions](./github-actions.md) for details.
 
 ## Next Steps
 
-- [Installation Guide](/slurm-factory/installation/) - Get started with Slurm Factory
-- [Architecture](/slurm-factory/architecture/) - Learn about the modular design
-- [Examples](/slurm-factory/examples/) - Practical usage scenarios and patterns
-- [API Reference](/slurm-factory/api-reference/) - Complete CLI and Python API documentation
+- **[Installation Guide](./installation.md)** - Get started with Slurm Factory
+- **[Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md)** - Using the public buildcache
+- **[Architecture](./architecture.md)** - Learn about the modular design and build pipeline
+- **[Examples](./examples.md)** - Practical usage scenarios and patterns
+- **[API Reference](./api-reference.md)** - Complete CLI and Python API documentation
