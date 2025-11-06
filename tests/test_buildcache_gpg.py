@@ -235,8 +235,8 @@ class TestGPGKeyImport:
             assert "allow-loopback-pinentry" not in bash_script
             assert "--unsigned" in bash_script
 
-    def test_gpg_agent_reload_command(self, mock_gpg_key, mock_aws_env):
-        """Test that GPG agent reload command is included and has error handling."""
+    def test_gpg_agent_kill_and_restart(self, mock_gpg_key, mock_aws_env):
+        """Test that GPG agent is killed and restarted to ensure clean configuration state."""
         with patch.dict(os.environ, mock_aws_env), patch("subprocess.run") as mock_run:
             # Mock successful subprocess run
             mock_run.return_value = Mock(returncode=0, stdout="", stderr="")
@@ -256,9 +256,11 @@ class TestGPGKeyImport:
             cmd = call_args[0][0]
             bash_script = cmd[-1]
 
-            # Verify gpg-connect-agent command is present with error handling
+            # Verify gpgconf --kill is present to ensure clean agent state
+            assert "gpgconf" in bash_script
+            assert "--kill gpg-agent" in bash_script
+            # Verify gpg-connect-agent starts fresh agent
             assert "gpg-connect-agent" in bash_script
-            assert "reloadagent" in bash_script
             # Should have '|| true' to prevent failure if agent is not running
             assert "|| true" in bash_script
 
