@@ -829,7 +829,7 @@ def publish_compiler_to_buildcache(
                     # Import GPG key into Spack's GPG keyring with batch mode
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
                     'gpg --homedir /opt/spack/opt/spack/gpg --batch --yes '
-                    '--pinentry-mode loopback --import /tmp/private.key',
+                    '--pinentry-mode loopback --no-tty --import /tmp/private.key',
                     'rm -f /tmp/private.key',
                 ]
             )
@@ -1015,7 +1015,7 @@ def push_to_buildcache(
                     # Import GPG key into Spack's GPG keyring with batch mode
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
                     'gpg --homedir /opt/spack/opt/spack/gpg --batch --yes '
-                    '--pinentry-mode loopback --import /tmp/private.key',
+                    '--pinentry-mode loopback --no-tty --import /tmp/private.key',
                     'rm -f /tmp/private.key',
                 ]
             )
