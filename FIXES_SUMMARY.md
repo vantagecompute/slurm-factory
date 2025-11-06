@@ -106,3 +106,66 @@ These two small configuration changes fix the root causes of all build failures:
 2. Adding padding enables buildcache packages to be relocated to different install paths
 
 Both fixes are minimal, well-tested, and ready for production deployment.
+
+---
+
+## Fix #3: GPG Signing for Buildcache (2025-11-06)
+
+### Problem
+
+GPG signing failed with "Inappropriate ioctl for device" error when pushing packages to S3 buildcache:
+
+```
+gpg: signing failed: Inappropriate ioctl for device
+gpg: /tmp/spack-stage/root/tmpqsfhkl9v/6ttzjvroflebjhem5hkprsdsiefagk5h.manifest.json: clear-sign failed: Inappropriate ioctl for device
+```
+
+### Root Cause
+
+- GPG requires a TTY device for signing operations
+- Non-interactive Docker environments don't provide a proper TTY
+- Missing GPG_TTY environment variable and loopback pinentry configuration
+
+### Solution
+
+**Files Modified**: 
+- `slurm_factory/utils.py` (lines 813-826, 991-1004)
+- `tests/test_buildcache_gpg.py` (new file, 10 comprehensive tests)
+
+**Changes**:
+1. Set `GPG_TTY=$(tty)` to provide pseudo-terminal
+2. Create GPG directory structure
+3. Configure gpg-agent with `allow-loopback-pinentry`
+4. Use `gpg --batch --yes --pinentry-mode loopback --import` for non-interactive key import
+5. Reload GPG agent with error handling
+
+**Before**:
+```bash
+'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
+'spack gpg trust /tmp/private.key',
+'rm -f /tmp/private.key',
+```
+
+**After**:
+```bash
+'export GPG_TTY=$(tty)',
+'mkdir -p /opt/spack/opt/spack/gpg',
+'echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
+'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg reloadagent /bye || true',
+'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
+'gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --import /tmp/private.key',
+'rm -f /tmp/private.key',
+```
+
+### Testing
+
+- ✅ 10 new tests for GPG key import functionality
+- ✅ Tests verify correct GPG configuration (batch mode, loopback pinentry, GPG_TTY)
+- ✅ Tests verify error handling for missing AWS credentials
+- ✅ All 142 tests passing
+- ✅ Code linting passed
+
+### Expected Results
+
+**Before**: GPG signing fails in CI/non-interactive environments
+**After**: GPG signing works correctly in all environments

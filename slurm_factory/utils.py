@@ -813,9 +813,15 @@ def publish_compiler_to_buildcache(
         if gpg_private_key:
             bash_script_parts.extend(
                 [
-                    # Import GPG key into Spack's GPG keyring
+                    # Configure GPG for non-interactive use
+                    'export GPG_TTY=$(tty)',
+                    'mkdir -p /opt/spack/opt/spack/gpg',
+                    'echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
+                    'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg reloadagent /bye || true',
+                    # Import GPG key into Spack's GPG keyring with batch mode
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
-                    'spack gpg trust /tmp/private.key',
+                    'gpg --homedir /opt/spack/opt/spack/gpg --batch --yes '
+                    '--pinentry-mode loopback --import /tmp/private.key',
                     'rm -f /tmp/private.key',
                 ]
             )
@@ -985,9 +991,15 @@ def push_to_buildcache(
         if gpg_private_key:
             bash_script_parts.extend(
                 [
-                    # Import GPG key into Spack's GPG keyring
+                    # Configure GPG for non-interactive use
+                    'export GPG_TTY=$(tty)',
+                    'mkdir -p /opt/spack/opt/spack/gpg',
+                    'echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
+                    'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg reloadagent /bye || true',
+                    # Import GPG key into Spack's GPG keyring with batch mode
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key',
-                    'spack gpg trust /tmp/private.key',
+                    'gpg --homedir /opt/spack/opt/spack/gpg --batch --yes '
+                    '--pinentry-mode loopback --import /tmp/private.key',
                     'rm -f /tmp/private.key',
                 ]
             )
