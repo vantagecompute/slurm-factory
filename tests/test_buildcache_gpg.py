@@ -92,6 +92,7 @@ class TestGPGKeyImport:
             assert "--batch" in bash_script
             assert "--yes" in bash_script
             assert "--pinentry-mode loopback" in bash_script
+            assert "--no-tty" in bash_script
 
     def test_push_to_buildcache_gpg_configuration(self, mock_gpg_key, mock_aws_env):
         """Test that push_to_buildcache configures GPG correctly for non-interactive use."""
@@ -139,6 +140,7 @@ class TestGPGKeyImport:
             assert "--batch" in bash_script
             assert "--yes" in bash_script
             assert "--pinentry-mode loopback" in bash_script
+            assert "--no-tty" in bash_script
 
     def test_gpg_import_command_structure(self, mock_gpg_key, mock_aws_env):
         """Test that the GPG import command has the correct structure."""
