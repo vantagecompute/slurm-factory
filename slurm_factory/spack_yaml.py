@@ -87,14 +87,13 @@ def generate_compiler_bootstrap_config(
                 # Use binutils@2.44 instead of 2.45 to avoid build failures
                 # 2.44 is stable enough for GCC 14.2 while avoiding 2.45 issues
                 f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran' ^binutils@2.44",
-                # NOTE: gcc-runtime@{gcc_ver} will be built in a second step after gcc is registered
                 # Build autotools in compiler env so they're available in /opt/spack-compiler
                 # but not during Slurm build (which needs different versions for libjwt compatibility)
                 "autoconf@2.72",
                 "automake@1.16.5",
                 "libtool@2.4.7",
-                # NOTE: Both gcc-runtime and compiler-wrapper will be built in a second step
-                # after gcc is registered
+                # NOTE: gcc-runtime and compiler-wrapper will be built as dependencies
+                # during the Slurm build phase, not during compiler bootstrap
             ],
             "concretizer": {
                 "unify": "when_possible",
@@ -345,7 +344,8 @@ def generate_spack_config(
         f"libs=shared,static tls=openssl {compiler_spec}"
     )
     specs = [
-        # Note: gcc and gcc-runtime are installed outside the environment first
+        # Note: gcc is installed from buildcache and registered before this environment is built
+        # gcc-runtime will be built as a dependency during this phase with the registered compiler
         # All packages below will use %gcc@{compiler_version} which will be available after gcc is installed
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         # Build OpenSSL with explicit zlib dependency
@@ -558,11 +558,11 @@ def generate_spack_config(
                     "externals": [{"spec": f"gcc@{compiler_version}", "prefix": "/opt/spack-compiler-view"}],
                     "buildable": False,
                 },
+                # gcc-runtime can be built during Slurm build phase if needed
+                # It provides runtime libraries for packages compiled with this GCC version
                 "gcc-runtime": {
-                    "externals": [
-                        {"spec": f"gcc-runtime@{compiler_version}", "prefix": "/opt/spack-compiler-view"}
-                    ],
-                    "buildable": False,
+                    "buildable": True,
+                    "version": [compiler_version],
                 },
                 "slurm": {
                     "version": [slurm_package_version],
