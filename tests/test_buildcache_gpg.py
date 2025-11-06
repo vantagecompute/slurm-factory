@@ -235,8 +235,8 @@ class TestGPGKeyImport:
             assert "allow-loopback-pinentry" not in bash_script
             assert "--unsigned" in bash_script
 
-    def test_gpg_agent_reload_command(self, mock_gpg_key, mock_aws_env):
-        """Test that GPG agent is killed and restarted with proper configuration."""
+    def test_gpg_agent_kill_and_restart(self, mock_gpg_key, mock_aws_env):
+        """Test that GPG agent is killed and restarted to ensure clean configuration state."""
         with patch.dict(os.environ, mock_aws_env), patch("subprocess.run") as mock_run:
             # Mock successful subprocess run
             mock_run.return_value = Mock(returncode=0, stdout="", stderr="")

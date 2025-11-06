@@ -275,7 +275,7 @@ rm -f /tmp/private.key
 
 # Try to sign a file - should work with restarted agent
 echo "test content" > /tmp/test.txt
-gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --clearsign /tmp/test.txt 2>&1
+gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --clearsign /tmp/test.txt 2>&1
 
 # Verify
 test -f /tmp/test.txt.asc && echo "SUCCESS: Agent restart worked"
