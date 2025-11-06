@@ -201,19 +201,22 @@ cat /tmp/test.txt.asc
 set -e
 apt-get update -qq && apt-get install -y -qq gnupg > /dev/null 2>&1
 
-# Setup GPG environment
-chmod 1777 /tmp 2>/dev/null || true
+# Setup GPG environment (using production sequence)
+chmod 1777 /tmp
 export GPG_TTY=$(tty)
 mkdir -p /opt/spack/opt/spack/gpg/private-keys-v1.d
 chmod 700 /opt/spack/opt/spack/gpg
 chmod 700 /opt/spack/opt/spack/gpg/private-keys-v1.d
 echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf
 echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf
-gpg-connect-agent --homedir /opt/spack/opt/spack/gpg reloadagent /bye 2>&1 || true
+# Kill any existing agent to ensure clean state
+gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true
+# Start agent with our configuration
+gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye || true
 
 # Import key
 echo '{test_gpg_key}' | base64 -d > /tmp/private.key
-gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --import /tmp/private.key 2>&1
+gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --import /tmp/private.key 2>&1
 rm -f /tmp/private.key
 
 # Create subdirectory similar to spack-stage
@@ -241,6 +244,56 @@ echo "SUCCESS: File signed in /tmp subdirectory"
         assert result.returncode == 0, f"Signing in subdirectory failed: {result.stderr}\n{result.stdout}"
         assert "BEGIN PGP SIGNED MESSAGE" in result.stdout, "Manifest not signed correctly"
         assert "SUCCESS: File signed in /tmp subdirectory" in result.stdout
+
+    def test_gpg_agent_restart_with_config(self, test_gpg_key):
+        """Test that killing and restarting the agent ensures it reads the config correctly."""
+        restart_script = f"""
+set -e
+apt-get update -qq && apt-get install -y -qq gnupg > /dev/null 2>&1
+
+# Setup GPG directory
+chmod 1777 /tmp
+mkdir -p /opt/spack/opt/spack/gpg/private-keys-v1.d
+chmod 700 /opt/spack/opt/spack/gpg
+chmod 700 /opt/spack/opt/spack/gpg/private-keys-v1.d
+
+# Start agent WITHOUT config (simulating misconfigured state)
+gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye
+
+# NOW add config
+echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf
+echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf
+
+# Kill and restart agent (production fix)
+gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true
+gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye || true
+
+# Import key
+echo '{test_gpg_key}' | base64 -d > /tmp/private.key
+gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --import /tmp/private.key 2>&1
+rm -f /tmp/private.key
+
+# Try to sign a file - should work with restarted agent
+echo "test content" > /tmp/test.txt
+gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --clearsign /tmp/test.txt 2>&1
+
+# Verify
+test -f /tmp/test.txt.asc && echo "SUCCESS: Agent restart worked"
+"""
+
+        result = subprocess.run(
+            ["docker", "run", "--rm", "ubuntu:24.04", "bash", "-c", restart_script],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        # Verify the agent restart allows signing to work
+        assert result.returncode == 0, f"Agent restart test failed: {result.stderr}\n{result.stdout}"
+        assert "SUCCESS: Agent restart worked" in result.stdout
+        # Make sure no /dev/tty errors appear
+        assert "cannot open '/dev/tty'" not in result.stdout
+        assert "cannot open '/dev/tty'" not in result.stderr
 
     def test_tmp_permissions_are_critical(self):
         """Test that /tmp permissions are actually necessary for GPG signing."""
