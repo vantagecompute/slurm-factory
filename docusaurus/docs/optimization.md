@@ -53,7 +53,7 @@ graph LR
     end
     
     subgraph "Stage 2: Dependencies Buildcache"
-        BC1 --> B1[Slurm 25.05 Deps × 8 Compilers]
+        BC1 --> B1[Slurm 25.11 Deps × 8 Compilers]
         BC1 --> B2[Slurm 24.11 Deps × 8 Compilers]
         BC1 --> B3[Slurm 23.11 Deps × 8 Compilers]
         BC1 --> B4[Slurm 23.02 Deps × 8 Compilers]
@@ -64,7 +64,7 @@ graph LR
     end
     
     subgraph "Stage 3: Complete Slurm Packages"
-        BC2 --> C1[Slurm 25.05 × 8 Compilers]
+        BC2 --> C1[Slurm 25.11 × 8 Compilers]
         BC2 --> C2[Slurm 24.11 × 8 Compilers]
         BC2 --> C3[Slurm 23.11 × 8 Compilers]
         BC2 --> C4[Slurm 23.02 × 8 Compilers]
@@ -113,7 +113,7 @@ gcc-15.2.0-compiler.tar.gz  # Latest (glibc 2.40)
 
 ```bash
 # Dependencies are compiler-specific but Slurm-agnostic
-slurm-25.05-deps-gcc-13.4.0/   # All deps for Slurm 25.05 with GCC 13.4.0
+slurm-25.11-deps-gcc-13.4.0/   # All deps for Slurm 25.11 with GCC 13.4.0
 slurm-24.11-deps-gcc-11.5.0/   # All deps for Slurm 24.11 with GCC 11.5.0
 ```
 
@@ -130,7 +130,7 @@ slurm-24.11-deps-gcc-11.5.0/   # All deps for Slurm 24.11 with GCC 11.5.0
 
 ```bash
 # Final deployable packages
-slurm-25.05-gcc-13.4.0-x86_64.tar.gz   # Complete installation
+slurm-25.11-gcc-13.4.0-x86_64.tar.gz   # Complete installation
 slurm-24.11-gcc-11.5.0-x86_64.tar.gz   # Different version/compiler
 ```
 
@@ -163,9 +163,9 @@ Total Time:             84 minutes for 3 combinations (94% reduction)
 
 | Scenario | Cache Hits | Build Time | Speedup |
 |----------|------------|------------|---------|
-| **First-time user, popular combo** (Slurm 25.05 + GCC 13.4.0) | Compiler + Deps + Slurm | ~2 min | **45x faster** |
+| **First-time user, popular combo** (Slurm 25.11 + GCC 13.4.0) | Compiler + Deps + Slurm | ~2 min | **45x faster** |
 | **New Slurm version, existing compiler** (Slurm 25.11 + GCC 13.4.0) | Compiler + Deps | ~5 min | **18x faster** |
-| **New compiler, existing Slurm** (Slurm 25.05 + GCC 16.0.0) | None | ~80 min | **1x (builds cache)** |
+| **New compiler, existing Slurm** (Slurm 25.11 + GCC 16.0.0) | None | ~80 min | **1x (builds cache)** |
 | **Rebuild same config** | Everything | ~2 min | **45x faster** |
 
 ## Consistency Across Configurations
@@ -174,7 +174,7 @@ Total Time:             84 minutes for 3 combinations (94% reduction)
 
 | Slurm Version | GCC Versions | Total Configs |
 |---------------|-------------|---------------|
-| **25.05** (latest) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
+| **25.11** (latest) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
 | **24.11** (stable) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
 | **23.11** (LTS) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
 | **23.02** (legacy) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
@@ -189,12 +189,12 @@ Total Time:             84 minutes for 3 combinations (94% reduction)
 ### Configuration Consistency Examples
 
 ```bash
-# Load Slurm 25.05 with GCC 13.4.0
-module load slurm/25.05-gcc-13.4.0
+# Load Slurm 25.11 with GCC 13.4.0
+module load slurm/25.11-gcc-13.4.0
 which scontrol  # /opt/slurm/view/bin/scontrol
 
 # Switch to GCC 11.5.0 build (same Slurm version)
-module swap slurm/25.05-gcc-11.5.0
+module swap slurm/25.11-gcc-11.5.0
 which scontrol  # /opt/slurm/view/bin/scontrol (same path, different binary)
 
 # Switch to Slurm 24.11 (same compiler)
@@ -251,7 +251,7 @@ sequenceDiagram
     S3-->>CloudFront: index.json
     CloudFront-->>Spack: index.json (cached)
     
-    Spack->>CloudFront: GET /build_cache/.../slurm-25-05-4-1.spack
+    Spack->>CloudFront: GET /build_cache/.../slurm-25-11-0-1.spack
     CloudFront-->>Spack: Binary package (cached at edge)
     
     Spack->>User: Extract & install (2 minutes)
@@ -296,20 +296,20 @@ Even when building locally (not using public buildcache), Slurm Factory caches i
 ├── spack-buildcache/      # Downloaded binaries from S3
 │   └── linux-ubuntu24.04-x86_64/
 ├── spack-sourcecache/     # Source tarballs (never re-downloaded)
-│   ├── slurm-25.05.tar.bz2
+│   ├── slurm-25.11.tar.bz2
 │   └── gcc-13.4.0.tar.gz
 ├── compilers/             # Built compilers (reused across Slurm versions)
 │   ├── gcc-13.4.0/
 │   └── gcc-11.5.0/
 └── builds/                # Final outputs
-    └── slurm-25.05-gcc-13.4.0/
+    └── slurm-25.11-gcc-13.4.0/
 ```
 
 ### Build Performance (Local)
 
 ```bash
 # First build: Downloads from S3 buildcache
-$ time slurm-factory build --slurm-version 25.05 --compiler-version 13.4.0
+$ time slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
 real    2m15s  # Download + extract
 
 # Different Slurm version, same compiler: Reuses compiler, downloads Slurm deps
@@ -317,11 +317,11 @@ $ time slurm-factory build --slurm-version 24.11 --compiler-version 13.4.0
 real    1m45s  # Compiler cached locally
 
 # Same Slurm, different compiler: Downloads new compiler + deps
-$ time slurm-factory build --slurm-version 25.05 --compiler-version 11.5.0
+$ time slurm-factory build --slurm-version 25.11 --compiler-version 11.5.0
 real    2m30s  # New compiler from buildcache
 
 # Rebuild same config: Everything cached
-$ time slurm-factory build --slurm-version 25.05 --compiler-version 13.4.0
+$ time slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
 real    0m45s  # All local caches hit
 ```
 
@@ -331,10 +331,10 @@ real    0m45s  # All local caches hit
 
 ```bash
 # Deploy to 100 compute nodes in parallel (using Ansible/parallel-ssh)
-time ansible compute -m copy -a "src=slurm-25.05-gcc-13.4.0.tar.gz dest=/tmp/"
+time ansible compute -m copy -a "src=slurm-25.11-gcc-13.4.0.tar.gz dest=/tmp/"
 # ~2 minutes (network I/O)
 
-time ansible compute -m shell -a "tar -xzf /tmp/slurm-25.05-gcc-13.4.0.tar.gz -C /opt/"
+time ansible compute -m shell -a "tar -xzf /tmp/slurm-25.11-gcc-13.4.0.tar.gz -C /opt/"
 # ~30 seconds (parallel extraction)
 
 time ansible compute -m shell -a "systemctl restart slurmd"
@@ -348,7 +348,7 @@ time ansible compute -m shell -a "systemctl restart slurmd"
 When upgrading Slurm versions, only changed files are updated:
 
 ```bash
-# Upgrade from 25.05 to 25.11 (same compiler)
+# Upgrade from 25.11 to 25.11 (same compiler)
 rsync -av --delete slurm-25.11-gcc-13.4.0/ /opt/slurm/
 # Only Slurm binaries changed (~50 MB)
 # Dependencies unchanged (~400 MB reused)
@@ -401,7 +401,7 @@ timeout-minutes: 480  # Allow long builds
 strategy:
   fail-fast: false
   matrix:
-    slurm_version: ["25.05", "24.11", "23.11", "23.02"]
+    slurm_version: ["25.11", "24.11", "23.11", "23.02"]
     compiler_version: ["13.4.0", "11.5.0", "10.5.0"]
 ```
 
@@ -423,13 +423,13 @@ export DOCKER_MEMORY=32g
 
 ```bash
 # Use shared filesystem to deploy once, mount everywhere
-tar -xzf slurm-25.05-gcc-13.4.0.tar.gz -C /shared/nfs/slurm/
+tar -xzf slurm-25.11-gcc-13.4.0.tar.gz -C /shared/nfs/slurm/
 
 # Nodes mount /shared/nfs/slurm -> /opt/slurm (read-only)
 # No extraction needed on compute nodes
 
 # Or use container registries for immutable deployments
-skopeo copy dir:slurm-25.05-gcc-13.4.0 docker://registry/slurm:25.05
+skopeo copy dir:slurm-25.11-gcc-13.4.0 docker://registry/slurm:25.11
 ```
 
 ## Conclusion

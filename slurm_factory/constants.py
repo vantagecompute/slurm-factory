@@ -20,10 +20,9 @@ from pathlib import Path
 
 # Mapping of user-facing version strings to Spack package versions
 SLURM_VERSIONS = {
-    "25.05": "25-05-4-1",
+    "25.11": "25-11-0-1",
     "24.11": "24-11-6-1",
     "23.11": "23-11-11-1",
-    "23.02": "23-02-7-1",
 }
 
 # Supported compiler versions for building
@@ -45,10 +44,9 @@ COMPILER_TOOLCHAINS = {
 class SlurmVersion(str, Enum):
     """Available Slurm versions for building."""
 
-    v25_05 = "25.05"
+    v25_11 = "25.11"
     v24_11 = "24.11"
     v23_11 = "23.11"
-    v23_02 = "23.02"
 
 
 class BuildType(str, Enum):
@@ -373,7 +371,7 @@ def get_package_tarball_script(
 
     Args:
         modulerc_script: The script to create .modulerc.lua file
-        version: Slurm version (e.g., "25.05") for the tarball filename
+        version: Slurm version (e.g., "25.11") for the tarball filename
         compiler_version: GCC compiler version used for the build (e.g., "7.5.0")
         gpu_support: Whether GPU support is enabled (affects CUDA/ROCm handling)
 
@@ -570,7 +568,7 @@ CMD ["/bin/bash"]
 
 def get_dockerfile(
     spack_yaml_content: str,
-    version: str = "25.05",
+    version: str = "25.11",
     compiler_version: str = "13.4.0",
     gpu_support: bool = False,
     cache_dir: str = "",
@@ -588,7 +586,7 @@ def get_dockerfile(
 
     Args:
         spack_yaml_content: The complete spack.yaml content as a string
-        version: Slurm version (e.g., "25.05") for the tarball filename
+        version: Slurm version (e.g., "25.11") for the tarball filename
         compiler_version: GCC compiler version to use (downloaded from buildcache)
         gpu_support: Whether GPU support is enabled
         cache_dir: Host cache directory (not used for compiler anymore)

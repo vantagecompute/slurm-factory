@@ -13,7 +13,7 @@ slurm-factory build [OPTIONS]
 ```
 
 **Options:**
-- `--slurm-version TEXT` - Slurm version (default: 25.05)
+- `--slurm-version TEXT` - Slurm version (default: 25.11)
 - `--compiler-version TEXT` - GCC compiler version (default: 13.4.0)
   - Available: 15.2.0, 14.3.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
 - `--gpu` - Include GPU support (CUDA/ROCm)
@@ -24,7 +24,7 @@ slurm-factory build [OPTIONS]
 **Examples:**
 ```bash
 # Standard build with default compiler (GCC 13.4.0)
-slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.11
 
 # Build with specific compiler for cross-distro compatibility
 slurm-factory build --compiler-version 10.5.0  # RHEL 8/Ubuntu 20.04
@@ -34,8 +34,8 @@ slurm-factory build --compiler-version 7.5.0   # RHEL 7
 slurm-factory build --compiler-version 15.2.0  # Latest GCC 15
 
 # Combine options
-slurm-factory build --slurm-version 25.05 --compiler-version 11.5.0 --gpu
-slurm-factory build --slurm-version 25.05 --minimal
+slurm-factory build --slurm-version 25.11 --compiler-version 11.5.0 --gpu
+slurm-factory build --slurm-version 25.11 --minimal
 ```
 
 ### clean
@@ -63,8 +63,8 @@ slurm-factory clean --full       # Full cleanup
 
 **Examples:**
 ```bash
-slurm-factory --project-name prod build --slurm-version 25.05
-slurm-factory --verbose build --slurm-version 25.05
+slurm-factory --project-name prod build --slurm-version 25.11
+slurm-factory --verbose build --slurm-version 25.11
 ```
 
 ## Python API
@@ -74,14 +74,14 @@ from slurm_factory.builder import build
 from slurm_factory.config import Settings
 
 # Basic build
-build(slurm_version="25.05", gpu=False, minimal=False)
+build(slurm_version="25.11", gpu=False, minimal=False)
 
 # GPU build
-build(slurm_version="25.05", gpu=True, minimal=False)
+build(slurm_version="25.11", gpu=True, minimal=False)
 
 # Custom settings
 settings = Settings(project_name="custom")
-build(slurm_version="25.05", settings=settings)
+build(slurm_version="25.11", settings=settings)
 ```
 
 ## Configuration

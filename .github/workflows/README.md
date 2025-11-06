@@ -36,13 +36,13 @@ Builds and publishes **only** Slurm dependencies (excluding Slurm itself) to S3 
 **Inputs:**
 - `slurm_versions`: Slurm versions to build dependencies for (comma-separated or "all")
   - Default: `all`
-  - Example: `"25.05,24.11"` or `"all"`
+  - Example: `"25.11,24.11"` or `"all"`
 - `compiler_versions`: Compiler versions to use (comma-separated or "all")
   - Default: `all`
   - Example: `"13.4.0,11.5.0"` or `"all"`
 
 **Supported Slurm Versions:**
-- 25.05, 24.11, 23.11, 23.02
+- 25.11, 24.11, 23.11, 23.02
 
 **Build Command:**
 ```bash
@@ -70,8 +70,8 @@ Builds and publishes **both** Slurm and all its dependencies to S3 buildcache. T
 
 **Inputs:**
 - `slurm_versions`: Slurm versions to build (comma-separated or "all")
-  - Default: `25.05`
-  - Example: `"25.05,24.11"` or `"all"`
+  - Default: `25.11`
+  - Example: `"25.11,24.11"` or `"all"`
 - `compiler_versions`: Compiler versions to use (comma-separated or "all")
   - Default: `13.4.0`
   - Example: `"13.4.0,11.5.0"` or `"all"`
@@ -158,14 +158,14 @@ Each workflow includes:
 #### Build dependencies for specific versions:
 ```bash
 # Via GitHub UI: Actions → "Build and Publish Slurm Dependencies for All Compilers" → Run workflow
-# Input: slurm_versions = "25.05,24.11"
+# Input: slurm_versions = "25.11,24.11"
 # Input: compiler_versions = "13.4.0,11.5.0"
 ```
 
 #### Build complete packages:
 ```bash
 # Via GitHub UI: Actions → "Build and Publish All Slurm Packages" → Run workflow
-# Input: slurm_versions = "25.05"
+# Input: slurm_versions = "25.11"
 # Input: compiler_versions = "13.4.0"
 # Input: build_type = "default"
 ```
@@ -181,11 +181,11 @@ spack mirror add compiler-buildcache \
 
 # Add Slurm buildcache
 spack mirror add slurm-buildcache \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.05/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
 # Install from buildcache
 spack install --no-check-signature gcc@13.4.0
-spack install --no-check-signature slurm@25.05
+spack install --no-check-signature slurm@25.11
 ```
 
 ## Monitoring

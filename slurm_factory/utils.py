@@ -388,7 +388,7 @@ def create_compiler_package(
 def create_slurm_package(
     container_name: str,
     image_tag: str,
-    version: str = "25.05",
+    version: str = "25.11",
     compiler_version: str = "13.4.0",
     gpu_support: bool = False,
     verify: bool = False,

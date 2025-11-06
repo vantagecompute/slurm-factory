@@ -87,14 +87,13 @@ def generate_compiler_bootstrap_config(
                 # Use binutils@2.44 instead of 2.45 to avoid build failures
                 # 2.44 is stable enough for GCC 14.2 while avoiding 2.45 issues
                 f"gcc@{gcc_ver} +binutils +piclibs languages='c,c++,fortran' ^binutils@2.44",
-                # NOTE: gcc-runtime@{gcc_ver} will be built in a second step after gcc is registered
                 # Build autotools in compiler env so they're available in /opt/spack-compiler
                 # but not during Slurm build (which needs different versions for libjwt compatibility)
                 "autoconf@2.72",
                 "automake@1.16.5",
                 "libtool@2.4.7",
-                # NOTE: Both gcc-runtime and compiler-wrapper will be built in a second step
-                # after gcc is registered
+                # NOTE: gcc-runtime and compiler-wrapper will be built as dependencies
+                # during the Slurm build phase, not during compiler bootstrap
             ],
             "concretizer": {
                 "unify": "when_possible",
@@ -192,7 +191,7 @@ def generate_compiler_bootstrap_yaml(
 
 
 def generate_module_config(
-    slurm_version: str = "25.05",
+    slurm_version: str = "25.11",
     gpu_support: bool = False,
     compiler_version: str = "13.4.0",
     enable_hierarchy: bool = False,
@@ -201,7 +200,7 @@ def generate_module_config(
     Generate the Lmod module configuration section for Spack.
 
     Args:
-        slurm_version: Slurm version to build (25.05, 24.11, 23.11, 23.02)
+        slurm_version: Slurm version to build (25.11, 24.11, 23.11, 23.02)
         gpu_support: Whether to include GPU support (NVML, RSMI)
         compiler_version: GCC compiler version to use
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
@@ -301,7 +300,7 @@ def generate_module_config(
 
 
 def generate_spack_config(
-    slurm_version: str = "25.05",
+    slurm_version: str = "25.11",
     gpu_support: bool = False,
     install_tree_root: str = "/opt/slurm/software",
     view_root: str = "/opt/slurm/view",  # Use separate view directory
@@ -313,7 +312,7 @@ def generate_spack_config(
     Generate a Spack environment configuration dictionary.
 
     Args:
-        slurm_version: Slurm version to build (25.05, 24.11, 23.11, 23.02)
+        slurm_version: Slurm version to build (25.11, 24.11, 23.11, 23.02)
         gpu_support: Whether to include GPU support (NVML, RSMI)
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view
@@ -345,8 +344,10 @@ def generate_spack_config(
         f"libs=shared,static tls=openssl {compiler_spec}"
     )
     specs = [
-        # Note: gcc and gcc-runtime are installed outside the environment first
-        # All packages below will use %gcc@{compiler_version} which will be available after gcc is installed
+        # Install GCC first from buildcache (built separately with build-compiler command)
+        # gcc-runtime will be built as a dependency of gcc
+        f"gcc@{compiler_version} +binutils +piclibs languages=c,c++,fortran {compiler_spec}",
+        # All packages below will use %gcc@{compiler_version}
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         # Build OpenSSL with explicit zlib dependency
         f"slurm_factory.openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",
@@ -552,17 +553,18 @@ def generate_spack_config(
                 # NOTE: bzip2 and xz are configured as external packages above to avoid library conflicts
                 "zstd": {"buildable": True},  # Fast compression (transitive)
                 # GCC compiler - downloaded from buildcache (built separately with build-compiler command)
-                # Mark as external to prevent being pulled in as dependency during concretization
+                # Let Spack install it from buildcache so gcc-runtime can find it properly
                 # The compiler is registered separately via 'spack compiler add' after bootstrap
                 "gcc": {
-                    "externals": [{"spec": f"gcc@{compiler_version}", "prefix": "/opt/spack-compiler-view"}],
-                    "buildable": False,
+                    "buildable": True,
+                    "version": [compiler_version],
+                    "variants": "+binutils +piclibs languages=c,c++,fortran",
                 },
+                # gcc-runtime will be built automatically as a dependency of gcc
+                # It provides runtime libraries for packages compiled with this GCC version
                 "gcc-runtime": {
-                    "externals": [
-                        {"spec": f"gcc-runtime@{compiler_version}", "prefix": "/opt/spack-compiler-view"}
-                    ],
-                    "buildable": False,
+                    "buildable": True,
+                    "version": [compiler_version],
                 },
                 "slurm": {
                     "version": [slurm_package_version],
@@ -652,7 +654,7 @@ def get_comment_header(slurm_version: str, gpu_support: bool) -> str:
 
 
 def generate_yaml_string(
-    slurm_version: str = "25.05",
+    slurm_version: str = "25.11",
     compiler_version: str = "13.4.0",
     gpu_support: bool = False,
     enable_verification: bool = False,
@@ -690,21 +692,21 @@ def generate_yaml_string(
 
 
 # Convenience functions for common configurations
-def cpu_only_config(slurm_version: str = "25.05", enable_verification: bool = False) -> Dict[str, Any]:
+def cpu_only_config(slurm_version: str = "25.11", enable_verification: bool = False) -> Dict[str, Any]:
     """Generate CPU-only configuration (default, optimized for size)."""
     return generate_spack_config(
         slurm_version=slurm_version, gpu_support=False, enable_verification=enable_verification
     )
 
 
-def gpu_enabled_config(slurm_version: str = "25.05", enable_verification: bool = False) -> Dict[str, Any]:
+def gpu_enabled_config(slurm_version: str = "25.11", enable_verification: bool = False) -> Dict[str, Any]:
     """Generate GPU-enabled configuration (larger, includes CUDA/ROCm)."""
     return generate_spack_config(
         slurm_version=slurm_version, gpu_support=True, enable_verification=enable_verification
     )
 
 
-def verification_config(slurm_version: str = "25.05", gpu_support: bool = False) -> Dict[str, Any]:
+def verification_config(slurm_version: str = "25.11", gpu_support: bool = False) -> Dict[str, Any]:
     """Generate configuration with verification enabled (for CI and pre-release checks)."""
     return generate_spack_config(
         slurm_version=slurm_version, gpu_support=gpu_support, enable_verification=True
@@ -713,14 +715,14 @@ def verification_config(slurm_version: str = "25.05", gpu_support: bool = False)
 
 if __name__ == "__main__":
     # Example usage - generate configurations for testing
-    print("=== CPU-only Slurm 25.05 (default gcc 13.4.0) ===")
-    print(generate_yaml_string("25.05", gpu_support=False))
+    print("=== CPU-only Slurm 25.11 (default gcc 13.4.0) ===")
+    print(generate_yaml_string("25.11", gpu_support=False))
 
-    print("\n=== GPU-enabled Slurm 25.05 (default gcc 13.4.0) ===")
-    print(generate_yaml_string("25.05", gpu_support=True))
+    print("\n=== GPU-enabled Slurm 25.11 (default gcc 13.4.0) ===")
+    print(generate_yaml_string("25.11", gpu_support=True))
 
-    print("\n=== Slurm 25.05 with gcc 10.5.0 for RHEL 8 compatibility ===")
-    print(generate_yaml_string("25.05", compiler_version="10.5.0", gpu_support=False))
+    print("\n=== Slurm 25.11 with gcc 10.5.0 for RHEL 8 compatibility ===")
+    print(generate_yaml_string("25.11", compiler_version="10.5.0", gpu_support=False))
 
-    print("\n=== CPU-only Slurm 25.05 with Verification (CI) ===")
-    print(generate_yaml_string("25.05", gpu_support=False, enable_verification=True))
+    print("\n=== CPU-only Slurm 25.11 with Verification (CI) ===")
+    print(generate_yaml_string("25.11", gpu_support=False, enable_verification=True))

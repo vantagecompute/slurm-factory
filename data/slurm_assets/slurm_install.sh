@@ -304,7 +304,7 @@ if [[ -d /opt/slurm/view/bin ]] && [[ -f /opt/slurm/view/bin/sinfo ]]; then
 else
     echo "Downloading and extracting Slurm software"
     mkdir -p /opt/slurm
-    wget -qO- https://vantage-public-assets.s3.us-west-2.amazonaws.com/slurm/25.05/slurm-latest.tar.gz | \
+    wget -qO- https://vantage-public-assets.s3.us-west-2.amazonaws.com/slurm/25.11/slurm-latest.tar.gz | \
         tar --no-same-owner --no-same-permissions --touch -xz -C /opt/slurm
     echo "Slurm software installed to /opt/slurm/view"
 fi

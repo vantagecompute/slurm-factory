@@ -25,12 +25,12 @@ sudo usermod -aG docker $USER && newgrp docker
 pip install slurm-factory
 
 # Build Slurm
-slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.11
 
 # Deploy
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
-module load slurm/25.05
+module load slurm/25.11
 ```
 
 ## Features
@@ -86,17 +86,17 @@ The compiler build produces:
 
 ```bash
 # Standard (CPU-optimized, 2-5GB)
-slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.11
 
 # GPU support (CUDA/ROCm, 15-25GB)
-slurm-factory build --slurm-version 25.05 --gpu
+slurm-factory build --slurm-version 25.11 --gpu
 
 # Minimal (no OpenMPI, 1-2GB)
-slurm-factory build --slurm-version 25.05 --minimal
+slurm-factory build --slurm-version 25.11 --minimal
 
 # Advanced Spack 1.x features
-slurm-factory build --slurm-version 25.05 --enable-hierarchy  # Core/Compiler/MPI hierarchy
-slurm-factory build --slurm-version 25.05 --enable-buildcache  # Binary cache for 5-10x faster rebuilds
+slurm-factory build --slurm-version 25.11 --enable-hierarchy  # Core/Compiler/MPI hierarchy
+slurm-factory build --slurm-version 25.11 --enable-buildcache  # Binary cache for 5-10x faster rebuilds
 
 # Cross-distro compatibility with older toolchains
 slurm-factory build --compiler-version 10.5.0  # RHEL 8 / Ubuntu 20.04
@@ -107,10 +107,10 @@ slurm-factory build --compiler-version 15.2.0  # Latest GCC 15
 slurm-factory build --compiler-version 14.3.0  # Latest GCC 14
 
 # Combine multiple options
-slurm-factory build --slurm-version 25.05 --enable-hierarchy --enable-buildcache
+slurm-factory build --slurm-version 25.11 --enable-hierarchy --enable-buildcache
 
 # Verbose
-slurm-factory --verbose build --slurm-version 25.05
+slurm-factory --verbose build --slurm-version 25.11
 ```
 
 ## Compiler Toolchains
@@ -134,7 +134,7 @@ You can now build compiler toolchains separately using `slurm-factory build-comp
 
 | Version | Status | Size (CPU) | Size (GPU) |
 |---------|--------|------------|------------|
-| 25.05   | Latest | 2-5GB      | 15-25GB    |
+| 25.11   | Latest | 2-5GB      | 15-25GB    |
 | 24.11   | LTS    | 2-5GB      | 15-25GB    |
 | 23.11   | Stable | 2-5GB      | 15-25GB    |
 | 23.02   | Legacy | 2-5GB      | 15-25GB    |
@@ -142,9 +142,9 @@ You can now build compiler toolchains separately using `slurm-factory build-comp
 ## Package Structure
 
 ```
-slurm-25.05-software.tar.gz
+slurm-25.11-software.tar.gz
 ├── view/                    # Slurm binaries & libraries
-├── modules/slurm/25.05.lua  # Lmod module (relocatable)
+├── modules/slurm/25.11.lua  # Lmod module (relocatable)
 └── data/slurm_assets/       # Config templates & install script
 ```
 
@@ -152,20 +152,20 @@ slurm-25.05-software.tar.gz
 
 ```bash
 # Extract
-sudo tar -xzf slurm-25.05-software.tar.gz -C /opt/
+sudo tar -xzf slurm-25.11-software.tar.gz -C /opt/
 
 # Install (creates users, configs, services)
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Use
-module load slurm/25.05
+module load slurm/25.11
 ```
 
 **Relocatable:**
 ```bash
 # Deploy to custom path
 export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.05
+module load slurm/25.11
 ```
 
 ## Spack 1.x Features
@@ -186,7 +186,7 @@ The optional 3-tier Core/Compiler/MPI hierarchy provides better dependency manag
 **Usage:**
 ```bash
 # Build with hierarchy
-slurm-factory build --slurm-version 25.05 --enable-hierarchy
+slurm-factory build --slurm-version 25.11 --enable-hierarchy
 
 # After deployment
 module avail           # Shows available Core modules
@@ -205,10 +205,10 @@ Enable binary package caching for 5-10x faster rebuilds:
 **Usage:**
 ```bash
 # First build with buildcache
-slurm-factory build --slurm-version 25.05 --enable-buildcache
+slurm-factory build --slurm-version 25.11 --enable-buildcache
 
 # Subsequent builds are much faster
-slurm-factory build --slurm-version 25.05 --enable-buildcache
+slurm-factory build --slurm-version 25.11 --enable-buildcache
 # Uses cached binaries, only rebuilds changed packages
 ```
 
@@ -255,11 +255,11 @@ slurm-factory build-compiler --compiler-version 13.4.0 --publish
 5. **Deploy** - Extract and run installation script
 
 ```bash
-slurm-factory build --slurm-version 25.05 --use-buildcache
+slurm-factory build --slurm-version 25.11 --use-buildcache
 ```
 
 **Output:**
-- `~/.slurm-factory/25.05/13.4.0/slurm-25.05-gcc13.4.0-software.tar.gz`
+- `~/.slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz`
 
 ### Build Cache Architecture
 

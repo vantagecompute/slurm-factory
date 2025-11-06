@@ -6,7 +6,7 @@ on:
       slurm_version:
         description: 'Slurm version to build'
         required: true
-        default: '25.05'
+        default: '25.11'
         type: string
       gpu_support:
         description: 'Enable GPU support'

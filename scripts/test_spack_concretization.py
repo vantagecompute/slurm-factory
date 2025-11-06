@@ -24,7 +24,7 @@ Requirements:
     - Python 3.12+
 
 Usage:
-    python scripts/test_spack_concretization.py [--slurm-version 25.05] [--compiler-version 13.4.0]
+    python scripts/test_spack_concretization.py [--slurm-version 25.11] [--compiler-version 13.4.0]
 """
 
 import argparse
@@ -142,8 +142,8 @@ def main():
     )
     parser.add_argument(
         "--slurm-version",
-        default="25.05",
-        help="Slurm version to test (default: 25.05)",
+        default="25.11",
+        help="Slurm version to test (default: 25.11)",
     )
     parser.add_argument(
         "--compiler-version",

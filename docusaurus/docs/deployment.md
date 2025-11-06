@@ -8,34 +8,34 @@ Deploy relocatable Slurm packages to HPC clusters. Packages can be built locally
 
 ```bash
 # Build package (default: GCC 13.4.0 for Ubuntu 24.04)
-slurm-factory build --slurm-version 25.05
+slurm-factory build --slurm-version 25.11
 
 # Build for RHEL 8 / Ubuntu 20.04 compatibility
-slurm-factory build --slurm-version 25.05 --compiler-version 10.5.0
+slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
 
 # Build for RHEL 7 compatibility
-slurm-factory build --slurm-version 25.05 --compiler-version 7.5.0
+slurm-factory build --slurm-version 25.11 --compiler-version 7.5.0
 
 # Deploy
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.05-gcc13.4.0-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
-module load slurm/25.05-gcc13.4.0
+module load slurm/25.11-gcc13.4.0
 ```
 
 ### Option 2: Download Pre-Built Package from S3
 
 ```bash
 # Download from S3
-aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.05-gcc13.4.0-software.tar.gz /tmp/
+aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.11-gcc13.4.0-software.tar.gz /tmp/
 
 # Deploy
-sudo tar -xzf /tmp/slurm-25.05-gcc13.4.0-software.tar.gz -C /opt/
+sudo tar -xzf /tmp/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
-module load slurm/25.05-gcc13.4.0
+module load slurm/25.11-gcc13.4.0
 ```
 
 See [Build Artifacts](build-artifacts.md) for all available S3 packages.
@@ -100,7 +100,7 @@ slurm-{version}-gcc{compiler}-software.tar.gz
 ```bash
 # Custom path deployment
 export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.05-gcc13.4.0
+module load slurm/25.11-gcc13.4.0
 
 # Verify
 which srun
@@ -111,14 +111,14 @@ echo $SLURM_ROOT
 
 ```bash
 # Deploy multiple versions
-sudo tar -xzf slurm-25.05-gcc13.4.0-software.tar.gz -C /opt/slurm-25.05/
+sudo tar -xzf slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/slurm-25.11/
 sudo tar -xzf slurm-24.11-gcc11.5.0-software.tar.gz -C /opt/slurm-24.11/
 
-cd /opt/slurm-25.05 && sudo ./data/slurm_assets/slurm_install.sh
+cd /opt/slurm-25.11 && sudo ./data/slurm_assets/slurm_install.sh
 cd /opt/slurm-24.11 && sudo ./data/slurm_assets/slurm_install.sh
 
 # Switch versions
-module load slurm/25.05-gcc13.4.0  # or slurm/24.11-gcc11.5.0
+module load slurm/25.11-gcc13.4.0  # or slurm/24.11-gcc11.5.0
 ```
 
 ## Basic Configuration

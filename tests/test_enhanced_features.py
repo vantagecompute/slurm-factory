@@ -254,7 +254,7 @@ class TestBackwardCompatibility:
     def test_existing_tests_compatibility(self):
         """Test that existing test patterns still work."""
         # This mimics what existing tests do
-        config = generate_spack_config(slurm_version="25.05", gpu_support=False)
+        config = generate_spack_config(slurm_version="25.11", gpu_support=False)
         
         assert "spack" in config
         assert "specs" in config["spack"]
@@ -282,7 +282,7 @@ class TestParameterValidation:
 
     def test_hierarchy_with_different_slurm_versions(self):
         """Test hierarchy works with all Slurm versions."""
-        versions = ["25.05", "24.11", "23.11", "23.02"]
+        versions = ["25.11", "24.11", "23.11", "23.02"]
         
         for version in versions:
             config = generate_spack_config(slurm_version=version, enable_hierarchy=True)

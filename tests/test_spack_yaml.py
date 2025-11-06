@@ -267,12 +267,12 @@ class TestYAMLGeneration:
 
     def test_get_comment_header(self):
         """Test comment header generation."""
-        header = get_comment_header("25.05", True)
-        assert "25.05" in header
+        header = get_comment_header("25.11", True)
+        assert "25.11" in header
         assert "with GPU support" in header
 
-        header = get_comment_header("25.05", False)
-        assert "25.05" in header
+        header = get_comment_header("25.11", False)
+        assert "25.11" in header
         assert "(without GPU support)" in header
 
 

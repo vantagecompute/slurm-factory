@@ -13,7 +13,7 @@ Slurm Factory simplifies the complex process of building and packaging Slurm for
 - **Creating relocatable packages** that can be deployed to any filesystem path
 - **Optimizing performance** with CPU-specific optimizations and optional GPU support
 - **Ensuring reproducibility** through Docker container isolation and version-controlled dependencies
-- **Supporting multiple versions** of Slurm (25.05, 24.11, 23.11, 23.02)
+- **Supporting multiple versions** of Slurm (25.11, 24.11, 23.11, 23.02)
 
 ## Key Features
 
@@ -53,7 +53,7 @@ Slurm Factory simplifies the complex process of building and packaging Slurm for
 ## CLI Examples
 
 ```bash
-# Build latest Slurm with default settings (Slurm 25.05, GCC 13.4.0)
+# Build latest Slurm with default settings (Slurm 25.11, GCC 13.4.0)
 slurm-factory build
 
 # Build specific Slurm version with default compiler
@@ -66,7 +66,7 @@ slurm-factory build --compiler-version 10.5.0
 slurm-factory build --compiler-version 7.5.0 --slurm-version 23.11
 
 # Build specific combination
-slurm-factory build --slurm-version 25.05 --compiler-version 14.2.0
+slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
 
 # Build with GPU support and verbose output
 slurm-factory --verbose build --gpu
@@ -87,7 +87,7 @@ slurm-factory clean --full
 
 Slurm Factory supports building the following Slurm versions:
 
-- **25.05** - Latest stable release (default)
+- **25.11** - Latest stable release (default)
 - **24.11** - Previous stable release
 - **23.11** - Long-term support
 - **23.02** - Extended support
