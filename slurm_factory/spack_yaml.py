@@ -344,9 +344,10 @@ def generate_spack_config(
         f"libs=shared,static tls=openssl {compiler_spec}"
     )
     specs = [
-        # Note: gcc is installed from buildcache and registered before this environment is built
-        # gcc-runtime will be built as a dependency during this phase with the registered compiler
-        # All packages below will use %gcc@{compiler_version} which will be available after gcc is installed
+        # Install GCC first from buildcache (built separately with build-compiler command)
+        # gcc-runtime will be built as a dependency of gcc
+        f"gcc@{compiler_version} +binutils +piclibs languages=c,c++,fortran {compiler_spec}",
+        # All packages below will use %gcc@{compiler_version}
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         # Build OpenSSL with explicit zlib dependency
         f"slurm_factory.openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",
@@ -552,13 +553,14 @@ def generate_spack_config(
                 # NOTE: bzip2 and xz are configured as external packages above to avoid library conflicts
                 "zstd": {"buildable": True},  # Fast compression (transitive)
                 # GCC compiler - downloaded from buildcache (built separately with build-compiler command)
-                # Mark as external to prevent being pulled in as dependency during concretization
+                # Let Spack install it from buildcache so gcc-runtime can find it properly
                 # The compiler is registered separately via 'spack compiler add' after bootstrap
                 "gcc": {
-                    "externals": [{"spec": f"gcc@{compiler_version}", "prefix": "/opt/spack-compiler-view"}],
-                    "buildable": False,
+                    "buildable": True,
+                    "version": [compiler_version],
+                    "variants": "+binutils +piclibs languages=c,c++,fortran",
                 },
-                # gcc-runtime can be built during Slurm build phase if needed
+                # gcc-runtime will be built automatically as a dependency of gcc
                 # It provides runtime libraries for packages compiled with this GCC version
                 "gcc-runtime": {
                     "buildable": True,
