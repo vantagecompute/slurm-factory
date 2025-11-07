@@ -19,24 +19,42 @@ from pathlib import Path
 
 
 class TestBuildcacheIndexUpdate:
-    """Test that buildcache index is updated after adding mirrors."""
+    """
+    Test that buildcache index is updated after adding mirrors.
+    
+    These tests validate:
+    - Index update commands are present in workflows
+    - Commands are in the correct order
+    - Workflow structure follows best practices for buildcache usage
+    """
+
+    @staticmethod
+    def _find_test_step(workflow_path: Path, step_name: str = "Test buildcache installation"):
+        """
+        Helper method to find a specific step in a GitHub Actions workflow.
+        
+        Args:
+            workflow_path: Path to the workflow YAML file
+            step_name: Name of the step to find
+            
+        Returns:
+            The step dictionary if found, None otherwise
+        """
+        with open(workflow_path) as f:
+            workflow = yaml.safe_load(f)
+        
+        for job in workflow["jobs"].values():
+            if "steps" in job:
+                for step in job["steps"]:
+                    if step.get("name") == step_name:
+                        return step
+        return None
 
     def test_compiler_workflow_updates_index(self):
         """Test that compiler buildcache workflow updates index after adding mirror."""
         workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
         
-        with open(workflow_path) as f:
-            workflow = yaml.safe_load(f)
-        
-        # Find the test buildcache installation job
-        test_step = None
-        for job in workflow["jobs"].values():
-            if "steps" in job:
-                for step in job["steps"]:
-                    if step.get("name") == "Test buildcache installation":
-                        test_step = step
-                        break
-        
+        test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
         
         # Check that the step includes buildcache update-index command
@@ -56,18 +74,7 @@ class TestBuildcacheIndexUpdate:
         """Test that slurm buildcache workflow updates index after adding mirrors."""
         workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
         
-        with open(workflow_path) as f:
-            workflow = yaml.safe_load(f)
-        
-        # Find the test buildcache installation job
-        test_step = None
-        for job in workflow["jobs"].values():
-            if "steps" in job:
-                for step in job["steps"]:
-                    if step.get("name") == "Test buildcache installation":
-                        test_step = step
-                        break
-        
+        test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
         
         # Check that the step includes buildcache update-index command
@@ -89,18 +96,7 @@ class TestBuildcacheIndexUpdate:
         """Test that compiler workflow has proper structure for buildcache testing."""
         workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
         
-        with open(workflow_path) as f:
-            workflow = yaml.safe_load(f)
-        
-        # Find the test buildcache installation step
-        test_step = None
-        for job in workflow["jobs"].values():
-            if "steps" in job:
-                for step in job["steps"]:
-                    if step.get("name") == "Test buildcache installation":
-                        test_step = step
-                        break
-        
+        test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
         
         run_script = test_step["run"]
@@ -135,18 +131,7 @@ class TestBuildcacheIndexUpdate:
         """Test that slurm workflow has proper structure for buildcache testing."""
         workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
         
-        with open(workflow_path) as f:
-            workflow = yaml.safe_load(f)
-        
-        # Find the test buildcache installation step
-        test_step = None
-        for job in workflow["jobs"].values():
-            if "steps" in job:
-                for step in job["steps"]:
-                    if step.get("name") == "Test buildcache installation":
-                        test_step = step
-                        break
-        
+        test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
         
         run_script = test_step["run"]
