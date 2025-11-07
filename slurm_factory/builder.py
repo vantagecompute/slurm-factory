@@ -34,7 +34,7 @@ def build_compiler(
     ctx: typer.Context,
     compiler_version: str = "13.4.0",
     no_cache: bool = False,
-    publish: bool = False,
+    publish: str = "none",
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
 ):

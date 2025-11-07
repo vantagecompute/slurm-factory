@@ -291,7 +291,7 @@ def create_compiler_package(
     cache_dir: str = "",
     verbose: bool = False,
     no_cache: bool = False,
-    publish: bool = False,
+    publish: str = "none",
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
 ) -> None:
@@ -360,8 +360,8 @@ def create_compiler_package(
             )
 
         # If publish is enabled, push to S3 buildcache using spack
-        if publish:
-            console.print("[bold cyan]Publishing compiler to S3 buildcache...[/bold cyan]")
+        if publish != "none":
+            console.print(f"[bold cyan]Publishing compiler to S3 buildcache ({publish})...[/bold cyan]")
             publish_compiler_to_buildcache(
                 image_tag=image_tag,
                 cache_dir=cache_dir,
