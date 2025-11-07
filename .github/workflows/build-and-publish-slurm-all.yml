@@ -189,9 +189,10 @@ jobs:
           spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
           
           # Update the buildcache index to ensure we have the latest packages
+          # Allow these to fail gracefully if the buildcaches are new/empty
           echo "Updating buildcache indexes..."
-          spack buildcache update-index compiler-buildcache
-          spack buildcache update-index deps-buildcache
+          spack buildcache update-index compiler-buildcache || echo "Warning: Could not update compiler-buildcache index (buildcache may be new/empty)"
+          spack buildcache update-index deps-buildcache || echo "Warning: Could not update deps-buildcache index (buildcache may be new/empty)"
           
           # List available packages
           echo "Available packages in buildcache:"
