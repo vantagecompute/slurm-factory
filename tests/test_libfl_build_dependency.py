@@ -10,7 +10,7 @@ class TestLibflBuildDependency:
     def test_libfl_dev_in_system_deps(self):
         """Verify libfl-dev is installed in the build container."""
         deps_script = get_install_system_deps_script()
-        
+
         # libfl-dev should be in the apt install list
         assert "libfl-dev" in deps_script, (
             "libfl-dev must be available during builds. "
@@ -21,7 +21,7 @@ class TestLibflBuildDependency:
     def test_flex_also_installed(self):
         """Verify flex tool is available alongside libfl-dev."""
         deps_script = get_install_system_deps_script()
-        
+
         # Both flex and libfl-dev should be present
         assert "flex" in deps_script, "flex tool must be available"
         assert "libfl-dev" in deps_script, "libfl-dev must be available"
