@@ -188,6 +188,11 @@ jobs:
           spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
           spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
           
+          # Update the buildcache index to ensure we have the latest packages
+          echo "Updating buildcache indexes..."
+          spack buildcache update-index compiler-buildcache
+          spack buildcache update-index deps-buildcache
+          
           # List available packages
           echo "Available packages in buildcache:"
           spack buildcache list --allarch | head -30

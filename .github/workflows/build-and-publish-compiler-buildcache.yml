@@ -162,6 +162,10 @@ jobs:
           spack mirror remove slurm-factory-buildcache 2>/dev/null || true
           spack mirror add slurm-factory-buildcache "$MIRROR_URL"
           
+          # Update the buildcache index to ensure we have the latest packages
+          echo "Updating buildcache index..."
+          spack buildcache update-index slurm-factory-buildcache
+          
           # List available packages
           echo "Available packages in buildcache:"
           spack buildcache list --allarch | head -20
