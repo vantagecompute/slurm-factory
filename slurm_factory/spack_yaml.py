@@ -419,7 +419,7 @@ def generate_spack_config(
                 "db_lock_timeout": 120,  # Database lock timeout in seconds
                 "bootstrap": {
                     "enable": True,
-                    "root": "$spack/opt/spack",
+                    "root": "$spack/opt/bootstrap",
                     "sources": ["github-actions-v0.5", "github-actions-v0.4"],
                 },
             },
