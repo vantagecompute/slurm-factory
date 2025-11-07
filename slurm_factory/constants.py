@@ -263,7 +263,7 @@ COMPILER_ENV_EOF
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
         echo '==> Installing GCC compiler from buildcache in dedicated environment...'
-        spack -e . install --cache-only --no-check-signature
+        spack -e . install --cache-only
         echo '==> Hiding system gcc binaries to prevent auto-detection...'
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
             [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
@@ -332,9 +332,9 @@ CEOF
         }}
         rm -f spack.lock
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
-        spack concretize -j $(nproc) -f --fresh
+        spack concretize -j $(( $(nproc) - 1 )) -f --fresh
         echo '==> Installing Slurm and dependencies...'
-        spack install -j$(nproc) -f || {{
+        spack install -j$(( $(nproc) - 1 )) -f || {{
             echo 'ERROR: spack install failed'
             echo 'Checking view status:'
             ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'
@@ -526,8 +526,8 @@ RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
     for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
         [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
     done && \\
-    spack -e . concretize -j $(nproc) -f && \\
-    spack -e . install -j $(nproc) --verbose'
+    spack -e . concretize -j $(( $(nproc) - 1 )) -f && \\
+    spack -e . install -j $(( $(nproc) - 1 )) --verbose
 
 # Register the newly built compiler with Spack at site scope
 # The view at /opt/spack-compiler is automatically created by the environment configuration
