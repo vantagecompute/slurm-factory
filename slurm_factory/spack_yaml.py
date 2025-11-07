@@ -599,7 +599,6 @@ def generate_spack_config(
                         "libsigsegv",
                         "tar",
                         "bison",
-                        "flex",
                         "glibc",
                         "gcc",
                     ]
