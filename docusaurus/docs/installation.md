@@ -187,7 +187,7 @@ slurm-factory clean --full
 
 **Available Versions:**
 
-- **Slurm**: 25.11, 24.11, 23.11, 23.02
+- **Slurm**: 25.11, 24.11, 23.11
 - **Compilers**: 14.2.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
 
 See [Build Artifacts](build-artifacts.md) for pre-built S3 packages.

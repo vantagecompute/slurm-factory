@@ -30,7 +30,7 @@ jobs:
         run: |
           # Prepare Slurm versions matrix
           if [ "${{ inputs.slurm_versions }}" = "all" ]; then
-            SLURM_VERSIONS='["25.11", "24.11", "23.11", "23.02"]'
+            SLURM_VERSIONS='["25.11", "24.11", "23.11"]'
           else
             IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
             SLURM_VERSIONS="["

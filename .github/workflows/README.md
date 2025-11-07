@@ -42,7 +42,7 @@ Builds and publishes **only** Slurm dependencies (excluding Slurm itself) to S3 
   - Example: `"13.4.0,11.5.0"` or `"all"`
 
 **Supported Slurm Versions:**
-- 25.11, 24.11, 23.11, 23.02
+- 25.11, 24.11, 23.11
 
 **Build Command:**
 ```bash
@@ -183,9 +183,12 @@ spack mirror add compiler-buildcache \
 spack mirror add slurm-buildcache \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# Install from buildcache
-spack install --no-check-signature gcc@13.4.0
-spack install --no-check-signature slurm@25.11
+# Import and trust GPG signing keys
+spack buildcache keys --install --trust
+
+# Install from signed buildcache
+spack install gcc@13.4.0
+spack install slurm@25.11
 ```
 
 ## Monitoring

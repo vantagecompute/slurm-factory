@@ -113,16 +113,24 @@ s3://slurm-factory-spack-buildcache-4b670/slurm/{slurm_version}/{compiler_versio
 │   │   │   ├── hwloc-2.11.2-*.spack            # Hardware locality
 │   │   │   ├── ucx-1.17.0-*.spack              # Communications
 │   │   │   └── ... (40+ more packages)
-├── _pgp/                          # GPG public keys
-│   └── *.pub
+├── _pgp/                          # GPG public keys for signature verification
+│   └── *.pub                      # Public keys automatically imported by Spack
 └── index.json                     # Package index
 ```
 
 **Package Benefits**:
-- ✅ **GPG Signed** - Verify package integrity
+- ✅ **GPG Signed** - Cryptographically signed for security and integrity
 - ✅ **Compressed** - zstd compression for smaller downloads
 - ✅ **Metadata** - Full dependency information included
 - ✅ **Relocatable** - RPATH configured for any prefix
+
+**Security Workflow**:
+
+1. All packages built in isolated Docker containers
+2. Packages signed with GPG private key during CI/CD
+3. Public keys stored in `_pgp/` directory of buildcache
+4. Users import keys with `spack buildcache keys --install --trust`
+5. Spack verifies signatures automatically during installation
 
 ## Distribution
 
@@ -197,9 +205,9 @@ All Slurm × Compiler combinations are pre-built and available:
 
 Similar URLs for Slurm 24.11 with all compiler versions.
 
-#### Slurm 23.11 (Stable) and 23.02 (Legacy)
+#### Slurm 23.11 (Stable)
 
-Similar URLs for older Slurm versions with all compiler versions.
+Similar URLs for Slurm 23.11 with all compiler versions.
 
 ### Buildcache
 
@@ -264,10 +272,13 @@ spack mirror add slurm-factory-compilers \
 spack mirror add slurm-factory-slurm \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# 3. Install from buildcache
-spack install --no-check-signature slurm@25.11%gcc@13.4.0
+# 3. Import and trust GPG signing keys
+spack buildcache keys --install --trust
 
-# 4. Load and use
+# 4. Install from signed buildcache
+spack install slurm@25.11%gcc@13.4.0
+
+# 5. Load and use
 spack load slurm@25.11
 sinfo --version
 ```
@@ -335,10 +346,13 @@ spack mirror add slurm-factory-compilers \
 spack mirror add slurm-factory-slurm \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# 2. Install from cache (5-15 minutes!)
-spack install --no-check-signature slurm@25.11%gcc@13.4.0
+# 2. Import and trust GPG signing keys
+spack buildcache keys --install --trust
 
-# 3. Load and verify
+# 3. Install from signed buildcache (5-15 minutes!)
+spack install slurm@25.11%gcc@13.4.0
+
+# 4. Load and verify
 spack load slurm@25.11
 sinfo --version
 ```

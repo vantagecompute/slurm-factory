@@ -94,8 +94,7 @@ s3://slurm-factory-spack-buildcache-4b670/
 └── slurm/
     ├── 25.11/{compiler}/buildcache/
     ├── 24.11/{compiler}/buildcache/
-    ├── 23.11/{compiler}/buildcache/
-    └── 23.02/{compiler}/buildcache/
+    └── 23.11/{compiler}/buildcache/
 ```
 
 ### CloudFront Distribution

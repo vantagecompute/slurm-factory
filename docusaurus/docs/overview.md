@@ -13,7 +13,7 @@ Slurm Factory simplifies the complex process of building and packaging Slurm for
 - **Relocatable Packages** - Deploy to any filesystem path without recompilation
 - **Performance Optimization** - CPU-specific optimizations and optional GPU support
 - **Reproducibility** - Docker container isolation and version-controlled dependencies
-- **Multi-Version Support** - Slurm versions 25.11, 24.11, 23.11, 23.02
+- **Multi-Version Support** - Slurm versions 25.11, 24.11, 23.11
 - **Flexible Compilers** - GCC 7.5.0 through 15.2.0 for maximum compatibility
 
 ## Build System Architecture
@@ -74,11 +74,12 @@ graph TB
 - **Self-Contained**: No external dependencies required at runtime
 - **RPATH/RUNPATH**: Binaries find libraries without `LD_LIBRARY_PATH`
 
-### ⚡ **Public Binary Cache**
+### ⚡ **Public Binary Cache with GPG Signing**
 - **Global CDN**: CloudFront-distributed buildcache at `slurm-factory-spack-binary-cache.vantagecompute.ai`
 - **Pre-built Packages**: Compilers and Slurm packages for all version combinations
 - **10-15x Speedup**: Install in 5-15 minutes instead of 45-90 minutes
-- **GPG Signed**: All packages signed for integrity verification
+- **GPG Signed**: All packages cryptographically signed for integrity and authenticity
+- **Secure Verification**: Automatic signature verification with `spack buildcache keys --install --trust`
 - **No Docker Required**: Install directly with Spack from buildcache
 
 ### ⚡ **Intelligent Multi-Layer Caching**
@@ -119,8 +120,11 @@ spack mirror add slurm-factory-compilers \
 spack mirror add slurm-factory-slurm \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# Install from cache (5-15 minutes!)
-spack install --no-check-signature slurm@25.11%gcc@13.4.0
+# Import and trust GPG signing keys
+spack buildcache keys --install --trust
+
+# Install from signed buildcache (5-15 minutes!)
+spack install slurm@25.11%gcc@13.4.0
 
 # Load and verify
 spack load slurm@25.11
@@ -160,7 +164,6 @@ Slurm Factory supports building the following Slurm versions:
 - **25.11** - Latest stable release (default)
 - **24.11** - Previous stable release
 - **23.11** - Long-term support
-- **23.02** - Extended support
 
 Use `--slurm-version` to specify which version to build.
 

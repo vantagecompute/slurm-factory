@@ -7,7 +7,7 @@ The Slurm Factory Spack Build Cache is a public binary package repository hosted
 The build cache is a **CloudFront-distributed S3 bucket** containing:
 
 - **GCC Compiler Toolchains** (versions 7.5.0 through 15.2.0)
-- **Slurm Packages** (versions 23.02, 23.11, 24.11, 25.11)
+- **Slurm Packages** (versions 23.11, 24.11, 25.11)
 - **All Dependencies** (OpenMPI, PMIx, Munge, HDF5, CUDA, etc.)
 
 All packages are:
@@ -60,11 +60,62 @@ slurm-factory-spack-binary-cache.vantagecompute.ai/
     │   └── ...
     ├── 24.11/                   # Slurm 24.11 (LTS)
     │   └── ...
-    ├── 23.11/                   # Slurm 23.11 (stable)
-    │   └── ...
-    └── 23.02/                   # Slurm 23.02 (legacy)
+    └── 23.11/                   # Slurm 23.11 (stable)
         └── ...
 ```
+
+## GPG Package Signing
+
+All packages in the build cache are cryptographically signed with GPG for security and integrity verification.
+
+### Automatic Key Import
+
+The easiest way to import the signing keys is to let Spack fetch them automatically from the buildcache:
+
+```bash
+# Add a mirror first
+spack mirror add slurm-factory \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+
+# Import and trust all GPG keys from the buildcache
+spack buildcache keys --install --trust
+```
+
+This command:
+1. Downloads all GPG public keys from the `_pgp/` directory in the buildcache
+2. Imports them into Spack's GPG keyring
+3. Marks them as trusted for package verification
+
+### Manual Key Verification
+
+For additional security, you can verify the key fingerprint:
+
+```bash
+# List imported keys
+spack gpg list
+
+# Expected output shows the Slurm Factory signing key
+# Key ID and fingerprint should match published values
+```
+
+### Signature Verification
+
+Once keys are imported, Spack automatically verifies package signatures during installation:
+
+```bash
+# Install with automatic signature verification
+spack install slurm@25.11
+
+# Check a specific package signature
+spack buildcache check slurm@25.11
+```
+
+### Why GPG Signing Matters
+
+- **Integrity**: Ensures packages haven't been tampered with
+- **Authenticity**: Confirms packages came from Slurm Factory
+- **Security**: Protects against man-in-the-middle attacks
+- **Compliance**: Meets security requirements for production systems
 
 ## Using the Build Cache
 
@@ -85,10 +136,13 @@ spack mirror add slurm-factory-compilers \
 spack mirror add slurm-factory-slurm \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# 4. Install Slurm from cache (takes 5-15 minutes!)
-spack install --no-check-signature slurm@25.11%gcc@13.4.0
+# 4. Import and trust GPG signing keys
+spack buildcache keys --install --trust
 
-# 5. Load and verify
+# 5. Install Slurm from signed buildcache (takes 5-15 minutes!)
+spack install slurm@25.11%gcc@13.4.0
+
+# 6. Load and verify
 spack load slurm@25.11
 sinfo --version
 # Output: slurm 25.11.0
@@ -146,7 +200,6 @@ All combinations of Slurm version × GCC compiler version are available:
 | 25.11 | Latest | All (7.5.0-15.2.0) | `slurm/25.11/{compiler}/buildcache` |
 | 24.11 | LTS | All (7.5.0-14.2.0) | `slurm/24.11/{compiler}/buildcache` |
 | 23.11 | Stable | All (7.5.0-14.2.0) | `slurm/23.11/{compiler}/buildcache` |
-| 23.02 | Legacy | All (7.5.0-14.2.0) | `slurm/23.02/{compiler}/buildcache` |
 
 Each Slurm buildcache includes:
 - **Slurm** - Complete workload manager with all plugins
@@ -200,6 +253,9 @@ GPU builds additionally include:
 spack mirror add slurm-factory \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
+# Import GPG signing keys
+spack buildcache keys --install --trust
+
 # List all packages in buildcache
 spack buildcache list --allarch
 ```
@@ -207,11 +263,14 @@ spack buildcache list --allarch
 ### Install Specific Dependencies
 
 ```bash
-# Install only OpenMPI from buildcache
-spack install --no-check-signature --cache-only openmpi@5.0.6
+# Import GPG keys (if not already done)
+spack buildcache keys --install --trust
 
-# Install PMIx from buildcache
-spack install --no-check-signature --cache-only pmix@5.0.3
+# Install only OpenMPI from signed buildcache
+spack install --cache-only openmpi@5.0.6
+
+# Install PMIx from signed buildcache
+spack install --cache-only pmix@5.0.3
 ```
 
 ### Use Multiple Mirrors
@@ -224,8 +283,11 @@ spack mirror add compilers \
 spack mirror add slurm-deps \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# Install will use both mirrors
-spack install --no-check-signature slurm@25.11
+# Import GPG signing keys from all mirrors
+spack buildcache keys --install --trust
+
+# Install with verified signatures
+spack install slurm@25.11
 ```
 
 ### Cache-Only Installation
@@ -233,19 +295,26 @@ spack install --no-check-signature slurm@25.11
 Force Spack to only use buildcache (fail if package not in cache):
 
 ```bash
-spack install --no-check-signature --cache-only slurm@25.11
+# Import GPG keys first
+spack buildcache keys --install --trust
+
+# Install only from buildcache with signature verification
+spack install --cache-only slurm@25.11
 ```
 
-### Verify Package Signatures
+### GPG Key Management
 
-If you have the GPG public key, you can verify package signatures:
+All packages in the buildcache are GPG-signed for security and integrity:
 
 ```bash
-# Import GPG public key (if available)
-spack gpg trust <key-file>
+# Import and trust GPG keys from buildcache
+spack buildcache keys --install --trust
 
-# Install with signature verification
-spack install slurm@25.11  # Without --no-check-signature
+# List trusted GPG keys
+spack gpg list
+
+# Verify a package signature manually
+spack buildcache check <package-spec>
 ```
 
 ## CI/CD Integration
@@ -294,11 +363,29 @@ If Spack can't find packages in buildcache:
 # Verify mirror is configured
 spack mirror list
 
+# Import GPG keys if not already done
+spack buildcache keys --install --trust
+
 # Check buildcache index
 spack buildcache list --allarch
 
 # Try updating buildcache index
 spack buildcache update-index
+```
+
+### Signature Verification Issues
+
+If you encounter GPG signature errors:
+
+```bash
+# Import and trust GPG keys from buildcache
+spack buildcache keys --install --trust
+
+# Verify keys are installed
+spack gpg list
+
+# Check package signature
+spack buildcache check slurm@25.11
 ```
 
 ### Network Issues
@@ -312,18 +399,32 @@ curl -I https://slurm-factory-spack-binary-cache.vantagecompute.ai/
 # Try direct S3 access (if CloudFront is down)
 spack mirror add s3-direct \
   https://slurm-factory-spack-buildcache-4b670.s3.amazonaws.com/slurm/25.11/13.4.0/buildcache
+spack buildcache keys --install --trust
 ```
 
 ### Signature Verification Failures
 
-If package signatures fail:
+If package signatures fail, the issue is usually that GPG keys haven't been imported:
 
 ```bash
-# Skip signature verification (use with caution)
-spack install --no-check-signature slurm@25.11
+# Import GPG keys from the buildcache
+spack buildcache keys --install --trust
 
-# Or import the public key if available
-spack gpg list  # Check if key is already imported
+# Verify keys are installed
+spack gpg list
+
+# Try installation again
+spack install slurm@25.11
+```
+
+If you still encounter issues:
+
+```bash
+# Update buildcache index
+spack buildcache update-index
+
+# Verify the package signature manually
+spack buildcache check slurm@25.11
 ```
 
 ## See Also

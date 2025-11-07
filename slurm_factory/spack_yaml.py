@@ -200,7 +200,7 @@ def generate_module_config(
     Generate the Lmod module configuration section for Spack.
 
     Args:
-        slurm_version: Slurm version to build (25.11, 24.11, 23.11, 23.02)
+        slurm_version: Slurm version to build (25.11, 24.11, 23.11)
         gpu_support: Whether to include GPU support (NVML, RSMI)
         compiler_version: GCC compiler version to use
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
@@ -312,7 +312,7 @@ def generate_spack_config(
     Generate a Spack environment configuration dictionary.
 
     Args:
-        slurm_version: Slurm version to build (25.11, 24.11, 23.11, 23.02)
+        slurm_version: Slurm version to build (25.11, 24.11, 23.11)
         gpu_support: Whether to include GPU support (NVML, RSMI)
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view

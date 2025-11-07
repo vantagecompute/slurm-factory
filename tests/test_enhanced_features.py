@@ -282,7 +282,7 @@ class TestParameterValidation:
 
     def test_hierarchy_with_different_slurm_versions(self):
         """Test hierarchy works with all Slurm versions."""
-        versions = ["25.11", "24.11", "23.11", "23.02"]
+        versions = ["25.11", "24.11", "23.11"]
         
         for version in versions:
             config = generate_spack_config(slurm_version=version, enable_hierarchy=True)

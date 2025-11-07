@@ -137,7 +137,6 @@ You can now build compiler toolchains separately using `slurm-factory build-comp
 | 25.11   | Latest | 2-5GB      | 15-25GB    |
 | 24.11   | LTS    | 2-5GB      | 15-25GB    |
 | 23.11   | Stable | 2-5GB      | 15-25GB    |
-| 23.02   | Legacy | 2-5GB      | 15-25GB    |
 
 ## Package Structure
 
