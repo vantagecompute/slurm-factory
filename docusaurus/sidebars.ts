@@ -35,6 +35,23 @@ const sidebars: SidebarsConfig = {
     },
     {
       type: 'category',
+      label: 'Build System',
+      items: [
+        'slurm-factory-spack-build-cache',
+        'build-artifacts',
+        'spack-repo',
+      ],
+    },
+    {
+      type: 'category',
+      label: 'Infrastructure',
+      items: [
+        'infrastructure',
+        'github-actions',
+      ],
+    },
+    {
+      type: 'category',
       label: 'Reference',
       items: [
         'architecture',

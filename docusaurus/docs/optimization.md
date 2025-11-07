@@ -56,22 +56,18 @@ graph LR
         BC1 --> B1[Slurm 25.11 Deps × 8 Compilers]
         BC1 --> B2[Slurm 24.11 Deps × 8 Compilers]
         BC1 --> B3[Slurm 23.11 Deps × 8 Compilers]
-        BC1 --> B4[Slurm 23.02 Deps × 8 Compilers]
         B1 --> BC2[(S3 Buildcache)]
         B2 --> BC2
         B3 --> BC2
-        B4 --> BC2
     end
     
     subgraph "Stage 3: Complete Slurm Packages"
         BC2 --> C1[Slurm 25.11 × 8 Compilers]
         BC2 --> C2[Slurm 24.11 × 8 Compilers]
         BC2 --> C3[Slurm 23.11 × 8 Compilers]
-        BC2 --> C4[Slurm 23.02 × 8 Compilers]
         C1 --> BC3[(S3 Buildcache<br/>+ CDN)]
         C2 --> BC3
         C3 --> BC3
-        C4 --> BC3
     end
     
     BC3 --> D[End Users:<br/>Instant Download]
@@ -177,7 +173,6 @@ Total Time:             84 minutes for 3 combinations (94% reduction)
 | **25.11** (latest) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
 | **24.11** (stable) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
 | **23.11** (LTS) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
-| **23.02** (legacy) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
 
 **Every combination produces:**
 - ✅ Identical module structure (Lmod-based)
@@ -401,7 +396,7 @@ timeout-minutes: 480  # Allow long builds
 strategy:
   fail-fast: false
   matrix:
-    slurm_version: ["25.11", "24.11", "23.11", "23.02"]
+    slurm_version: ["25.11", "24.11", "23.11"]
     compiler_version: ["13.4.0", "11.5.0", "10.5.0"]
 ```
 

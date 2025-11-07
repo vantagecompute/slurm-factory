@@ -4,7 +4,7 @@ Practical examples for building and deploying Slurm packages with different vers
 
 ## Supported Versions
 
-**Slurm Versions:** 25.11, 24.11, 23.11, 23.02
+**Slurm Versions:** 25.11, 24.11, 23.11
 
 **GCC Compilers:** 14.2.0, 13.4.0 (default), 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
 
@@ -48,9 +48,6 @@ slurm-factory build --slurm-version 24.11 --compiler-version 11.5.0
 
 # RHEL 8, Ubuntu 20.04, Debian 11+
 slurm-factory build --slurm-version 23.11 --compiler-version 10.5.0
-
-# RHEL 7, CentOS 7
-slurm-factory build --slurm-version 23.02 --compiler-version 7.5.0
 
 # Combine with GPU support
 slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu

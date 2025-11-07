@@ -1,26 +1,138 @@
 # Build Artifacts
 
-Slurm Factory produces relocatable Slurm packages that are published to Amazon S3 for easy distribution. Each build creates a single tarball containing both the Slurm installation and its corresponding Lmod modulefile.
+Slurm Factory produces two types of artifacts: **relocatable tarballs** for direct deployment and **Spack buildcache packages** for fast installation. Both are published to Amazon S3 for global distribution.
 
-## Package Structure
+## Artifact Types
+
+### 1. Relocatable Tarballs
+
+**Purpose**: Complete, self-contained Slurm installations ready to extract and deploy
+
+**Location**: `s3://vantage-public-assets/slurm-factory/`
+
+**Format**: Single tarball containing Slurm binaries, modules, and installation scripts
+
+**Use Cases**:
+- Quick deployment on any Linux system
+- Air-gapped installations (download once, deploy offline)
+- Container base images
+- Infrastructure automation (Ansible, Terraform)
+
+### 2. Spack Buildcache Packages
+
+**Purpose**: Binary package cache for Spack to enable fast installations
+
+**Location**: `s3://slurm-factory-spack-buildcache-4b670/`
+
+**Format**: Spack buildcache directory with GPG-signed packages
+
+**Use Cases**:
+- Fast Spack-based installations (5-15 minutes)
+- Custom Slurm builds with modified dependencies
+- Development and testing environments
+- CI/CD pipelines
+
+## Tarball Structure
+
+## Tarball Structure
 
 Each build produces **one tarball** containing:
 
 ```text
 slurm-{version}-gcc{compiler}-software.tar.gz
-├── view/                          # Slurm installation
-│   ├── bin/                       # Slurm binaries (srun, sbatch, etc.)
+├── view/                          # Slurm installation (unified prefix)
+│   ├── bin/                       # Slurm binaries (srun, sbatch, squeue, etc.)
+│   ├── sbin/                      # Daemons (slurmd, slurmctld, slurmdbd)
 │   ├── lib/                       # Shared libraries
+│   │   ├── libslurm.so            # Core Slurm library
+│   │   ├── libslurmdb.so          # Database library
+│   │   └── slurm/                 # Slurm plugins (auth, select, etc.)
 │   ├── lib64/                     # 64-bit libraries
 │   ├── include/                   # Header files
+│   │   └── slurm/                 # Slurm development headers
 │   ├── share/                     # Documentation, man pages
+│   │   ├── man/                   # Man pages (man1, man5, man8)
+│   │   ├── doc/slurm/             # HTML documentation
+│   │   └── licenses/              # License files
 │   └── etc/                       # Configuration templates
-└── modules/                       # Lmod modulefile
-    └── slurm/
-        └── {version}-gcc{compiler}.lua  # Modulefile for this build
+│       └── slurm/                 # Sample configs
+├── modules/                       # Lmod modulefile
+│   └── slurm/
+│       └── {version}-gcc{compiler}.lua  # Modulefile for this build
+└── data/slurm_assets/             # Installation scripts and configs
+    ├── slurm_install.sh           # Automated installation script
+    ├── defaults/                  # Systemd unit files
+    │   ├── slurmd.service
+    │   ├── slurmctld.service
+    │   └── slurmdbd.service
+    ├── slurm/                     # Configuration templates
+    │   ├── slurm.conf.template
+    │   ├── slurmdbd.conf.template
+    │   ├── cgroup.conf.template
+    │   └── topology.conf.template
+    └── mysql/                     # Database setup
+        └── slurm_acct_db.sql      # Database schema
 ```
 
-## Package Naming Convention
+## Buildcache Structure
+
+Spack buildcache packages are organized by component:
+
+### Compiler Buildcache
+
+```text
+s3://slurm-factory-spack-buildcache-4b670/compilers/{version}/buildcache/
+├── build_cache/                   # Compiled binary packages
+│   ├── linux-ubuntu24.04-x86_64_v3/
+│   │   ├── gcc-13.4.0/
+│   │   │   ├── gcc-13.4.0-*.spack              # GCC compiler package
+│   │   │   ├── gcc-runtime-13.4.0-*.spack      # Runtime libraries
+│   │   │   ├── binutils-2.43.1-*.spack         # Binary tools
+│   │   │   ├── gmp-6.3.0-*.spack               # Math library
+│   │   │   ├── mpfr-4.2.1-*.spack              # Floating-point library
+│   │   │   └── mpc-1.3.1-*.spack               # Complex math library
+├── _pgp/                          # GPG public keys
+│   └── *.pub
+└── index.json                     # Package index
+
+```
+
+### Slurm Buildcache
+
+```text
+s3://slurm-factory-spack-buildcache-4b670/slurm/{slurm_version}/{compiler_version}/buildcache/
+├── build_cache/                   # Compiled binary packages
+│   ├── linux-ubuntu24.04-x86_64_v3/
+│   │   ├── gcc-13.4.0/
+│   │   │   ├── slurm-25.11.0-*.spack           # Slurm package
+│   │   │   ├── openmpi-5.0.6-*.spack           # OpenMPI
+│   │   │   ├── pmix-5.0.3-*.spack              # PMIx
+│   │   │   ├── munge-0.5.16-*.spack            # Authentication
+│   │   │   ├── openssl-3.4.0-*.spack           # TLS/SSL
+│   │   │   ├── hdf5-1.14.5-*.spack             # Data format
+│   │   │   ├── hwloc-2.11.2-*.spack            # Hardware locality
+│   │   │   ├── ucx-1.17.0-*.spack              # Communications
+│   │   │   └── ... (40+ more packages)
+├── _pgp/                          # GPG public keys for signature verification
+│   └── *.pub                      # Public keys automatically imported by Spack
+└── index.json                     # Package index
+```
+
+**Package Benefits**:
+- ✅ **GPG Signed** - Cryptographically signed for security and integrity
+- ✅ **Compressed** - zstd compression for smaller downloads
+- ✅ **Metadata** - Full dependency information included
+- ✅ **Relocatable** - RPATH configured for any prefix
+
+**Security Workflow**:
+
+1. All packages built in isolated Docker containers
+2. Packages signed with GPG private key during CI/CD
+3. Public keys stored in `_pgp/` directory of buildcache
+4. Users import keys with `spack buildcache keys --install --trust`
+5. Spack verifies signatures automatically during installation
+
+## Distribution
 
 Tarballs follow this naming pattern:
 
@@ -34,97 +146,151 @@ slurm-{slurm_version}-gcc{compiler_version}-software.tar.gz
 - `slurm-24.11-gcc11.5.0-software.tar.gz` - Slurm 24.11 with GCC 11.5.0
 - `slurm-23.11-gcc7.5.0-software.tar.gz` - Slurm 23.11 with GCC 7.5.0 (RHEL 7)
 
-## S3 Build Artifacts
+## Distribution
 
-All pre-built packages are available in our S3 bucket. You can download them directly or use them in your deployment automation.
+### S3 Distribution
 
-### S3 Bucket Location
+**Tarballs**: Stored in public S3 bucket for direct download
 
 ```text
-s3://vantagecompute-slurm-builds/
+s3://vantage-public-assets/slurm-factory/{slurm_version}/{compiler_version}/
+└── slurm-{version}-gcc{compiler}-software.tar.gz
 ```
 
-### Available Builds
+**Buildcache**: Stored in dedicated buildcache bucket
 
-#### Slurm 25.11
+```text
+s3://slurm-factory-spack-buildcache-4b670/
+├── compilers/{version}/buildcache/
+└── slurm/{slurm_version}/{compiler_version}/buildcache/
+```
 
-| Compiler | Target OS | S3 URL |
-|----------|-----------|--------|
-| GCC 14.2.0 | Latest | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc14.2.0-software.tar.gz` |
-| GCC 13.4.0 | Ubuntu 24.04 | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc13.4.0-software.tar.gz` |
-| GCC 12.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc12.5.0-software.tar.gz` |
-| GCC 11.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc11.5.0-software.tar.gz` |
-| GCC 10.5.0 | RHEL 8/Ubuntu 20.04 | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc10.5.0-software.tar.gz` |
-| GCC 9.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc9.5.0-software.tar.gz` |
-| GCC 8.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc8.5.0-software.tar.gz` |
-| GCC 7.5.0 | RHEL 7 | `s3://vantagecompute-slurm-builds/slurm-25.11-gcc7.5.0-software.tar.gz` |
+### CloudFront CDN
 
-#### Slurm 24.11
+Both S3 buckets are distributed via CloudFront for fast global access:
 
-| Compiler | Target OS | S3 URL |
-|----------|-----------|--------|
-| GCC 14.2.0 | Latest | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc14.2.0-software.tar.gz` |
-| GCC 13.4.0 | Ubuntu 24.04 | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc13.4.0-software.tar.gz` |
-| GCC 12.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc12.5.0-software.tar.gz` |
-| GCC 11.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc11.5.0-software.tar.gz` |
-| GCC 10.5.0 | RHEL 8/Ubuntu 20.04 | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc10.5.0-software.tar.gz` |
-| GCC 9.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc9.5.0-software.tar.gz` |
-| GCC 8.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc8.5.0-software.tar.gz` |
-| GCC 7.5.0 | RHEL 7 | `s3://vantagecompute-slurm-builds/slurm-24.11-gcc7.5.0-software.tar.gz` |
+**Buildcache CDN**:
+```
+https://slurm-factory-spack-binary-cache.vantagecompute.ai
+```
 
-#### Slurm 23.11
+**Tarball CDN** (planned):
+```
+https://vantage-public-assets.s3.amazonaws.com/slurm-factory/
+```
 
-| Compiler | Target OS | S3 URL |
-|----------|-----------|--------|
-| GCC 14.2.0 | Latest | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc14.2.0-software.tar.gz` |
-| GCC 13.4.0 | Ubuntu 24.04 | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc13.4.0-software.tar.gz` |
-| GCC 12.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc12.5.0-software.tar.gz` |
-| GCC 11.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc11.5.0-software.tar.gz` |
-| GCC 10.5.0 | RHEL 8/Ubuntu 20.04 | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc10.5.0-software.tar.gz` |
-| GCC 9.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc9.5.0-software.tar.gz` |
-| GCC 8.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc8.5.0-software.tar.gz` |
-| GCC 7.5.0 | RHEL 7 | `s3://vantagecompute-slurm-builds/slurm-23.11-gcc7.5.0-software.tar.gz` |
+## Available Builds
 
-#### Slurm 23.02
+## Available Builds
 
-| Compiler | Target OS | S3 URL |
-|----------|-----------|--------|
-| GCC 14.2.0 | Latest | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc14.2.0-software.tar.gz` |
-| GCC 13.4.0 | Ubuntu 24.04 | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc13.4.0-software.tar.gz` |
-| GCC 12.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc12.5.0-software.tar.gz` |
-| GCC 11.5.0 | Ubuntu 22.04 | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc11.5.0-software.tar.gz` |
-| GCC 10.5.0 | RHEL 8/Ubuntu 20.04 | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc10.5.0-software.tar.gz` |
-| GCC 9.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc9.5.0-software.tar.gz` |
-| GCC 8.5.0 | RHEL 8 | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc8.5.0-software.tar.gz` |
-| GCC 7.5.0 | RHEL 7 | `s3://vantagecompute-slurm-builds/slurm-23.02-gcc7.5.0-software.tar.gz` |
+### Tarballs
+
+All Slurm × Compiler combinations are pre-built and available:
+
+#### Slurm 25.11 (Latest)
+
+| Compiler | Target OS | Public URL |
+|----------|-----------|------------|
+| GCC 15.2.0 | Latest (experimental) | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/15.2.0/slurm-25.11-gcc15.2.0-software.tar.gz` |
+| GCC 14.2.0 | Latest | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/14.2.0/slurm-25.11-gcc14.2.0-software.tar.gz` |
+| GCC 13.4.0 | Ubuntu 24.04 **(recommended)** | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz` |
+| GCC 12.5.0 | Ubuntu 22.04 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/12.5.0/slurm-25.11-gcc12.5.0-software.tar.gz` |
+| GCC 11.5.0 | Ubuntu 22.04 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/11.5.0/slurm-25.11-gcc11.5.0-software.tar.gz` |
+| GCC 10.5.0 | RHEL 8/Ubuntu 20.04 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/10.5.0/slurm-25.11-gcc10.5.0-software.tar.gz` |
+| GCC 9.5.0 | RHEL 8 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/9.5.0/slurm-25.11-gcc9.5.0-software.tar.gz` |
+| GCC 8.5.0 | RHEL 8 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/8.5.0/slurm-25.11-gcc8.5.0-software.tar.gz` |
+| GCC 7.5.0 | RHEL 7 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/7.5.0/slurm-25.11-gcc7.5.0-software.tar.gz` |
+
+#### Slurm 24.11 (LTS)
+
+Similar URLs for Slurm 24.11 with all compiler versions.
+
+#### Slurm 23.11 (Stable)
+
+Similar URLs for Slurm 23.11 with all compiler versions.
+
+### Buildcache
+
+All buildcache packages are available via CloudFront:
+
+**Compiler Buildcache URLs**:
+```
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache
+```
+
+**Slurm Buildcache URLs**:
+```
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache
+```
+
+See [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) for complete buildcache documentation.
 
 ## Downloading Artifacts
 
-### Using AWS CLI
+### Using Tarballs
+
+#### AWS CLI
 
 ```bash
 # Download a specific build
-aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.11-gcc13.4.0-software.tar.gz .
+aws s3 cp s3://vantage-public-assets/slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz .
 
 # List all available builds
-aws s3 ls s3://vantagecompute-slurm-builds/
+aws s3 ls s3://vantage-public-assets/slurm-factory/ --recursive
 
 # Download all builds for a specific Slurm version
-aws s3 sync s3://vantagecompute-slurm-builds/ . --exclude "*" --include "slurm-25.11-*"
+aws s3 sync s3://vantage-public-assets/slurm-factory/25.11/ ./slurm-25.11/
 ```
 
-### Using wget (Public Access)
+#### wget (Public Access)
 
 ```bash
-# Download via HTTPS (if bucket has public read access)
-wget https://vantagecompute-slurm-builds.s3.amazonaws.com/slurm-25.11-gcc13.4.0-software.tar.gz
+# Download via HTTPS
+wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz
 ```
 
-### Using curl
+#### curl
 
 ```bash
 # Download with curl
-curl -O https://vantagecompute-slurm-builds.s3.amazonaws.com/slurm-25.11-gcc13.4.0-software.tar.gz
+curl -O https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz
+```
+
+### Using Buildcache
+
+#### With Spack
+
+```bash
+# 1. Install Spack
+git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+source spack/share/spack/setup-env.sh
+
+# 2. Add buildcache mirrors
+spack mirror add slurm-factory-compilers \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+
+spack mirror add slurm-factory-slurm \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+
+# 3. Import and trust GPG signing keys
+spack buildcache keys --install --trust
+
+# 4. Install from signed buildcache
+spack install slurm@25.11%gcc@13.4.0
+
+# 5. Load and use
+spack load slurm@25.11
+sinfo --version
+```
+
+#### With slurm-factory CLI
+
+```bash
+# The CLI uses buildcache automatically
+pip install slurm-factory
+
+# Build will use buildcache for dependencies
+slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
 ```
 
 ## Artifact Verification
@@ -140,30 +306,55 @@ tar -xzf slurm-25.11-gcc13.4.0-software.tar.gz modules/slurm/25.11-gcc13.4.0.lua
 cat modules/slurm/25.11-gcc13.4.0.lua
 ```
 
-## Installation from S3
+## Installation from Artifacts
+
+### From Tarball
 
 Complete installation example:
 
 ```bash
 # 1. Download the tarball
-aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.11-gcc13.4.0-software.tar.gz /tmp/
+wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz
 
 # 2. Extract to target location
-sudo mkdir -p /opt/slurm
-sudo tar -xzf /tmp/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/slurm
+sudo mkdir -p /opt
+sudo tar -xzf slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
 
-# 3. Set up module system
-sudo mkdir -p /opt/modulefiles
-sudo cp -r /opt/slurm/modules/slurm /opt/modulefiles/
+# 3. Run installation script
+cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # 4. Configure Lmod to find modules
-export MODULEPATH=/opt/modulefiles:$MODULEPATH
+export MODULEPATH=/opt/modules:$MODULEPATH
 
 # 5. Load the module
 module load slurm/25.11-gcc13.4.0
 
 # 6. Verify installation
-srun --version
+sinfo --version
+# Output: slurm 25.11.0
+```
+
+### From Buildcache
+
+Install Slurm directly with Spack:
+
+```bash
+# 1. Add buildcache mirrors
+spack mirror add slurm-factory-compilers \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+
+spack mirror add slurm-factory-slurm \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+
+# 2. Import and trust GPG signing keys
+spack buildcache keys --install --trust
+
+# 3. Install from signed buildcache (5-15 minutes!)
+spack install slurm@25.11%gcc@13.4.0
+
+# 4. Load and verify
+spack load slurm@25.11
+sinfo --version
 ```
 
 ## Package Sizes
@@ -231,6 +422,9 @@ resource "null_resource" "deploy_slurm" {
 
 ## See Also
 
-- [Deployment Guide](/slurm-factory/deployment/) - Detailed deployment instructions
-- [Architecture](/slurm-factory/architecture/) - How packages are built
-- [Examples](/slurm-factory/examples/) - Usage examples and patterns
+- [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) - Detailed buildcache documentation
+- [Infrastructure](./infrastructure.md) - AWS infrastructure and CDN
+- [GitHub Actions](./github-actions.md) - Automated build and publishing
+- [Deployment Guide](./deployment.md) - Detailed deployment instructions
+- [Architecture](./architecture.md) - How packages are built
+- [Examples](./examples.md) - Usage examples and patterns

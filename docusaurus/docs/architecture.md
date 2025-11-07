@@ -1,17 +1,64 @@
 # Architecture
 
-Docker-based build system for creating relocatable Slurm packages using Spack.
+Slurm Factory is a modern Python-based build system that creates relocatable Slurm packages using Docker containers and Spack. The architecture is designed for modularity, reproducibility, and performance with intelligent caching at multiple layers.
 
 ## System Overview
 
-```text
-┌─────────────────────────────────────────────┐
-│     Python CLI (Typer + Pydantic)           │
-├─────────────────────────────────────────────┤
-│  Docker Build  │ Volume Mounts │ Spack      │
-├─────────────────────────────────────────────┤
-│  Integrated TAR │ Modules │ Install Script  │
-└─────────────────────────────────────────────┘
+```mermaid
+graph TB
+    subgraph "User Interface"
+        CLI[Python CLI<br/>Typer + Rich]
+    end
+    
+    subgraph "Build Orchestration"
+        Config[Pydantic Config<br/>Settings Management]
+        Builder[Builder Module<br/>Build Orchestration]
+        SpackYAML[Spack YAML Generator<br/>Dynamic Configs]
+        Utils[Utils Module<br/>Docker & Packaging]
+    end
+    
+    subgraph "Docker Container"
+        Ubuntu[Ubuntu 24.04<br/>Base Image]
+        Spack[Spack v1.0.0<br/>Package Manager]
+        CustomRepo[Custom Spack Repo<br/>slurm-factory-spack-repo]
+        Compiler[GCC Compiler<br/>Toolchain]
+        Build[Build Environment<br/>Parallel Compilation]
+    end
+    
+    subgraph "Caching Layers"
+        BuildCache[Binary Cache<br/>~/.slurm-factory/buildcache/]
+        SourceCache[Source Cache<br/>~/.slurm-factory/sourcecache/]
+        DockerCache[Docker Layer Cache<br/>Base images & volumes]
+    end
+    
+    subgraph "Outputs"
+        LocalTar[Local Tarball<br/>~/.slurm-factory/builds/]
+        S3Cache[S3 Buildcache<br/>Public CDN]
+        S3Tar[S3 Tarballs<br/>Public Downloads]
+    end
+    
+    CLI --> Config
+    CLI --> Builder
+    Builder --> SpackYAML
+    Builder --> Utils
+    Utils --> Ubuntu
+    Config --> BuildCache
+    Config --> SourceCache
+    Ubuntu --> Spack
+    Spack --> CustomRepo
+    Spack --> Compiler
+    Compiler --> Build
+    Build --> BuildCache
+    BuildCache --> LocalTar
+    BuildCache -.Publish.-> S3Cache
+    LocalTar -.Publish.-> S3Tar
+    DockerCache --> Ubuntu
+    SourceCache --> Spack
+    
+    style CLI fill:#4CAF50
+    style LocalTar fill:#2196F3
+    style S3Cache fill:#FF9800
+    style S3Tar fill:#FF9800
 ```
 
 ## Module Structure
@@ -29,26 +76,208 @@ slurm_factory/
 
 ## Build Pipeline
 
-1. **Docker Container** - Ubuntu 24.04 base with build tools
-2. **Spack Bootstrap** - Install compiler toolchain
-3. **Dependency Build** - Compile Slurm and dependencies
-4. **Package Creation** - Tar view/, modules/, data/
+The build process follows a multi-stage pipeline with intelligent caching:
+
+### Stage 1: Compiler Build (Optional)
+
+```mermaid
+flowchart LR
+    Start([build-compiler]) --> Config[Load Config<br/>Settings]
+    Config --> Docker[Create Docker<br/>Container]
+    Docker --> Spack[Bootstrap Spack<br/>v1.0.0]
+    Spack --> CompilerSource[Download GCC<br/>Source]
+    CompilerSource --> CompileSysGCC[Compile with<br/>System GCC]
+    CompileSysGCC --> StageGCC[Stage 1 GCC<br/>Bootstrap]
+    StageGCC --> BuildGCC[Build Final GCC<br/>Self-Hosted]
+    BuildGCC --> Runtime[Extract gcc-runtime<br/>Separate Package]
+    Runtime --> Binutils[Build binutils<br/>ld, as, etc.]
+    Binutils --> Sign{Sign?}
+    Sign -->|Yes| GPGSign[GPG Sign<br/>Packages]
+    Sign -->|No| Index[Create Buildcache<br/>Index]
+    GPGSign --> Index
+    Index --> Publish{Publish?}
+    Publish -->|Yes| S3Upload[Upload to S3<br/>Buildcache]
+    Publish -->|No| LocalStore[Store Locally]
+    S3Upload --> Done1([Complete])
+    LocalStore --> Done2([Complete])
+    
+    style Start fill:#4CAF50
+    style Done1 fill:#2196F3
+    style Done2 fill:#2196F3
+```
+
+**Outputs**:
+- Docker image: `slurm-factory:compiler-{version}`
+- Buildcache: `~/.slurm-factory/buildcache/` (local) or S3 (published)
+- Tarball: `~/.slurm-factory/compilers/{version}/gcc-{version}-compiler.tar.gz` (optional)
+
+**Time**: 30-60 minutes (first build), 2-5 minutes (from cache)
+
+### Stage 2: Slurm Build
+
+```mermaid
+flowchart TB
+    Start([build]) --> Config[Load Config<br/>& Cache Dirs]
+    Config --> Docker[Create Docker<br/>Container]
+    Docker --> Spack[Install Spack<br/>v1.0.0]
+    Spack --> CustomRepo[Clone Custom Repo<br/>slurm-factory-spack-repo]
+    CustomRepo --> AddMirrors[Add Buildcache<br/>Mirrors]
+    
+    AddMirrors --> CompilerCheck{Compiler<br/>Available?}
+    CompilerCheck -->|Buildcache| PullCompiler[Pull from<br/>Buildcache]
+    CompilerCheck -->|Build| BuildCompiler[Build from<br/>Source]
+    
+    PullCompiler --> RegisterComp[Register Compiler<br/>with Spack]
+    BuildCompiler --> RegisterComp
+    
+    RegisterComp --> GenYAML[Generate spack.yaml<br/>Environment Config]
+    GenYAML --> CreateEnv[Create Spack<br/>Environment]
+    CreateEnv --> DepsCheck{Dependencies<br/>in Cache?}
+    
+    DepsCheck -->|Yes| InstallCached[Install from<br/>Buildcache]
+    DepsCheck -->|Partial| InstallMixed[Mixed: Cache<br/>+ Build]
+    DepsCheck -->|No| InstallSource[Build All from<br/>Source]
+    
+    InstallCached --> BuildSlurm[Build Slurm<br/>Package]
+    InstallMixed --> BuildSlurm
+    InstallSource --> BuildSlurm
+    
+    BuildSlurm --> CreateView[Create Spack View<br/>Unified Prefix]
+    CreateView --> FixRPATH[Fix RPATH<br/>Relocatability]
+    FixRPATH --> GenModule[Generate Lmod<br/>Module]
+    GenModule --> AddAssets[Add Install Script<br/>& Configs]
+    AddAssets --> CreateTar[Create Tarball<br/>view/ + modules/ + data/]
+    
+    CreateTar --> PublishBC{Publish<br/>Buildcache?}
+    PublishBC -->|all| SignAll[Sign & Upload<br/>All Packages]
+    PublishBC -->|slurm-only| SignSlurm[Sign & Upload<br/>Slurm Only]
+    PublishBC -->|no| Skip[Skip Publishing]
+    
+    SignAll --> Extract[Extract Tarball<br/>to Host]
+    SignSlurm --> Extract
+    Skip --> Extract
+    
+    Extract --> Done([Complete])
+    
+    style Start fill:#4CAF50
+    style Done fill:#2196F3
+```
+
+**Outputs**:
+- Docker image: `slurm-factory:{slurm_version}-gcc{compiler_version}`
+- Buildcache: `~/.slurm-factory/buildcache/` (local) or S3 (published)
+- Tarball: `~/.slurm-factory/builds/slurm-{version}-gcc{compiler}-software.tar.gz`
+
+**Time**: 
+- From buildcache: 5-15 minutes
+- Partial cache: 20-45 minutes  
+- From source: 45-90 minutes (CPU), 90-180 minutes (GPU)
 
 ## Caching Strategy
 
-```text
-~/.slurm-factory/
-├── builds/              # Final tarballs
-├── spack-buildcache/    # Binary packages (>10x speedup)
-├── spack-sourcecache/   # Downloaded sources
-└── binary_index/        # Dependency cache
+Slurm Factory implements a sophisticated multi-layer caching system:
+
+### Cache Hierarchy
+
+```mermaid
+graph TB
+    subgraph "Layer 1: Docker Cache"
+        DockerBase[Base Image Cache<br/>Ubuntu 24.04]
+        DockerBuild[Build Layer Cache<br/>Spack, Tools]
+        DockerVolume[Volume Mounts<br/>Persistent Caches]
+    end
+    
+    subgraph "Layer 2: Spack Buildcache"
+        CompilerCache[Compiler Buildcache<br/>GCC Toolchains]
+        DepsCache[Dependencies Buildcache<br/>OpenMPI, PMIx, etc.]
+        SlurmCache[Slurm Buildcache<br/>Slurm Packages]
+    end
+    
+    subgraph "Layer 3: Source Cache"
+        SourceTarballs[Source Tarballs<br/>Downloaded Archives]
+        GitRepos[Git Repositories<br/>Cloned Repos]
+    end
+    
+    subgraph "Layer 4: Output Cache"
+        LocalBuilds[Local Builds<br/>~/.slurm-factory/builds/]
+        CompilerTarballs[Compiler Tarballs<br/>~/.slurm-factory/compilers/]
+    end
+    
+    DockerBase --> DockerBuild
+    DockerBuild --> DockerVolume
+    DockerVolume --> CompilerCache
+    DockerVolume --> DepsCache
+    DockerVolume --> SlurmCache
+    DockerVolume --> SourceTarballs
+    CompilerCache --> LocalBuilds
+    DepsCache --> LocalBuilds
+    SlurmCache --> LocalBuilds
+    SourceTarballs --> LocalBuilds
+    CompilerCache --> CompilerTarballs
+    
+    style CompilerCache fill:#4CAF50
+    style DepsCache fill:#4CAF50
+    style SlurmCache fill:#4CAF50
 ```
 
-**Performance:**
+### Cache Locations
 
-- First build: 45-90 minutes
-- Cached builds: 5-15 minutes
-- Cache hit: 80-95%
+```text
+~/.slurm-factory/
+├── buildcache/              # Spack binary packages (Layer 2)
+│   ├── build_cache/         # Compiled binaries
+│   ├── _pgp/                # GPG keys for verification
+│   └── *.spec.json          # Package specifications
+├── sourcecache/             # Downloaded sources (Layer 3)
+│   ├── gcc-*.tar.xz
+│   ├── slurm-*.tar.bz2
+│   └── ...
+├── builds/                  # Final tarballs (Layer 4)
+│   └── slurm-*-software.tar.gz
+└── compilers/               # Compiler tarballs (Layer 4)
+    └── {version}/
+        └── gcc-*-compiler.tar.gz
+```
+
+**Docker Volume Mounts** (Layer 1):
+```bash
+~/.slurm-factory/buildcache  → /opt/slurm-factory-cache/buildcache
+~/.slurm-factory/sourcecache → /opt/slurm-factory-cache/sourcecache
+```
+
+### Cache Performance
+
+| Build Scenario | Time | Cache Hit |
+|----------------|------|-----------|
+| First compiler build | 30-60 min | 0% |
+| Subsequent compiler | 2-5 min | 95% |
+| First Slurm (source) | 45-90 min | 0% |
+| Slurm (compiler cached) | 30-60 min | 20% |
+| Slurm (full cache) | 5-15 min | 95% |
+| Slurm (GPU, source) | 90-180 min | 0% |
+| Slurm (GPU, cached) | 15-25 min | 85% |
+
+### Public Buildcache
+
+In addition to local caching, Slurm Factory can use the **public buildcache**:
+
+**Compiler Buildcache**:
+```
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache
+```
+
+**Slurm Buildcache**:
+```
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache
+```
+
+Benefits:
+- ✅ **10-15x faster builds** - Skip compilation entirely
+- ✅ **80-90% storage savings** - No local compilation required
+- ✅ **Global CDN** - Fast downloads via CloudFront
+- ✅ **Reproducible** - Identical binaries across systems
+
+See [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) for details.
 
 ## Dependency Classification
 
@@ -95,16 +324,28 @@ slurm-{version}-gcc{compiler}-software.tar.gz (2-25GB depending on options)
 │   ├── bin/                               # Slurm binaries (srun, sbatch, etc.)
 │   ├── sbin/                              # Daemons (slurmd, slurmctld, slurmdbd)
 │   ├── lib/                               # Shared libraries and plugins
+│   │   ├── libslurm.so                    # Core Slurm library
+│   │   └── slurm/                         # Slurm plugins
 │   ├── lib64/                             # 64-bit libraries
 │   ├── include/                           # Header files
+│   │   └── slurm/                         # Slurm headers
 │   └── share/                             # Documentation, man pages
+│       ├── man/                           # Man pages
+│       └── doc/                           # Documentation
 ├── modules/slurm/                         # Lmod modulefiles
 │   └── {version}-gcc{compiler}.lua        # Modulefile for this build
 └── data/slurm_assets/                     # Configuration and scripts
     ├── slurm_install.sh                   # Installation script
     ├── defaults/                          # Systemd unit files
+    │   ├── slurmd.service
+    │   ├── slurmctld.service
+    │   └── slurmdbd.service
     ├── slurm/                             # Configuration templates
+    │   ├── slurm.conf.template
+    │   ├── slurmdbd.conf.template
+    │   └── cgroup.conf.template
     └── mysql/                             # Database configs
+        └── slurm_acct_db.sql
 ```
 
 **Package naming examples:**
@@ -154,27 +395,122 @@ slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu
 **Volume Mounts:**
 
 ```text
-~/.slurm-factory/spack-buildcache  → /opt/slurm-factory-cache/buildcache
-~/.slurm-factory/spack-sourcecache → /opt/slurm-factory-cache/sourcecache
+Host                                    → Container
+~/.slurm-factory/buildcache             → /opt/slurm-factory-cache/buildcache
+~/.slurm-factory/sourcecache            → /opt/slurm-factory-cache/sourcecache
+/var/run/docker.sock                    → /var/run/docker.sock (if needed)
 ```
 
 **Container Lifecycle:**
 
-1. Create container with Ubuntu 24.04
-2. Mount cache volumes
-3. Install Spack and bootstrap compiler
-4. Build Slurm with dependencies
-5. Extract packages to host
-6. Cleanup container
+```mermaid
+sequenceDiagram
+    participant Host
+    participant Docker
+    participant Container
+    participant Spack
+    
+    Host->>Docker: Create container with Ubuntu 24.04
+    Docker->>Container: Start container
+    Host->>Container: Mount cache volumes
+    Container->>Container: Install build tools
+    Container->>Spack: Install Spack v1.0.0
+    Container->>Spack: Clone custom repo
+    Spack->>Container: Bootstrap compiler
+    Spack->>Container: Build dependencies
+    Spack->>Container: Build Slurm
+    Container->>Container: Create view & modules
+    Container->>Host: Extract tarball
+    Host->>Docker: Stop & remove container
+    Host->>Host: Tarball ready in ~/.slurm-factory/builds/
+```
+
+**Build Environment**:
+- **Base**: Ubuntu 24.04 LTS
+- **Spack**: v1.0.0
+- **Python**: 3.12+
+- **Build Tools**: gcc, g++, gfortran, make, cmake, autotools
+- **Libraries**: libc6-dev, libssl-dev, etc.
+
+**Resource Limits**:
+```bash
+# Default (can be customized)
+--cpus=0               # Use all available CPUs
+--memory=0             # Use all available memory
+--shm-size=2g          # Shared memory for compilation
+```
 
 ## Error Handling
 
-Custom exception hierarchy:
+Custom exception hierarchy for comprehensive error management:
 
-- `SlurmFactoryError` - Base exception
-- `DockerError` - Docker operation failures  
-- `BuildError` - Build process failures
-- `ConfigurationError` - Invalid configuration
+```mermaid
+classDiagram
+    Exception <|-- SlurmFactoryError
+    SlurmFactoryError <|-- DockerError
+    SlurmFactoryError <|-- BuildError
+    SlurmFactoryError <|-- ConfigurationError
+    SlurmFactoryError <|-- SpackError
+    
+    class SlurmFactoryError {
+        +message: str
+        +context: dict
+        +__str__()
+    }
+    
+    class DockerError {
+        +container_name: str
+        +image: str
+        +exit_code: int
+    }
+    
+    class BuildError {
+        +stage: str
+        +package: str
+        +logs: str
+    }
+    
+    class ConfigurationError {
+        +setting: str
+        +value: any
+        +expected: str
+    }
+    
+    class SpackError {
+        +command: str
+        +output: str
+        +spec: str
+    }
+```
+
+**Exception Types**:
+
+- **`SlurmFactoryError`** - Base exception with context
+- **`DockerError`** - Docker operation failures (image build, container run)
+- **`BuildError`** - Build process failures (compilation, packaging)
+- **`ConfigurationError`** - Invalid configuration (missing settings, wrong types)
+- **`SpackError`** - Spack-specific errors (spec resolution, install failures)
+
+**Error Context**:
+
+All exceptions include:
+- Clear error message
+- Contextual information (package, version, stage)
+- Suggested remediation steps
+- Debug information (when verbose mode enabled)
+
+Example:
+```python
+raise BuildError(
+    "Failed to build package 'slurm'",
+    context={
+        "package": "slurm@25.11",
+        "compiler": "gcc@13.4.0",
+        "stage": "compilation",
+        "log_file": "/tmp/slurm-build.log"
+    }
+)
+```
 
 ## Optimization Features
 
@@ -186,8 +522,37 @@ Custom exception hierarchy:
 
 ## Security
 
-- Process isolation via Docker namespaces
-- Resource limits (--cpus, --memory)
-- Checksum validation for downloads
-- User-specific cache directories
-- No privileged container access
+### Process Isolation
+
+- **Docker Containers**: All builds run in isolated containers
+- **User Namespaces**: Container processes run as non-root when possible
+- **Resource Limits**: CPU, memory, and disk quotas enforced
+- **Network Isolation**: Containers can be restricted to specific networks
+
+### Data Protection
+
+- **Checksum Validation**: All downloaded sources verified
+- **GPG Signing**: Buildcache packages signed with GPG keys
+- **Secure Defaults**: TLS/SSL enabled for all network connections
+- **No Privileged Containers**: Builds don't require privileged access
+
+### Access Control
+
+- **User-Specific Caches**: Each user has isolated cache directories
+- **File Permissions**: Proper ownership and permissions on outputs
+- **AWS OIDC**: GitHub Actions use temporary credentials (no long-lived keys)
+- **Secret Management**: Sensitive data stored in GitHub Secrets
+
+### Supply Chain Security
+
+- **Pinned Dependencies**: Exact versions specified in `spack.yaml`
+- **Source Verification**: Downloaded sources verified with checksums
+- **Binary Verification**: GPG signatures on buildcache packages
+- **Audit Trail**: All builds logged with full provenance information
+
+## See Also
+
+- [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) - Public buildcache details
+- [Infrastructure](./infrastructure.md) - AWS infrastructure and CDK
+- [GitHub Actions](./github-actions.md) - CI/CD workflows
+- [API Reference](./api-reference.md) - CLI and Python API docs

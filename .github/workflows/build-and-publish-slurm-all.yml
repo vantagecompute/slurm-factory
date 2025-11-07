@@ -30,7 +30,7 @@ jobs:
         run: |
           # Prepare Slurm versions matrix
           if [ "${{ inputs.slurm_versions }}" = "all" ]; then
-            SLURM_VERSIONS='["25.11", "24.11", "23.11", "23.02"]'
+            SLURM_VERSIONS='["25.11", "24.11", "23.11"]'
           else
             IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
             SLURM_VERSIONS="["
@@ -187,6 +187,11 @@ jobs:
           spack mirror remove deps-buildcache 2>/dev/null || true
           spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
           spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
+          
+          # Update the buildcache index to ensure we have the latest packages
+          echo "Updating buildcache indexes..."
+          spack buildcache update-index compiler-buildcache
+          spack buildcache update-index deps-buildcache
           
           # List available packages
           echo "Available packages in buildcache:"

@@ -28,7 +28,6 @@ Slurm Factory supports multiple Slurm and GCC compiler combinations. All combina
 - **25.11** (Latest)
 - **24.11** (LTS)
 - **23.11** (Stable)
-- **23.02** (Legacy)
 
 ### GCC Compiler Versions
 
@@ -77,8 +76,11 @@ spack mirror add slurm-factory-compilers \
 spack mirror add slurm-factory-slurm \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
 
-# Install Slurm from cache (takes minutes!)
-spack install --no-check-signature slurm@25.11%gcc@13.4.0
+# Import and trust the GPG signing key
+spack buildcache keys --install --trust
+
+# Install Slurm from signed buildcache (takes minutes!)
+spack install slurm@25.11%gcc@13.4.0
 
 # Load and verify
 spack load slurm@25.11
@@ -156,7 +158,7 @@ slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
 slurm-factory build --slurm-version 25.11 --publish=all
 ```
 
-**Supported Versions**: 25.11, 24.11, 23.11, 23.02
+**Supported Versions**: 25.11, 24.11, 23.11
 
 **Output**: Tarball at `~/.slurm-factory/builds/slurm-{version}-gcc{compiler}-software.tar.gz`
 
@@ -175,14 +177,14 @@ Pre-built packages are available at `slurm-factory-spack-binary-cache.vantagecom
 #### Slurm Packages
 
 - **URL**: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache`
-- **Slurm Versions**: 25.11, 24.11, 23.11, 23.02
+- **Slurm Versions**: 25.11, 24.11, 23.11
 - **Compiler Combinations**: Each Slurm version × each GCC version
 - **Includes**: All dependencies (OpenMPI, OpenSSL, Munge, PMIx, HDF5, etc.)
 
 ### Benefits
 
 - ⚡ **10x Faster**: Install in 5-15 minutes vs 45-90 minutes building from source
-- 🔒 **Verified Builds**: All packages built and tested via GitHub Actions CI/CD
+- 🔒 **Verified Builds**: All packages GPG-signed and tested via GitHub Actions CI/CD
 - 🌐 **Global CDN**: CloudFront distribution for fast worldwide access
 - 🔄 **Always Current**: Automated workflows keep packages up-to-date
 - 💾 **Storage Efficient**: Download only what you need (2-25GB vs 50GB build requirements)
@@ -193,18 +195,55 @@ Pre-built packages are available at `slurm-factory-spack-binary-cache.vantagecom
 # Install latest Slurm with recommended compiler
 spack mirror add slurm-factory \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
-spack install --no-check-signature slurm@25.11
+spack buildcache keys --install --trust
+spack install slurm@25.11
 
 # Install legacy Slurm with older compiler
 spack mirror add slurm-factory \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/23.11/11.5.0/buildcache
-spack install --no-check-signature slurm@23.11
+spack buildcache keys --install --trust
+spack install slurm@23.11
 
 # Install just the compiler
 spack mirror add gcc-buildcache \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
-spack install --no-check-signature gcc@13.4.0
+spack buildcache keys --install --trust
+spack install gcc@13.4.0
 ```
+
+## GPG Package Verification
+
+All packages in the Slurm Factory buildcache are cryptographically signed with GPG for security and integrity.
+
+### Importing GPG Keys
+
+```bash
+# After adding a buildcache mirror, import the signing keys
+spack buildcache keys --install --trust
+
+# Verify keys are imported
+spack gpg list
+```
+
+### Automatic Verification
+
+Once keys are imported, Spack automatically verifies signatures:
+
+```bash
+# Install with signature verification (default behavior)
+spack install slurm@25.11
+
+# Spack will verify the GPG signature before installation
+```
+
+### Why This Matters
+
+- **Security**: Ensures packages haven't been tampered with
+- **Integrity**: Confirms packages are authentic from Slurm Factory
+- **Trust**: Cryptographic proof of package origin
+- **Compliance**: Meets security requirements for production deployments
+
+All packages are signed during the CI/CD build process and verified before deployment.
 
 ## Build Types Comparison
 
