@@ -244,6 +244,8 @@ def get_spack_build_script(compiler_version: str) -> str:
         spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
         echo '==> Installing buildcache keys...'
         spack buildcache keys --install --trust
+        echo '==> Updating buildcache index...'
+        spack buildcache update-index slurm-factory-buildcache
         echo '==> Creating temporary environment to install GCC compiler...'
         mkdir -p /tmp/compiler-install
         cd /tmp/compiler-install
@@ -262,7 +264,7 @@ spack:
 COMPILER_ENV_EOF
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
-        echo '==> Installing GCC compiler from buildcache in dedicated environment...'
+        echo '==> Installing GCC compiler from buildcache (preferring cache, building deps if needed)...'
         spack -e . install
         echo '==> Hiding system gcc binaries to prevent auto-detection...'
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
