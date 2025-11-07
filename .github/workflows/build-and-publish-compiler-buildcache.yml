@@ -216,5 +216,6 @@ jobs:
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "spack mirror add slurm-factory-buildcache ${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
-          echo "spack install --no-check-signature gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install gcc@${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY

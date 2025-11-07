@@ -228,7 +228,8 @@ jobs:
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
-          echo "spack install --no-check-signature <dependency>" >> $GITHUB_STEP_SUMMARY
+          echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   summary:
