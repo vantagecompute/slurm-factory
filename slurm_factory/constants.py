@@ -263,7 +263,7 @@ COMPILER_ENV_EOF
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
         echo '==> Installing GCC compiler from buildcache in dedicated environment...'
-        spack -e . install --cache-only
+        spack -e . install
         echo '==> Hiding system gcc binaries to prevent auto-detection...'
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
             [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
