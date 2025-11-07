@@ -163,8 +163,9 @@ jobs:
           spack mirror add slurm-factory-buildcache "$MIRROR_URL"
           
           # Update the buildcache index to ensure we have the latest packages
+          # Allow this to fail gracefully if the buildcache is new/empty
           echo "Updating buildcache index..."
-          spack buildcache update-index slurm-factory-buildcache
+          spack buildcache update-index slurm-factory-buildcache || echo "Warning: Could not update buildcache index (buildcache may be new/empty)"
           
           # List available packages
           echo "Available packages in buildcache:"
