@@ -157,6 +157,7 @@ def get_install_system_deps_script() -> str:
         unzip \\
         bison \\
         flex \\
+        libfl-dev \\
         cmake \\
         make \\
         m4 \\
