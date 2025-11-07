@@ -312,7 +312,7 @@ class TestGPGKeyImport:
             bash_script = cmd[-1]
 
             # Expected GPG homedir used by Spack
-            expected_homedir = "/opt/spack/opt/spack/gpg"
+            expected_homedir = "/opt/spack/var/spack/gpg"
 
             # Verify homedir is used consistently
             script_lines = bash_script.split(" && ")
