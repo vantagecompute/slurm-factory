@@ -211,8 +211,15 @@ def build_compiler(
         bool, typer.Option("--no-cache", help="Force a fresh build without using Docker cache")
     ] = False,
     publish: Annotated[
-        bool, typer.Option("--publish", help="Publish compiler binaries to S3 buildcache after build")
-    ] = False,
+        str,
+        typer.Option(
+            "--publish",
+            help=(
+                "Publish to buildcache: none (default), compiler (publish compiler), "
+                "all (same as compiler)"
+            ),
+        ),
+    ] = "none",
     signing_key: Annotated[
         str | None,
         typer.Option("--signing-key", help="GPG key ID for signing buildcache packages (e.g., '0xKEYID')"),
@@ -241,18 +248,30 @@ def build_compiler(
     - 8.5.0: GCC 8.5, glibc 2.28, RHEL 8 minimum
     - 7.5.0: GCC 7.5, glibc 2.17, RHEL 7 compatible (maximum compatibility)
 
+    Buildcache publishing (--publish):
+    - none (default): Don't publish to buildcache
+    - compiler: Publish the compiler to buildcache
+    - all: Publish all packages (same as compiler for this command)
+
     Examples:
         slurm-factory build-compiler                              # Build default compiler (gcc 13.4.0)
         slurm-factory build-compiler --compiler-version 14.2.0    # Build gcc 14.2
         slurm-factory build-compiler --compiler-version 10.5.0    # Build gcc 10.5 for RHEL 8
-        slurm-factory build-compiler --publish                    # Build and publish to S3 buildcache
-        slurm-factory build-compiler --publish --signing-key 0xKEYID  # Build and publish with signing
+        slurm-factory build-compiler --publish=compiler           # Build and publish to S3 buildcache
+        slurm-factory build-compiler --publish=all --signing-key 0xKEYID  # Build and publish with signing
         slurm-factory build-compiler --no-cache                   # Build without Docker cache
 
     """
     from slurm_factory.builder import build_compiler as builder_build_compiler
 
     console = Console()
+
+    # Validate publish parameter
+    valid_publish_options = ["none", "compiler", "all"]
+    if publish not in valid_publish_options:
+        console.print(f"[bold red]Error: Invalid --publish value '{publish}'[/bold red]")
+        console.print(f"[bold yellow]Valid options: {', '.join(valid_publish_options)}[/bold yellow]")
+        raise typer.Exit(1)
 
     if compiler_version not in COMPILER_TOOLCHAINS:
         console.print(f"[bold red]Error: Invalid compiler version '{compiler_version}'[/bold red]")
@@ -271,8 +290,8 @@ def build_compiler(
     if no_cache:
         console.print("[bold yellow]Building with --no-cache (fresh build)[/bold yellow]")
 
-    if publish:
-        console.print("[bold blue]Will publish compiler to S3 buildcache after build[/bold blue]")
+    if publish != "none":
+        console.print(f"[bold cyan]Will publish to buildcache: {publish}[/bold cyan]")
         if signing_key:
             console.print(f"[bold blue]Using GPG signing key: {signing_key}[/bold blue]")
 
