@@ -815,8 +815,6 @@ def publish_compiler_to_buildcache(
                 [
                     # Ensure /tmp has proper permissions for GPG temp files
                     'chmod 1777 /tmp',
-                    # Configure GPG for non-interactive use
-                    'export GPG_TTY=$(tty)',
                     # Create full GPG directory structure with correct permissions
                     'mkdir -p /opt/spack/var/spack/gpg/private-keys-v1.d',
                     'chmod 700 /opt/spack/var/spack/gpg',
@@ -1003,8 +1001,6 @@ def push_to_buildcache(
                 [
                     # Ensure /tmp has proper permissions for GPG temp files
                     'chmod 1777 /tmp',
-                    # Configure GPG for non-interactive use
-                    'export GPG_TTY=$(tty)',
                     # Create full GPG directory structure with correct permissions
                     'mkdir -p /opt/spack/var/spack/gpg/private-keys-v1.d',
                     'chmod 700 /opt/spack/var/spack/gpg',
