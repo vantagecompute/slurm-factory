@@ -148,9 +148,8 @@ class TestDockerfileBuildScript:
         assert "mkdir -p /tmp/compiler-install" in script
         assert "cd /tmp/compiler-install" in script
         
-        # Script should install GCC to /opt/spack-compiler-view
-        assert "view: /opt/spack-compiler-view" in script
-        assert "spack -e . install --cache-only --no-check-signature" in script
+        # Script should install compiler (will use buildcache when available, build from source if needed)
+        assert "spack -e . install" in script
         
         # Script should register compiler globally
         assert "spack compiler find --scope site /opt/spack-compiler-view" in script

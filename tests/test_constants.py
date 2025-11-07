@@ -206,8 +206,8 @@ class TestScriptTemplates:
         assert "type: buildcache" in script
         assert f"path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache" in script
         
-        # Test that it installs from buildcache with correct flags
-        assert "spack -e . install --cache-only --no-check-signature" in script
+        # Test that it installs compiler (will use buildcache when available, build from source if needed)
+        assert "spack -e . install" in script
         
         # Test that it registers compiler from the view location
         assert "spack compiler find --scope site /opt/spack-compiler-view" in script
