@@ -417,11 +417,6 @@ def generate_spack_config(
                     "missing_library_policy": "warn",  # Warn on missing system libraries
                 },
                 "db_lock_timeout": 120,  # Database lock timeout in seconds
-                "bootstrap": {
-                    "enable": True,
-                    "root": "$spack/opt/bootstrap",
-                    "sources": ["github-actions-v0.5", "github-actions-v0.4"],
-                },
             },
             # Force all packages to be buildable from source
             "packages": {

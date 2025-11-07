@@ -140,9 +140,9 @@ GPG requires specific directory structure and permissions to work correctly in n
 
 1. **Create full GPG directory structure**:
    ```bash
-   mkdir -p /opt/spack/opt/spack/gpg/private-keys-v1.d
-   chmod 700 /opt/spack/opt/spack/gpg
-   chmod 700 /opt/spack/opt/spack/gpg/private-keys-v1.d
+   mkdir -p /opt/spack/var/spack/gpg/private-keys-v1.d
+   chmod 700 /opt/spack/var/spack/gpg
+   chmod 700 /opt/spack/var/spack/gpg/private-keys-v1.d
    ```
 
 2. **Fix /tmp permissions** for GPG temp files:
@@ -153,10 +153,10 @@ GPG requires specific directory structure and permissions to work correctly in n
 3. **Configure both GPG config files**:
    ```bash
    # Agent configuration
-   echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf
+   echo "allow-loopback-pinentry" > /opt/spack/var/spack/gpg/gpg-agent.conf
    
    # GPG configuration
-   echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf
+   echo "pinentry-mode loopback" > /opt/spack/var/spack/gpg/gpg.conf
    ```
 
 **Complete Setup Sequence** (applied in both `publish_compiler_to_buildcache` and `push_to_buildcache`):
@@ -169,22 +169,22 @@ chmod 1777 /tmp 2>/dev/null || true
 export GPG_TTY=$(tty)
 
 # Create full GPG directory structure with correct permissions
-mkdir -p /opt/spack/opt/spack/gpg/private-keys-v1.d
-chmod 700 /opt/spack/opt/spack/gpg
-chmod 700 /opt/spack/opt/spack/gpg/private-keys-v1.d
+mkdir -p /opt/spack/var/spack/gpg/private-keys-v1.d
+chmod 700 /opt/spack/var/spack/gpg
+chmod 700 /opt/spack/var/spack/gpg/private-keys-v1.d
 
 # Configure GPG agent for non-interactive use
-echo "allow-loopback-pinentry" > /opt/spack/opt/spack/gpg/gpg-agent.conf
+echo "allow-loopback-pinentry" > /opt/spack/var/spack/gpg/gpg-agent.conf
 
 # Configure GPG for batch mode with loopback pinentry
-echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf
+echo "pinentry-mode loopback" > /opt/spack/var/spack/gpg/gpg.conf
 
 # Reload agent with error handling
-gpg-connect-agent --homedir /opt/spack/opt/spack/gpg reloadagent /bye || true
+gpg-connect-agent --homedir /opt/spack/var/spack/gpg reloadagent /bye || true
 
 # Import GPG key
 echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/private.key
-gpg --homedir /opt/spack/opt/spack/gpg --batch --yes --pinentry-mode loopback --import /tmp/private.key
+gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --import /tmp/private.key
 rm -f /tmp/private.key
 ```
 
