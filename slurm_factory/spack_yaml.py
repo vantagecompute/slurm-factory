@@ -458,8 +458,10 @@ def generate_spack_config(
                 # Build gettext from source to avoid libstdc++ compatibility issues with older compilers
                 # System gettext's msgfmt may require newer GLIBCXX versions than available in GCC 10.x
                 "gettext": {"buildable": True},
+                # Build libmd from source to ensure relocatability
+                # libmd provides message digest functions needed by some packages at runtime
+                "libmd": {"buildable": True},
                 # Use system build tools to avoid compiler wrapper issues during configure
-                "libmd": {"externals": [{"spec": "libmd@1.1.0", "prefix": "/usr"}], "buildable": False},
                 "libbsd": {"externals": [{"spec": "libbsd@0.12.1", "prefix": "/usr"}], "buildable": False},
                 "libsigsegv": {
                     "externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}],
@@ -594,7 +596,6 @@ def generate_spack_config(
                         "diffutils",
                         "findutils",
                         "gettext",
-                        "libmd",
                         "libbsd",
                         "libsigsegv",
                         "tar",
