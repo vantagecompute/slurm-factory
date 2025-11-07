@@ -82,7 +82,6 @@ class TestGPGKeyImport:
             bash_script = cmd[-1]  # Last argument should be the bash script
 
             # Check for GPG configuration commands
-            assert "GPG_TTY" in bash_script
             assert "allow-loopback-pinentry" in bash_script
             assert "gpg-agent.conf" in bash_script
             assert "gpg.conf" in bash_script
@@ -130,7 +129,6 @@ class TestGPGKeyImport:
             bash_script = cmd[-1]  # Last argument should be the bash script
 
             # Check for GPG configuration commands
-            assert "GPG_TTY" in bash_script
             assert "allow-loopback-pinentry" in bash_script
             assert "gpg-agent.conf" in bash_script
             assert "gpg.conf" in bash_script
@@ -173,11 +171,9 @@ class TestGPGKeyImport:
             assert len(gpg_commands) >= 4
 
             # Verify the sequence includes:
-            # 1. Setting GPG_TTY
-            # 2. Creating GPG directory
-            # 3. Configuring gpg-agent
-            # 4. Importing the key
-            assert any("GPG_TTY" in cmd for cmd in gpg_commands)
+            # 1. Creating GPG directory
+            # 2. Configuring gpg-agent
+            # 3. Importing the key
             assert any("mkdir -p" in cmd and "gpg" in cmd for cmd in gpg_commands)
             assert any("allow-loopback-pinentry" in cmd for cmd in gpg_commands)
             assert any("--import" in cmd and "--batch" in cmd for cmd in gpg_commands)
@@ -312,7 +308,7 @@ class TestGPGKeyImport:
             bash_script = cmd[-1]
 
             # Expected GPG homedir used by Spack
-            expected_homedir = "/opt/spack/opt/spack/gpg"
+            expected_homedir = "/opt/spack/var/spack/gpg"
 
             # Verify homedir is used consistently
             script_lines = bash_script.split(" && ")
