@@ -455,9 +455,7 @@ def generate_spack_config(
                     "externals": [{"spec": "findutils@4.9.0", "prefix": "/usr"}],
                     "buildable": False,
                 },
-                # Build gettext from source to avoid libstdc++ compatibility issues with older compilers
-                # System gettext's msgfmt may require newer GLIBCXX versions than available in GCC 10.x
-                "gettext": {"buildable": True},
+                "gettext": {"externals": [{"spec": "gettext@0.21", "prefix": "/usr"}], "buildable": False},
                 # Build libmd from source to ensure relocatability
                 # libmd provides message digest functions needed by some packages at runtime
                 "libmd": {"buildable": True},
