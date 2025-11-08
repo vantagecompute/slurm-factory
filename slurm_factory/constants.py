@@ -269,7 +269,9 @@ COMPILER_ENV_EOF
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
         echo '==> Installing GCC compiler from buildcache...'
-        spack -e . install --use-buildcache=package:gcc,dependencies:auto
+        # The concretizer.reuse configuration ensures GCC comes from buildcache
+        # Allow source builds for dependencies not in buildcache (like gcc-runtime for system compiler)
+        spack -e . install
         echo '==> Verifying GCC was installed from buildcache (not built from source)...'
         if spack find -v gcc@{compiler_version} | grep -q 'installed from binary cache'; then
             echo '✓ GCC was installed from buildcache'
