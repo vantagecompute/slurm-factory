@@ -150,7 +150,10 @@ class TestDockerfileBuildScript:
         
         # Script should install GCC to /opt/spack-compiler-view
         assert "view: /opt/spack-compiler-view" in script
-        assert "spack -e . install --cache-only --no-check-signature" in script
+        # Should install without --cache-only (allows source fallback) and without --no-check-signature (enables signature verification)
+        assert "spack -e . install" in script
+        assert "--cache-only" not in script
+        assert "--no-check-signature" not in script
         
         # Script should register compiler globally
         assert "spack compiler find --scope site /opt/spack-compiler-view" in script
