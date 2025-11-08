@@ -215,6 +215,12 @@ class TestScriptTemplates:
         # Test that other setup steps are present
         assert "spack mirror add" in script
         assert "spack buildcache keys --install --trust" in script
+        assert "spack buildcache update-index" in script  # Ensure buildcache index is updated
+        
+        # Ensure buildcache update comes after mirror add
+        mirror_add_pos = script.find("spack mirror add")
+        update_index_pos = script.find("spack buildcache update-index")
+        assert mirror_add_pos < update_index_pos, "buildcache update-index should come after mirror add"
         
         # Test that compiler verification steps are present
         assert "spack compiler list" in script

@@ -95,7 +95,7 @@ class TestSlurmEnvironmentConfig:
                 assert "%gcc@13.4.0" in spec, f"Spec missing compiler constraint: {spec}"
                 
     def test_slurm_env_gcc_requirements_match_bootstrap(self):
-        """Test that GCC in Slurm environment is marked as external with correct version."""
+        """Test that GCC in Slurm environment is configured to be installed from buildcache."""
         
         compiler_version = "13.4.0"
         
@@ -103,12 +103,12 @@ class TestSlurmEnvironmentConfig:
         slurm_config = generate_spack_config(compiler_version=compiler_version)
         gcc_package_config = slurm_config["spack"]["packages"]["gcc"]
         
-        # GCC should be marked as external to prevent being pulled as dependency
-        assert "externals" in gcc_package_config
-        assert len(gcc_package_config["externals"]) == 1
-        assert gcc_package_config["externals"][0]["spec"] == f"gcc@{compiler_version}"
-        assert gcc_package_config["externals"][0]["prefix"] == "/opt/spack-compiler-view"
-        assert gcc_package_config["buildable"] is False
+        # GCC should be buildable (from buildcache) with correct version and variants
+        assert gcc_package_config["buildable"] is True
+        assert gcc_package_config["version"] == [compiler_version]
+        assert "+binutils" in gcc_package_config["variants"]
+        assert "+piclibs" in gcc_package_config["variants"]
+        assert "languages=c,c++,fortran" in gcc_package_config["variants"]
         
         # gcc-runtime should be buildable during Slurm build phase
         gcc_runtime_config = slurm_config["spack"]["packages"]["gcc-runtime"]
@@ -120,13 +120,15 @@ class TestSlurmEnvironmentConfig:
         compiler_version = "13.4.0"
         config = generate_spack_config(compiler_version=compiler_version)
         
-        # GCC package should point to buildcache location, not system
+        # GCC package should be buildable (from buildcache), not external
         gcc_config = config["spack"]["packages"]["gcc"]
-        assert "externals" in gcc_config
-        assert len(gcc_config["externals"]) > 0
-        # Should point to spack-compiler-view, not system paths like /usr
-        assert gcc_config["externals"][0]["prefix"] == "/opt/spack-compiler-view"
-        assert gcc_config["buildable"] is False  # Don't build from source
+        assert gcc_config["buildable"] is True  # Install from buildcache
+        assert gcc_config["version"] == [compiler_version]  # Specific version
+        
+        # The buildcache mirror should be configured to provide gcc binaries
+        mirrors = config["spack"]["mirrors"]
+        assert "slurm-factory-buildcache" in mirrors
+        assert f"compilers/{compiler_version}/buildcache" in mirrors["slurm-factory-buildcache"]["url"]
         
     def test_slurm_env_has_empty_compilers_list(self):
         """Test that Slurm environment starts with empty compilers list."""
@@ -243,17 +245,21 @@ class TestCompilerBootstrapIntegration:
         assert len(compiler_gcc_specs) == 1
         assert f"gcc@{compiler_version}" in compiler_gcc_specs[0]
         
-        # Slurm config should mark GCC as external (downloaded from buildcache)
+        # Slurm config should mark GCC as buildable (will be installed from buildcache)
         slurm_gcc_config = slurm_config["spack"]["packages"]["gcc"]
-        assert "externals" in slurm_gcc_config
-        assert slurm_gcc_config["externals"][0]["spec"] == f"gcc@{compiler_version}"
-        assert slurm_gcc_config["buildable"] is False
+        assert slurm_gcc_config["buildable"] is True
+        assert slurm_gcc_config["version"] == [compiler_version]
+        
+        # Verify variants match between compiler bootstrap and Slurm configs
+        assert "+binutils" in slurm_gcc_config["variants"]
+        assert "+piclibs" in slurm_gcc_config["variants"]
         
         # Compiler bootstrap config should prevent system GCC from being detected
         assert compiler_config["spack"]["packages"]["gcc"]["externals"] == []
         
-        # Slurm config should reference the compiler built by bootstrap
-        assert slurm_gcc_config["externals"][0]["prefix"] == "/opt/spack-compiler-view"
+        # Both configs should reference the same buildcache
+        assert "slurm-factory-buildcache" in slurm_config["spack"]["mirrors"]
+        assert f"compilers/{compiler_version}/buildcache" in slurm_config["spack"]["mirrors"]["slurm-factory-buildcache"]["url"]
 
 
 if __name__ == "__main__":

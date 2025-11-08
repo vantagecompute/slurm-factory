@@ -169,20 +169,22 @@ class TestGCCRuntimeIntegration:
         config = generate_spack_config()
         packages = config["spack"]["packages"]
         
+        # gcc-runtime should be buildable (built during Slurm build phase)
         assert "gcc-runtime" in packages
-        assert packages["gcc-runtime"]["buildable"] is False
-        assert "externals" in packages["gcc-runtime"]
+        assert packages["gcc-runtime"]["buildable"] is True
+        # Version should match the compiler version
+        assert "version" in packages["gcc-runtime"]
 
     def test_gcc_runtime_version_match(self):
-        """Test that gcc-runtime is configured in packages as external (not built)."""
+        """Test that gcc-runtime is configured to be built with correct version."""
         compiler_version = "13.4.0"
         config = generate_spack_config(compiler_version=compiler_version)
         packages = config["spack"]["packages"]
         
-        # gcc-runtime should be in packages config as external (not buildable)
+        # gcc-runtime should be buildable with matching compiler version
         assert "gcc-runtime" in packages
-        assert packages["gcc-runtime"]["buildable"] is False
-        assert "externals" in packages["gcc-runtime"]
+        assert packages["gcc-runtime"]["buildable"] is True
+        assert packages["gcc-runtime"]["version"] == [compiler_version]
 
     def test_gcc_runtime_in_module_env(self):
         """Test that gcc-runtime prefix is exposed in module environment."""

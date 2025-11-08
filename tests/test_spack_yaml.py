@@ -101,18 +101,17 @@ class TestSpackConfigGeneration:
         config = generate_spack_config(compiler_version=compiler_version)
         packages = config["spack"]["packages"]
         
-        # Test that GCC is configured as external (downloaded from buildcache during bootstrap)
+        # Test that GCC is configured to be installed from buildcache
         assert "gcc" in packages
         gcc_config = packages["gcc"]
         
-        # GCC should NOT be buildable (it's pre-built in buildcache)
-        assert gcc_config["buildable"] is False
+        # GCC should be buildable (from buildcache)
+        assert gcc_config["buildable"] is True
         
-        # GCC should have externals pointing to buildcache location
-        assert "externals" in gcc_config
-        assert len(gcc_config["externals"]) > 0
-        assert gcc_config["externals"][0]["spec"] == f"gcc@{compiler_version}"
-        assert gcc_config["externals"][0]["prefix"] == "/opt/spack-compiler-view"
+        # GCC should have correct version and variants to match buildcache
+        assert gcc_config["version"] == [compiler_version]
+        assert "+binutils" in gcc_config["variants"]
+        assert "+piclibs" in gcc_config["variants"]
 
     def test_package_configurations(self):
         """Test package-specific configurations."""
