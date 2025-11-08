@@ -184,7 +184,7 @@ def get_install_spack_script() -> str:
     """Generate script to install Spack."""
     return textwrap.dedent(
         """\
-        git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack && \\
+        git clone --depth 1 --branch v1.0.2 https://github.com/spack/spack.git /opt/spack && \\
         chown -R root:root /opt/spack && chmod -R a+rX /opt/spack
     """
     ).strip()

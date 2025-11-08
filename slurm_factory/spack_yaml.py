@@ -144,10 +144,17 @@ def generate_compiler_bootstrap_config(
                 "binary_index_ttl": 600,
             },
             "mirrors": {
-                "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                "spack-public": {
+                    "url": "https://mirror.spack.io",
+                    "signed": False,
+                    "binary": False,
+                    "source": True,
+                },
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
                     "signed": True,
+                    "binary": True,
+                    "source": False,
                 },
             },
         }
@@ -610,11 +617,18 @@ def generate_spack_config(
             "mirrors": {
                 # Only use spack-public mirror for source downloads, not binaries
                 # In single-stage builds, we build everything from source
-                "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                "spack-public": {
+                    "url": "https://mirror.spack.io",
+                    "signed": False,
+                    "binary": False,
+                    "source": True,
+                },
                 # Use slurm-factory buildcache for compiler binaries
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
                     "signed": True,
+                    "binary": True,
+                    "source": False,
                 },
             },
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected

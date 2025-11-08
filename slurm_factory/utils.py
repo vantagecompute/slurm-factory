@@ -843,8 +843,10 @@ def publish_compiler_to_buildcache(
                 "cd /root/compiler-bootstrap",
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 # Push all packages in the environment (gcc and its dependencies)
-                f"spack -e . buildcache push {signing_flags} --update-index "
-                f"--without-build-dependencies s3-buildcache",
+                f"spack -e . buildcache push {signing_flags} --without-build-dependencies s3-buildcache",
+                # Update the buildcache index after pushing (Spack 1.0+ requirement)
+                # This creates/updates the build_cache/index.json file
+                f"spack buildcache update-index s3-buildcache",
             ]
         )
 
@@ -966,15 +968,18 @@ def push_to_buildcache(
         # Determine what to push based on publish_mode
         if publish_mode == "slurm":
             # Push only slurm package
-            push_cmd = f"spack buildcache push {signing_flags} --update-index s3-buildcache slurm"
+            push_cmd = f"spack buildcache push {signing_flags} s3-buildcache slurm"
+            update_index_cmd = "spack buildcache update-index s3-buildcache"
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
             push_cmd = (
-                f"spack -e . buildcache push {signing_flags} --update-index --only dependencies s3-buildcache"
+                f"spack -e . buildcache push {signing_flags} --only dependencies s3-buildcache"
             )
+            update_index_cmd = "spack buildcache update-index s3-buildcache"
         else:  # all
             # Push everything
-            push_cmd = f"spack -e . buildcache push {signing_flags} --update-index s3-buildcache"
+            push_cmd = f"spack -e . buildcache push {signing_flags} s3-buildcache"
+            update_index_cmd = "spack buildcache update-index s3-buildcache"
 
         # Build docker run command with AWS environment variables
         cmd = ["docker", "run", "--rm"]
@@ -1027,6 +1032,8 @@ def push_to_buildcache(
                 "spack env activate .",
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 push_cmd,
+                # Update buildcache index after pushing (Spack 1.0+ requirement)
+                update_index_cmd,
             ]
         )
 
