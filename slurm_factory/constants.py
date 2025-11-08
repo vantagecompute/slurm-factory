@@ -248,7 +248,7 @@ def get_spack_build_script(compiler_version: str) -> str:
         cat > spack.yaml << 'COMPILER_ENV_EOF'
 spack:
   specs:
-  - gcc@{compiler_version}
+  - gcc@{compiler_version} languages=c,c++,fortran
   view: /opt/spack-compiler-view
   concretizer:
     unify: false
@@ -260,8 +260,17 @@ spack:
 COMPILER_ENV_EOF
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
-        echo '==> Installing GCC compiler from buildcache in dedicated environment...'
-        spack -e . install --cache-only
+        echo '==> Attempting to install GCC compiler from buildcache...'
+        spack -e . install --cache-only 2>&1 | tee /tmp/compiler-install.log || true
+        if [ -f /opt/spack-compiler-view/bin/gcc ]; then
+            echo '==> Successfully installed GCC from buildcache'
+        else
+            echo '==> WARNING: Buildcache installation did not create compiler view'
+            echo '==> Falling back to source build - this will take 30-60 minutes'
+            cat /tmp/compiler-install.log | tail -30 || true
+            echo '==> Installing GCC compiler from source...'
+            spack -e . install
+        fi
         echo '==> Hiding system gcc binaries to prevent auto-detection...'
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
             [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
@@ -270,7 +279,8 @@ COMPILER_ENV_EOF
         ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
         /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
         echo '==> Setting up compiler runtime library path...'
-        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:\\
+${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
