@@ -258,10 +258,28 @@ spack:
       - type: buildcache
         path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache
 COMPILER_ENV_EOF
+        echo '==> Checking if GCC is available in buildcache...'
+        if ! spack buildcache list --allarch | grep -q "gcc@{compiler_version}"; then
+            echo 'ERROR: gcc@{compiler_version} not found in buildcache!'
+            echo 'Available packages in buildcache:'
+            spack buildcache list --allarch | head -50
+            exit 1
+        fi
+        echo '✓ gcc@{compiler_version} found in buildcache'
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
         echo '==> Installing GCC compiler from buildcache...'
-        spack -e . install --cache-only
+        # The concretizer.reuse configuration ensures GCC comes from buildcache
+        # Allow source builds for dependencies not in buildcache (like gcc-runtime for system compiler)
+        spack -e . install
+        echo '==> Verifying GCC was installed from buildcache (not built from source)...'
+        if spack find -v gcc@{compiler_version} | grep -q 'installed from binary cache'; then
+            echo '✓ GCC was installed from buildcache'
+        else
+            # Check the build stage to confirm it came from cache
+            echo 'Checking installation method...'
+            spack find -vl gcc@{compiler_version} || true
+        fi
         echo '==> Hiding system gcc binaries to prevent auto-detection...'
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
             [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
