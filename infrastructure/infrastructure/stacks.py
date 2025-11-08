@@ -78,6 +78,23 @@ class SlurmFactoryBinaryCache(Stack):
         )
 
         # CloudFront distribution
+        # Custom cache policy for buildcache - allow query strings and specific headers
+        buildcache_cache_policy = cloudfront.CachePolicy(
+            self,
+            "BuildcacheCachePolicy",
+            cache_policy_name=f"spack-buildcache-policy-{account_hash}",
+            comment="Cache policy for Spack buildcache with query string support",
+            default_ttl=Duration.days(7),
+            max_ttl=Duration.days(365),
+            min_ttl=Duration.seconds(0),
+            header_behavior=cloudfront.CacheHeaderBehavior.allow_list(
+                "Accept",
+            ),
+            query_string_behavior=cloudfront.CacheQueryStringBehavior.all(),
+            enable_accept_encoding_gzip=True,
+            enable_accept_encoding_brotli=True,
+        )
+        
         distribution_props = {
             "default_behavior": cloudfront.BehaviorOptions(
                 origin=origins.S3BucketOrigin(
@@ -85,11 +102,22 @@ class SlurmFactoryBinaryCache(Stack):
                     origin_access_control_id=oac.origin_access_control_id,
                 ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
-                cache_policy=cloudfront.CachePolicy.CACHING_OPTIMIZED,
+                cache_policy=buildcache_cache_policy,
                 compress=True,
+                allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
+                cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,
             ),
             "price_class": cloudfront.PriceClass.PRICE_CLASS_100,
             "comment": "CDN for slurm-factory Spack binary cache",
+            "error_responses": [
+                # Return 404 for 403 errors (helps with missing files)
+                cloudfront.ErrorResponse(
+                    http_status=403,
+                    response_http_status=404,
+                    response_page_path="/404.html",
+                    ttl=Duration.seconds(10),
+                ),
+            ],
         }
 
         # Certificate for custom domain (if provided)
@@ -120,12 +148,29 @@ class SlurmFactoryBinaryCache(Stack):
         )
 
         # Grant CloudFront OAC access to the bucket
+        # Need both GetObject for files AND ListBucket for directory listings
+        # This is required for Spack buildcache index.json and build_cache/ subdirectory access
         self.bucket.add_to_resource_policy(
             iam.PolicyStatement(
                 effect=iam.Effect.ALLOW,
                 principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
                 actions=["s3:GetObject"],
                 resources=[f"{self.bucket.bucket_arn}/*"],
+                conditions={
+                    "StringEquals": {
+                        "AWS:SourceArn": f"arn:aws:cloudfront::{self.account}:distribution/{self.distribution.distribution_id}"
+                    }
+                },
+            )
+        )
+        
+        # Add ListBucket permission for directory listings (needed for build_cache/ access)
+        self.bucket.add_to_resource_policy(
+            iam.PolicyStatement(
+                effect=iam.Effect.ALLOW,
+                principals=[iam.ServicePrincipal("cloudfront.amazonaws.com")],
+                actions=["s3:ListBucket"],
+                resources=[self.bucket.bucket_arn],
                 conditions={
                     "StringEquals": {
                         "AWS:SourceArn": f"arn:aws:cloudfront::{self.account}:distribution/{self.distribution.distribution_id}"

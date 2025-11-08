@@ -147,7 +147,7 @@ jobs:
           cd "$TEST_DIR"
           
           # Clone Spack
-          git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+          git clone --depth 1 --branch v1.0.2 https://github.com/spack/spack.git
           cd spack
           
           # Initialize Spack (avoid sourcing which can have issues)
@@ -162,6 +162,10 @@ jobs:
           spack mirror remove slurm-factory-buildcache 2>/dev/null || true
           spack mirror add slurm-factory-buildcache "$MIRROR_URL"
           
+          # Import GPG keys for signature verification
+          echo "Importing GPG keys..."
+          spack buildcache keys --install --trust || echo "Warning: Could not import GPG keys"
+          
           # Update the buildcache index to ensure we have the latest packages
           # Allow this to fail gracefully if the buildcache is new/empty
           echo "Updating buildcache index..."
@@ -171,10 +175,10 @@ jobs:
           echo "Available packages in buildcache:"
           spack buildcache list --allarch | head -20
           
-          # Try to install GCC from buildcache only
+          # Try to install GCC from buildcache only (with signature verification)
           echo ""
-          echo "Installing GCC ${{ matrix.compiler_version }} from buildcache..."
-          spack install --no-check-signature --cache-only gcc@${{ matrix.compiler_version }} 2>&1 | tail -50
+          echo "Installing GCC ${{ matrix.compiler_version }} from buildcache with GPG verification..."
+          spack install --cache-only gcc@${{ matrix.compiler_version }} target=x86_64_v3 2>&1 | tail -50
           
           # Verify installation
           echo ""

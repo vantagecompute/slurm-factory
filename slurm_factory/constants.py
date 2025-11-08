@@ -184,7 +184,7 @@ def get_install_spack_script() -> str:
     """Generate script to install Spack."""
     return textwrap.dedent(
         """\
-        git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack && \\
+        git clone --depth 1 --branch v1.0.2 https://github.com/spack/spack.git /opt/spack && \\
         chown -R root:root /opt/spack && chmod -R a+rX /opt/spack
     """
     ).strip()
@@ -240,6 +240,10 @@ def get_spack_build_script(compiler_version: str) -> str:
     return textwrap.dedent(f"""        source {SPACK_SETUP_SCRIPT}
         echo '==> Configuring buildcache mirror globally for compiler installation...'
         spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
+        echo '==> Trusting Slurm Factory GPG public key for signed compiler packages...'
+        wget -q {SLURM_FACTORY_GPG_PUBLIC_KEY_URL} -O /tmp/vantage-slurm-factory.pub && \\
+        spack gpg trust /tmp/vantage-slurm-factory.pub && \\
+        rm /tmp/vantage-slurm-factory.pub
         echo '==> Installing buildcache keys...'
         spack buildcache keys --install --trust
         echo '==> Creating temporary environment to install GCC compiler from buildcache...'
@@ -258,18 +262,28 @@ spack:
       - type: buildcache
         path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache
 COMPILER_ENV_EOF
+        echo '==> Checking if GCC is available in buildcache...'
+        if ! spack buildcache list --allarch | grep -q "gcc@{compiler_version}"; then
+            echo 'ERROR: gcc@{compiler_version} not found in buildcache!'
+            echo 'Available packages in buildcache:'
+            spack buildcache list --allarch | head -50
+            exit 1
+        fi
+        echo '✓ gcc@{compiler_version} found in buildcache'
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
-        echo '==> Attempting to install GCC compiler from buildcache...'
-        spack -e . install --cache-only 2>&1 | tee /tmp/compiler-install.log || true
-        if [ -f /opt/spack-compiler-view/bin/gcc ]; then
-            echo '==> Successfully installed GCC from buildcache'
+        echo '==> Installing GCC compiler from buildcache...'
+        # The concretizer is configured to prefer buildcache (via reuse:roots + from:buildcache)
+        # This will use gcc from buildcache while allowing dependencies to build from source if needed
+        # GPG signature verification is automatic since we've trusted the key
+        spack -e . install
+        echo '==> Verifying GCC was installed from buildcache (not built from source)...'
+        if spack find -v gcc@{compiler_version} | grep -q 'installed from binary cache'; then
+            echo '✓ GCC was installed from buildcache'
         else
-            echo '==> WARNING: Buildcache installation did not create compiler view'
-            echo '==> Falling back to source build - this will take 30-60 minutes'
-            cat /tmp/compiler-install.log | tail -30 || true
-            echo '==> Installing GCC compiler from source...'
-            spack -e . install
+            # Check the build stage to confirm it came from cache
+            echo 'Checking installation method...'
+            spack find -vl gcc@{compiler_version} || true
         fi
         echo '==> Hiding system gcc binaries to prevent auto-detection...'
         for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do

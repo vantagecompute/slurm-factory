@@ -50,8 +50,13 @@ class TestSpackConfigGeneration:
         assert len(spack_config["specs"]) > 0
         
         # Test that all specs have compiler constraints (using default 13.4.0)
+        # EXCEPT gcc itself which should not have a compiler spec (it's built with system compiler)
         for spec in spack_config["specs"]:
-            assert "%gcc@13.4.0" in spec, f"Spec missing compiler constraint: {spec}"
+            if not spec.startswith("gcc@"):
+                assert "%gcc@13.4.0" in spec, f"Spec missing compiler constraint: {spec}"
+            else:
+                # GCC should not have a compiler spec - it's built with system compiler from Ubuntu
+                assert "%" not in spec, f"GCC spec should not have compiler constraint: {spec}"
 
     def test_generate_spack_config_versions(self):
         """Test configuration generation for all supported Slurm versions."""
@@ -119,15 +124,14 @@ class TestSpackConfigGeneration:
         packages = config["spack"]["packages"]
         
         # Test external build tools that should not be built (using system versions)
-        external_tools = ["cmake", "python", "gmake", "m4", "pkgconf", "diffutils", "findutils", "tar"]
+        external_tools = ["cmake", "python", "gmake", "m4", "pkgconf", "diffutils", "findutils", "tar", "gettext"]
         for tool in external_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is False
             assert "externals" in packages[tool]
         
         # Test autotools are buildable (built from source for libjwt compatibility)
-        # gettext is also buildable to avoid GLIBCXX compatibility issues
-        buildable_tools = ["autoconf", "automake", "libtool", "gettext"]
+        buildable_tools = ["autoconf", "automake", "libtool"]
         for tool in buildable_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is True

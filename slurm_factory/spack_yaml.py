@@ -144,10 +144,17 @@ def generate_compiler_bootstrap_config(
                 "binary_index_ttl": 600,
             },
             "mirrors": {
-                "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                "spack-public": {
+                    "url": "https://mirror.spack.io",
+                    "signed": False,
+                    "binary": False,
+                    "source": True,
+                },
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
                     "signed": True,
+                    "binary": True,
+                    "source": False,
                 },
             },
         }
@@ -346,7 +353,9 @@ def generate_spack_config(
     specs = [
         # Install GCC first from buildcache (built separately with build-compiler command)
         # gcc-runtime will be built as a dependency of gcc
-        f"gcc@{compiler_version} +binutils +piclibs languages=c,c++,fortran {compiler_spec}",
+        # NOTE: Do NOT specify compiler for gcc itself - it's built with system compiler (gcc@13.3.0 on Ubuntu 24.04)
+        # Specifying {compiler_spec} here causes a mismatch with buildcache and forces source build
+        f"gcc@{compiler_version} +binutils +piclibs languages=c,c++,fortran",
         # All packages below will use %gcc@{compiler_version}
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         # Build OpenSSL with explicit zlib dependency
@@ -455,9 +464,7 @@ def generate_spack_config(
                     "externals": [{"spec": "findutils@4.9.0", "prefix": "/usr"}],
                     "buildable": False,
                 },
-                # Build gettext from source to avoid libstdc++ compatibility issues with older compilers
-                # System gettext's msgfmt may require newer GLIBCXX versions than available in GCC 10.x
-                "gettext": {"buildable": True},
+                "gettext": {"externals": [{"spec": "gettext@0.21", "prefix": "/usr"}], "buildable": False},
                 # Build libmd from source to ensure relocatability
                 # libmd provides message digest functions needed by some packages at runtime
                 "libmd": {"buildable": True},
@@ -610,11 +617,18 @@ def generate_spack_config(
             "mirrors": {
                 # Only use spack-public mirror for source downloads, not binaries
                 # In single-stage builds, we build everything from source
-                "spack-public": {"url": "https://mirror.spack.io", "signed": False},
+                "spack-public": {
+                    "url": "https://mirror.spack.io",
+                    "signed": False,
+                    "binary": False,
+                    "source": True,
+                },
                 # Use slurm-factory buildcache for compiler binaries
                 "slurm-factory-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
                     "signed": True,
+                    "binary": True,
+                    "source": False,
                 },
             },
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
