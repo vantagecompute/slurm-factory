@@ -348,9 +348,6 @@ CEOF
 
 
 def get_package_tarball_script(
-
-
-def get_package_tarball_script(
     modulerc_script: str,
     version: str,
     compiler_version: str = "13.4.0",
