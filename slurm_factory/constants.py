@@ -286,6 +286,15 @@ COMPILER_ENV_EOF
         rm -f "$SPACK_ROOT/etc/spack/packages.yaml" "$SPACK_ROOT/etc/spack/compilers.yaml"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
+        echo '==> Configuring GCC as external package...'
+        cat > "$SPACK_ROOT/etc/spack/packages.yaml" << 'PACKAGES_EOF'
+packages:
+  gcc:
+    externals:
+    - spec: gcc@{compiler_version}~binutils+bootstrap~graphite~nvptx~piclibs~profiled~strip languages:='c,c++,fortran'
+      prefix: /opt/spack-compiler-view
+    buildable: false
+PACKAGES_EOF
         echo '==> LD_LIBRARY_PATH is already configured globally for this session'
         echo "Current LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
         echo '==> Removing any auto-detected system compilers...'
