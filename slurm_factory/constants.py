@@ -240,6 +240,10 @@ def get_spack_build_script(compiler_version: str) -> str:
     return textwrap.dedent(f"""        source {SPACK_SETUP_SCRIPT}
         echo '==> Configuring buildcache mirror globally for compiler installation...'
         spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
+        echo '==> Trusting Slurm Factory GPG public key for signed compiler packages...'
+        wget -q {SLURM_FACTORY_GPG_PUBLIC_KEY_URL} -O /tmp/vantage-slurm-factory.pub && \\
+        spack gpg trust /tmp/vantage-slurm-factory.pub && \\
+        rm /tmp/vantage-slurm-factory.pub
         echo '==> Installing buildcache keys...'
         spack buildcache keys --install --trust
         echo '==> Creating temporary environment to install GCC compiler from buildcache...'
