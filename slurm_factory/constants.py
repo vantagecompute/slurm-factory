@@ -245,7 +245,8 @@ def get_spack_build_script(compiler_version: str) -> str:
         echo '==> Installing buildcache keys...'
         spack buildcache keys --install --trust
         echo '==> Updating buildcache index...'
-        spack buildcache update-index slurm-factory-buildcache
+        spack buildcache update-index slurm-factory-buildcache || \\
+            echo "Warning: Could not update buildcache index (buildcache may be new/empty)"
         echo '==> Creating temporary environment to install GCC compiler...'
         mkdir -p /tmp/compiler-install
         cd /tmp/compiler-install
