@@ -237,24 +237,18 @@ def get_spack_build_script(compiler_version: str) -> str:
     buildcache_url = (
         f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache"
     )
-    return textwrap.dedent(f"""\
-        source {SPACK_SETUP_SCRIPT}
-        echo '==> Installing GCC compiler {compiler_version}...'
+    return textwrap.dedent(f"""        source {SPACK_SETUP_SCRIPT}
         echo '==> Configuring buildcache mirror globally for compiler installation...'
         spack mirror add --scope site slurm-factory-buildcache {buildcache_url} || true
         echo '==> Installing buildcache keys...'
         spack buildcache keys --install --trust
-        echo '==> Hiding system gcc binaries to prevent auto-detection...'
-        for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
-            [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
-        done
-        echo '==> Creating temporary environment to install GCC compiler...'
+        echo '==> Creating temporary environment to install GCC compiler from buildcache...'
         mkdir -p /tmp/compiler-install
         cd /tmp/compiler-install
         cat > spack.yaml << 'COMPILER_ENV_EOF'
 spack:
   specs:
-  - gcc@{compiler_version} languages=c,c++,fortran
+  - gcc@{compiler_version}
   view: /opt/spack-compiler-view
   concretizer:
     unify: false
@@ -264,65 +258,43 @@ spack:
       - type: buildcache
         path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache
 COMPILER_ENV_EOF
-        spack env activate .
-        echo '==> Restoring system gcc binaries for build use...'
-        for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
-            [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true
-        done
         echo '==> Concretizing GCC environment...'
         spack -e . concretize -f
-        echo '==> Installing GCC compiler from buildcache (preferring cache, building deps if needed)...'
-        spack -e . install
+        echo '==> Installing GCC compiler from buildcache in dedicated environment...'
+        spack -e . install --cache-only --no-check-signature
+        echo '==> Hiding system gcc binaries to prevent auto-detection...'
+        for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
+            [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
+        done
         echo '==> Verifying GCC installation in compiler view...'
         ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
         /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
         echo '==> Setting up compiler runtime library path...'
-        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:\\
-/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
+        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
-        echo '==> Clearing any cached Spack configuration...'
-        rm -rf /root/.spack /root/.cache/spack
-        SPACK_ROOT=$(spack location -r)
-        rm -f "$SPACK_ROOT/etc/spack/packages.yaml" "$SPACK_ROOT/etc/spack/compilers.yaml"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
-        echo '==> Configuring GCC as external package...'
-        cat > "$SPACK_ROOT/etc/spack/packages.yaml" << 'PACKAGES_EOF'
-packages:
-  gcc:
-    externals:
-    - spec: gcc@{compiler_version}~binutils+bootstrap~graphite~nvptx~piclibs~profiled~strip languages:='c,c++,fortran'
-      prefix: /opt/spack-compiler-view
-    buildable: false
-PACKAGES_EOF
-        echo '==> LD_LIBRARY_PATH is already configured globally for this session'
-        echo "Current LD_LIBRARY_PATH: $LD_LIBRARY_PATH"
         echo '==> Removing any auto-detected system compilers...'
-        for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \\
+        for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \
                 grep gcc@ | awk '{{print $1}}'); do
             echo "Removing $compiler"
             spack compiler rm --scope site $compiler 2>/dev/null || true
         done
         echo '==> Verifying gcc@{compiler_version} is available...'
         if ! spack compiler list | grep -q "gcc@{compiler_version}"; then
-            echo 'ERROR: gcc@{compiler_version} compiler not found after installation'
-            echo 'Available compilers:'
+            echo 'ERROR: gcc@{compiler_version} compiler not found:'
             spack compiler list
             exit 1
         fi
         echo '==> Configured compilers:'
         spack compiler list
         echo '==> Compiler info for gcc@{compiler_version}:'
-        spack compiler info gcc@{compiler_version} || {{
-            echo 'ERROR: gcc@{compiler_version} not available in compiler info after registration'
-            echo 'Available compilers:'
-            spack compiler list
-            exit 1
-        }}
+        spack compiler info gcc@{compiler_version}
         echo '==> Testing compiler with simple program...'
         cat > /tmp/test.c << 'CEOF'
 #include <stdio.h>
-int main() {{ printf("Compiler test OK\\n"); return 0; }}
+int main() {{ printf("Compiler test OK
+"); return 0; }}
 CEOF
         /opt/spack-compiler-view/bin/gcc /tmp/test.c -o /tmp/test && /tmp/test || {{
             echo 'ERROR: Compiler test failed'
@@ -346,9 +318,9 @@ CEOF
         }}
         rm -f spack.lock
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
-        spack concretize -j $(( $(nproc) - 1 )) -f --fresh
+        spack concretize -j $(nproc) -f --fresh
         echo '==> Installing Slurm and dependencies...'
-        spack install -j$(( $(nproc) - 1 )) -f || {{
+        spack install -j$(nproc) -f || {{
             echo 'ERROR: spack install failed'
             echo 'Checking view status:'
             ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'
@@ -373,6 +345,9 @@ CEOF
             case $f in *slurm*) cp "$f" {CONTAINER_SLURM_DIR}/modules/;; esac
         done
     """).strip()
+
+
+def get_package_tarball_script(
 
 
 def get_package_tarball_script(
