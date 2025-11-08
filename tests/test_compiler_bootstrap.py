@@ -184,17 +184,20 @@ class TestDockerfileBuildScript:
         assert "gcc@13.4.0 compiler not found" in script
         assert "spack compiler list" in script
         
-    def test_build_script_uses_cache_only_for_compiler_install(self):
-        """Test that build script uses --cache-only flag to force buildcache usage."""
+    def test_build_script_prefers_buildcache_for_compiler_install(self):
+        """Test that build script prefers buildcache for compiler installation."""
         script = get_spack_build_script("13.4.0")
         
-        # Should use --cache-only to prevent source builds
-        assert "spack -e . install --cache-only" in script
+        # Should install using concretizer configuration that prefers buildcache
+        assert "spack -e . install" in script
         assert "Installing GCC compiler from buildcache" in script
         
         # Should check if compiler is available in buildcache before installing
         assert "spack buildcache list" in script
         assert "gcc@13.4.0 not found in buildcache" in script
+        
+        # Should verify that GCC was installed from buildcache
+        assert "Verifying GCC was installed from buildcache" in script
         
     def test_dockerfile_includes_correct_build_script(self):
         """Test that generated Dockerfile includes the corrected build script."""
