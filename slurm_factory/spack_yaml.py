@@ -346,7 +346,9 @@ def generate_spack_config(
     specs = [
         # Install GCC first from buildcache (built separately with build-compiler command)
         # gcc-runtime will be built as a dependency of gcc
-        f"gcc@{compiler_version} +binutils +piclibs languages=c,c++,fortran {compiler_spec}",
+        # NOTE: Do NOT specify compiler for gcc itself - it's built with system compiler (gcc@13.3.0 on Ubuntu 24.04)
+        # Specifying {compiler_spec} here causes a mismatch with buildcache and forces source build
+        f"gcc@{compiler_version} +binutils +piclibs languages=c,c++,fortran",
         # All packages below will use %gcc@{compiler_version}
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         # Build OpenSSL with explicit zlib dependency
