@@ -525,16 +525,16 @@ BOOTSTRAP_YAML_EOF
 WORKDIR /root/compiler-bootstrap
 
 # Build the compiler toolchain
-# CRITICAL: Clear any auto-detected compilers before concretization
-# Spack auto-detects compilers on first use - we need to remove them
-# This prevents gcc@13.3.0 from being added as external during concretization
+# Note: The spack.yaml has "gcc": {"externals": [], "buildable": True} to prevent
+# gcc@13.3.0 from being used as an external package during concretization.
+# System gcc is still available in PATH to actually BUILD the new gcc.
 RUN bash << 'EOF'
+set -e
 source /opt/spack/share/spack/setup-env.sh
 eval $(spack env activate --sh .)
-# Remove any auto-detected compilers (happens on first spack command)
-spack compiler list || true
-rm -f /root/.spack/linux/compilers.yaml
-rm -f /opt/spack/etc/spack/compilers.yaml
+# Clean any previous build failures
+spack clean -a 2>/dev/null || true
+# Concretize and install
 spack -e . concretize -j $(( $(nproc) - 1 )) -f
 spack -e . install -j $(( $(nproc) - 1 )) --verbose
 EOF
