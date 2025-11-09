@@ -64,7 +64,7 @@ def generate_compiler_bootstrap_config(
 
     Args:
         gcc_version: GCC version to build
-        (e.g., "15.1.0", "14.3.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0")
+        (e.g., "15.2.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0")
         buildcache_root: Directory for binary build cache
         sourcecache_root: Directory for source cache
 
@@ -97,10 +97,10 @@ def generate_compiler_bootstrap_config(
             ],
             "concretizer": {
                 "unify": "when_possible",
-                "reuse": {
-                    "roots": True,
-                    "from": [{"type": "buildcache"}],
-                },
+                #"reuse": {
+                #    "roots": False,
+                #    "from": [{"type": "buildcache"}],
+                #},
                 # Disable using externals during concretization
                 "targets": {
                     "host_compatible": False,
@@ -108,7 +108,7 @@ def generate_compiler_bootstrap_config(
             },
             "packages": {
                 "all": {
-                    "target": ["x86_64_v3"],
+                    "target": ["x86_64"],
                     "buildable": True,
                     # Prefer building from source over using externals
                     "prefer": ["~external"],
@@ -158,12 +158,12 @@ def generate_compiler_bootstrap_config(
                     "binary": False,
                     "source": True,
                 },
-                "slurm-factory-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
-                    "signed": True,
-                    "binary": True,
-                    "source": False,
-                },
+                #"slurm-factory-buildcache": {
+                #    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
+                #    "signed": True,
+                #    "binary": True,
+                #    "source": False,
+                #},
             },
         }
     }
@@ -438,8 +438,8 @@ def generate_spack_config(
             # Force all packages to be buildable from source
             "packages": {
                 "all": {
-                    "target": ["x86_64_v3"],
-                    "require": "target=x86_64_v3",
+                    "target": ["x86_64"],
+                    "require": "target=x86_64",
                     "buildable": True,
                 },
                 "cmake": {

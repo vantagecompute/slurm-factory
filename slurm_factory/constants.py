@@ -27,9 +27,9 @@ SLURM_VERSIONS = {
 
 # Supported compiler versions for building
 # Key: user-facing version, Value: (gcc_version, glibc_version, description)
-# Latest stable minor versions for each major GCC version from Spack v1.0.2
+# Latest stable minor versions for each major GCC version from Spack v1.0.0
 COMPILER_TOOLCHAINS = {
-    "15.1.0": ("15.1.0", "2.40", "GCC 15.1 (latest in Spack v1.0.2) - glibc 2.40"),
+    "15.2.0": ("15.2.0", "2.40", "GCC 15.2 (latest in Spack v1.0.0) - glibc 2.40"),
     "14.2.0": ("14.2.0", "2.39", "GCC 14.2 (latest stable) - glibc 2.39"),
     "13.4.0": ("13.4.0", "2.39", "GCC 13.4 / Ubuntu 24.04 (default) - glibc 2.39"),
     "12.5.0": ("12.5.0", "2.35", "GCC 12.5 (latest stable) - glibc 2.35"),
@@ -184,7 +184,7 @@ def get_install_spack_script() -> str:
     """Generate script to install Spack."""
     return textwrap.dedent(
         """\
-        git clone --depth 1 --branch v1.0.2 https://github.com/spack/spack.git /opt/spack && \\
+        git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack && \\
         chown -R root:root /opt/spack && chmod -R a+rX /opt/spack
     """
     ).strip()
@@ -344,7 +344,7 @@ CEOF
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
         spack concretize -j $(nproc) -f --fresh
         echo '==> Installing Slurm and dependencies...'
-        spack install -j$(nproc) -f || {{
+        spack install -j $(nproc) -f || {{
             echo 'ERROR: spack install failed'
             echo 'Checking view status:'
             ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'
@@ -545,11 +545,11 @@ spack compiler list
 
 # Concretize with explicit preference to build from source
 echo "==> Starting concretization..."
-spack -e . concretize -j $(( $(nproc) - 1 )) -f
+spack -e . concretize -j $(nproc) -f
 
 # Install
 echo "==> Starting installation..."
-spack -e . install -j $(( $(nproc) - 1 )) --verbose
+spack -e . install -j $(nproc) --verbose
 
 echo "==> Installation complete"
 BASH_EOF

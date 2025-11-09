@@ -147,7 +147,7 @@ jobs:
           cd "$TEST_DIR"
           
           # Clone Spack
-          git clone --depth 1 --branch v1.0.2 https://github.com/spack/spack.git
+          git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
           cd spack
           
           # Initialize Spack (avoid sourcing which can have issues)
@@ -178,7 +178,7 @@ jobs:
           # Try to install GCC from buildcache only (with signature verification)
           echo ""
           echo "Installing GCC ${{ matrix.compiler_version }} from buildcache with GPG verification..."
-          spack install --cache-only gcc@${{ matrix.compiler_version }} target=x86_64_v3 2>&1 | tail -50
+          spack install --cache-only gcc@${{ matrix.compiler_version }} target=x86_64 2>&1 | tail -50
           
           # Verify installation
           echo ""
