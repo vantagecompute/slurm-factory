@@ -319,8 +319,13 @@ def create_compiler_package(
             if verbose:
                 console.print(f"[dim]Warning: Could not clear buildx cache: {escape(str(e))}[/dim]")
 
+        # Always use no-cache for compiler builds to ensure clean state
+        # Compiler builds are infrequent but need to be reliable
+        force_no_cache = True
+        logger.debug("Forcing --no-cache for compiler build to ensure clean state")
+
         # If no_cache is enabled, clean up old images too
-        if no_cache:
+        if no_cache or force_no_cache:
             console.print("[bold yellow]🗑️  Performing fresh build - cleaning all caches...[/bold yellow]")
 
             # Remove old Docker images
@@ -343,7 +348,7 @@ def create_compiler_package(
             dockerfile_content,
             cache_dir,
             verbose=verbose,
-            no_cache=no_cache,
+            no_cache=force_no_cache,  # Always use no-cache for reliable compiler builds
             target="compiler-packager",  # Build up to the packager stage
         )
 
