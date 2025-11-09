@@ -752,7 +752,8 @@ def publish_compiler_to_buildcache(
     console.print("[bold blue]Publishing compiler to S3 buildcache...[/bold blue]")
 
     s3_bucket = "s3://slurm-factory-spack-buildcache-4b670"
-    s3_mirror_url = f"{s3_bucket}/compilers/{compiler_version}/buildcache"
+    # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
+    s3_mirror_url = f"{s3_bucket}/compilers/{compiler_version}"
 
     logger.debug(f"Publishing compiler {compiler_version} to {s3_mirror_url}")
 
@@ -939,7 +940,8 @@ def push_to_buildcache(
     console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
 
     s3_bucket = "s3://slurm-factory-spack-buildcache-4b670"
-    s3_mirror_url = f"{s3_bucket}/slurm/{version}/{compiler_version}/buildcache"
+    # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
+    s3_mirror_url = f"{s3_bucket}/slurm/{version}/{compiler_version}"
 
     logger.debug(f"Publishing Slurm {version} to {s3_mirror_url} (mode: {publish_mode})")
 

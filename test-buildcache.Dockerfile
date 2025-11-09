@@ -56,7 +56,7 @@ spack:
   
   mirrors:
     slurm-factory-buildcache:
-      url: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/15.1.0/buildcache
+      url: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/15.1.0
       signed: true
       binary: true
       source: false

@@ -634,8 +634,9 @@ def generate_spack_config(
                     "source": True,
                 },
                 # Use slurm-factory buildcache for compiler binaries
+                # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
                 "slurm-factory-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache",
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}",
                     "signed": True,
                     "binary": True,
                     "source": False,
