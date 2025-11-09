@@ -64,7 +64,7 @@ def generate_compiler_bootstrap_config(
 
     Args:
         gcc_version: GCC version to build
-        (e.g., "15.2.0", "14.3.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0")
+        (e.g., "15.1.0", "14.3.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0")
         buildcache_root: Directory for binary build cache
         sourcecache_root: Directory for source cache
 

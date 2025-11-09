@@ -14,7 +14,7 @@ Slurm Factory simplifies the complex process of building and packaging Slurm for
 - **Performance Optimization** - CPU-specific optimizations and optional GPU support
 - **Reproducibility** - Docker container isolation and version-controlled dependencies
 - **Multi-Version Support** - Slurm versions 25.11, 24.11, 23.11
-- **Flexible Compilers** - GCC 7.5.0 through 15.2.0 for maximum compatibility
+- **Flexible Compilers** - GCC 7.5.0 through 15.1.0 for maximum compatibility
 
 ## Build System Architecture
 
@@ -93,7 +93,7 @@ graph TB
 - **Two Build Commands**: `build-compiler` for GCC toolchains, `build` for Slurm packages
 - **Dependency Classification**: External tools vs runtime libraries for optimal sizing
 - **Multiple Build Types**: CPU-only, GPU-enabled, minimal variants
-- **Compiler Flexibility**: GCC 7.5.0 through 15.2.0 for cross-distro compatibility
+- **Compiler Flexibility**: GCC 7.5.0 through 15.1.0 for cross-distro compatibility
 - **Automated Publishing**: Push to S3 buildcache and tarball repositories
 
 ## Package Types

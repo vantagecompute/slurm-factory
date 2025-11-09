@@ -6,7 +6,7 @@ The Slurm Factory Spack Build Cache is a public binary package repository hosted
 
 The build cache is a **CloudFront-distributed S3 bucket** containing:
 
-- **GCC Compiler Toolchains** (versions 7.5.0 through 15.2.0)
+- **GCC Compiler Toolchains** (versions 7.5.0 through 15.1.0)
 - **Slurm Packages** (versions 23.11, 24.11, 25.11)
 - **All Dependencies** (OpenMPI, PMIx, Munge, HDF5, CUDA, etc.)
 
@@ -31,8 +31,8 @@ No AWS credentials are required for read access.
 ```text
 slurm-factory-spack-binary-cache.vantagecompute.ai/
 ├── compilers/
-│   ├── 15.2.0/
-│   │   └── buildcache/          # GCC 15.2.0 compiler packages
+│   ├── 15.1.0/
+│   │   └── buildcache/          # GCC 15.1.0 compiler packages
 │   ├── 14.2.0/
 │   │   └── buildcache/          # GCC 14.2.0 compiler packages
 │   ├── 13.4.0/
@@ -51,8 +51,8 @@ slurm-factory-spack-binary-cache.vantagecompute.ai/
 │       └── buildcache/
 └── slurm/
     ├── 25.11/                   # Slurm 25.11 (latest)
-    │   ├── 15.2.0/
-    │   │   └── buildcache/      # Slurm 25.11 + deps built with GCC 15.2.0
+    │   ├── 15.1.0/
+    │   │   └── buildcache/      # Slurm 25.11 + deps built with GCC 15.1.0
     │   ├── 14.2.0/
     │   │   └── buildcache/      # Slurm 25.11 + deps built with GCC 14.2.0
     │   ├── 13.4.0/
@@ -174,7 +174,7 @@ All GCC versions are available with full dependency chains:
 
 | GCC Version | glibc | Target Distro | Buildcache URL |
 |-------------|-------|---------------|----------------|
-| 15.2.0 | 2.40 | Latest (experimental) | `compilers/15.2.0/buildcache` |
+| 15.1.0 | 2.40 | Latest (experimental) | `compilers/15.1.0/buildcache` |
 | 14.2.0 | 2.39 | Latest stable | `compilers/14.2.0/buildcache` |
 | 13.4.0 | 2.39 | Ubuntu 24.04 **(default)** | `compilers/13.4.0/buildcache` |
 | 12.5.0 | 2.35 | Ubuntu 22.04 | `compilers/12.5.0/buildcache` |
@@ -197,7 +197,7 @@ All combinations of Slurm version × GCC compiler version are available:
 
 | Slurm Version | Status | Available Compilers | Buildcache URL Pattern |
 |---------------|--------|---------------------|------------------------|
-| 25.11 | Latest | All (7.5.0-15.2.0) | `slurm/25.11/{compiler}/buildcache` |
+| 25.11 | Latest | All (7.5.0-15.1.0) | `slurm/25.11/{compiler}/buildcache` |
 | 24.11 | LTS | All (7.5.0-14.2.0) | `slurm/24.11/{compiler}/buildcache` |
 | 23.11 | Stable | All (7.5.0-14.2.0) | `slurm/23.11/{compiler}/buildcache` |
 

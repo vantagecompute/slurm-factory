@@ -51,7 +51,7 @@ specs:
 ## Testing
 
 ### Automated Tests
-- ✅ New test validates all 9 supported GCC versions (7.5.0-15.2.0)
+- ✅ New test validates all 9 supported GCC versions (7.5.0-15.1.0)
 - ✅ Existing compiler configuration tests still pass
 - ✅ CodeQL security scan: 0 vulnerabilities
 

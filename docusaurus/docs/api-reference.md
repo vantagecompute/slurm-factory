@@ -15,7 +15,7 @@ slurm-factory build [OPTIONS]
 **Options:**
 - `--slurm-version TEXT` - Slurm version (default: 25.11)
 - `--compiler-version TEXT` - GCC compiler version (default: 13.4.0)
-  - Available: 15.2.0, 14.3.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
+  - Available: 15.1.0, 14.3.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
 - `--gpu` - Include GPU support (CUDA/ROCm)
 - `--minimal` - Minimal build (no OpenMPI)
 - `--verify` - Verify relocatability
@@ -31,7 +31,7 @@ slurm-factory build --compiler-version 10.5.0  # RHEL 8/Ubuntu 20.04
 slurm-factory build --compiler-version 7.5.0   # RHEL 7
 
 # Latest compiler versions
-slurm-factory build --compiler-version 15.2.0  # Latest GCC 15
+slurm-factory build --compiler-version 15.1.0  # Latest GCC 15
 
 # Combine options
 slurm-factory build --slurm-version 25.11 --compiler-version 11.5.0 --gpu

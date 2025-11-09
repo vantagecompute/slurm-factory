@@ -27,9 +27,9 @@ SLURM_VERSIONS = {
 
 # Supported compiler versions for building
 # Key: user-facing version, Value: (gcc_version, glibc_version, description)
-# Latest stable minor versions for each major GCC version from Spack
+# Latest stable minor versions for each major GCC version from Spack v1.0.2
 COMPILER_TOOLCHAINS = {
-    "15.2.0": ("15.2.0", "2.40", "GCC 15.2 (latest) - glibc 2.40"),
+    "15.1.0": ("15.1.0", "2.40", "GCC 15.1 (latest in Spack v1.0.2) - glibc 2.40"),
     "14.2.0": ("14.2.0", "2.39", "GCC 14.2 (latest stable) - glibc 2.39"),
     "13.4.0": ("13.4.0", "2.39", "GCC 13.4 / Ubuntu 24.04 (default) - glibc 2.39"),
     "12.5.0": ("12.5.0", "2.35", "GCC 12.5 (latest stable) - glibc 2.35"),

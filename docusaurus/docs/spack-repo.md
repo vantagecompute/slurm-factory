@@ -109,7 +109,7 @@ The custom repository enhances standard Spack packages:
 | **GPU Support** | Optional | Tested with CUDA 11.8+ and ROCm 5.7+ |
 | **OpenMPI** | Basic PMIx support | Enhanced with UCX and hwloc integration |
 | **REST API** | Basic curl | Full LDAP/SSH/TLS support via enhanced curl |
-| **Compiler Support** | Standard | Tested with GCC 7.5.0 through 15.2.0 |
+| **Compiler Support** | Standard | Tested with GCC 7.5.0 through 15.1.0 |
 | **Module Generation** | Basic | Enhanced Lmod modules with autoloading |
 | **Build Optimizations** | Generic | CPU-specific (x86_64_v3) by default |
 

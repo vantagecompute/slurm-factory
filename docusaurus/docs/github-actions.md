@@ -27,7 +27,7 @@ flowchart TD
     Start([Workflow Dispatch]) --> PrepareMatrix[Prepare Compiler Matrix]
     PrepareMatrix --> Matrix{Matrix Build}
     
-    Matrix -->|GCC 15.2.0| Build1[Build Compiler 15.2.0]
+    Matrix -->|GCC 15.1.0| Build1[Build Compiler 15.1.0]
     Matrix -->|GCC 14.2.0| Build2[Build Compiler 14.2.0]
     Matrix -->|GCC 13.4.0| Build3[Build Compiler 13.4.0]
     Matrix -->|GCC 12.5.0| Build4[Build Compiler 12.5.0]

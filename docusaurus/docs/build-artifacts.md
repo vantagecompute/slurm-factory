@@ -191,7 +191,7 @@ All Slurm × Compiler combinations are pre-built and available:
 
 | Compiler | Target OS | Public URL |
 |----------|-----------|------------|
-| GCC 15.2.0 | Latest (experimental) | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/15.2.0/slurm-25.11-gcc15.2.0-software.tar.gz` |
+| GCC 15.1.0 | Latest (experimental) | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/15.1.0/slurm-25.11-gcc15.1.0-software.tar.gz` |
 | GCC 14.2.0 | Latest | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/14.2.0/slurm-25.11-gcc14.2.0-software.tar.gz` |
 | GCC 13.4.0 | Ubuntu 24.04 **(recommended)** | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz` |
 | GCC 12.5.0 | Ubuntu 22.04 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/12.5.0/slurm-25.11-gcc12.5.0-software.tar.gz` |
