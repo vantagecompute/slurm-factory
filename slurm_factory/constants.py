@@ -528,14 +528,9 @@ WORKDIR /root/compiler-bootstrap
 # The packages config sets gcc externals to empty list, but we need to ensure
 # Spack doesn't auto-detect gcc as an external package during concretization.
 RUN bash << 'BASH_EOF'
-set -ex  # Enable command tracing
+set -e
 source /opt/spack/share/spack/setup-env.sh
 eval $(spack env activate --sh .)
-
-# Clean any previous build failures AND remove failed install tree
-echo "==> Cleaning previous build state..."
-spack clean -a 2>/dev/null || true
-rm -rf /opt/spack-compiler-install/* 2>/dev/null || true
 
 # Show environment info for debugging
 echo "==> Spack environment info:"
@@ -549,6 +544,8 @@ spack -e . concretize -j $(( $(nproc) - 1 )) -f
 # Install
 echo "==> Starting installation..."
 spack -e . install -j $(( $(nproc) - 1 )) --verbose
+
+echo "==> Installation complete"
 BASH_EOF
 
 # Register the newly built compiler with Spack at site scope
