@@ -528,16 +528,16 @@ WORKDIR /root/compiler-bootstrap
 # CRITICAL: Hide system gcc binaries ONLY during Spack environment activation
 # This prevents Spack v1.0.0 from auto-detecting and adding gcc as external
 # But we restore them before concretization so gcc can be used to BUILD gcc@11.4.0
-RUN bash -c 'for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
-        [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true; \\
+RUN bash -c "for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
+        [ -f /usr/bin/$$f ] && mv /usr/bin/$$f /usr/bin/$$f.hidden || true; \\
     done && \\
     source /opt/spack/share/spack/setup-env.sh && \\
-    eval $(spack env activate --sh .) && \\
+    eval $$(spack env activate --sh .) && \\
     for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do \\
-        [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true; \\
+        [ -f /usr/bin/$$f.hidden ] && mv /usr/bin/$$f.hidden /usr/bin/$$f || true; \\
     done && \\
-    spack -e . concretize -j $(( $(nproc) - 1 )) -f && \\
-    spack -e . install -j $(( $(nproc) - 1 )) --verbose
+    spack -e . concretize -j $$(( $$(nproc) - 1 )) -f && \\
+    spack -e . install -j $$(( $$(nproc) - 1 )) --verbose"
 
 # Register the newly built compiler with Spack at site scope
 # The view at /opt/spack-compiler is automatically created by the environment configuration
