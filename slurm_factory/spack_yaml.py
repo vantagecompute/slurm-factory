@@ -108,9 +108,11 @@ def generate_compiler_bootstrap_config(
                     "buildable": True,
                 },
                 # CRITICAL: Prevent gcc from being used as external (Spack auto-detects and adds it)
+                # Use require to force building from source, not from externals
                 "gcc": {
                     "externals": [],
                     "buildable": True,
+                    "require": f"@{gcc_ver}",
                 },
                 # Build autotools from source in compiler env
                 "autoconf": {"buildable": True},
