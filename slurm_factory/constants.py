@@ -527,6 +527,12 @@ WORKDIR /root/compiler-bootstrap
 # Build the compiler toolchain  
 # The packages config sets gcc externals to empty list, but we need to ensure
 # Spack doesn't auto-detect gcc as an external package during concretization.
+# Remove any cached Spack state first to ensure truly clean build
+RUN rm -rf /opt/spack/var/spack/cache/* \
+           /opt/spack/var/spack/junit-report/* \
+           /opt/spack-compiler-install/.spack-db \
+           /opt/spack-compiler-install/.spack-empty 2>/dev/null || true
+
 RUN bash << 'BASH_EOF'
 set -e
 source /opt/spack/share/spack/setup-env.sh
