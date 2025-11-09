@@ -531,8 +531,9 @@ RUN bash << 'BASH_EOF'
 set -e
 source /opt/spack/share/spack/setup-env.sh
 eval $(spack env activate --sh .)
-# Clean any previous build failures
+# Clean any previous build failures AND remove failed install tree
 spack clean -a 2>/dev/null || true
+rm -rf /opt/spack-compiler-install/* 2>/dev/null || true
 # Concretize with explicit preference to build from source
 spack -e . concretize -j $(( $(nproc) - 1 )) -f
 spack -e . install -j $(( $(nproc) - 1 )) --verbose
