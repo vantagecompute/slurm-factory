@@ -847,15 +847,17 @@ def publish_compiler_to_buildcache(
             [
                 "cd /root/compiler-bootstrap",
                 # Activate the environment
-                "eval $(spack env activate --sh .)",
+                "source /opt/spack/share/spack/setup-env.sh",
+                "spack env activate .",
                 # List what we're about to push for debugging
                 "echo '==> Packages in environment:'",
                 "spack find",
                 # Add the mirror
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
-                # Push ALL installed packages (not just env roots) using wildcard spec
-                # The --force flag ensures packages are pushed even if they already exist
-                f"spack buildcache push {signing_flags} --force --verbose s3-buildcache",
+                # Push ALL installed packages from the environment
+                # Use --force to overwrite existing packages
+                # Use --only package to avoid pushing dependencies that weren't requested
+                f"spack buildcache push {signing_flags} --force --verbose --only package s3-buildcache",
                 # Update the buildcache index after pushing (Spack 1.0+ requirement)
                 # This creates/updates the build_cache/index.json file
                 f"spack buildcache update-index s3-buildcache",
