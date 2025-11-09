@@ -846,17 +846,27 @@ def publish_compiler_to_buildcache(
         bash_script_parts.extend(
             [
                 "cd /root/compiler-bootstrap",
+                # Activate the environment
+                "eval $(spack env activate --sh .)",
+                # List what we're about to push for debugging
+                "echo '==> Packages in environment:'",
+                "spack find",
+                # Add the mirror
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
-                # Push all packages in the environment (gcc and its dependencies)
-                f"spack -e . buildcache push {signing_flags} --without-build-dependencies s3-buildcache",
+                # Push ALL installed packages (not just env roots) using wildcard spec
+                # The --force flag ensures packages are pushed even if they already exist
+                f"spack buildcache push {signing_flags} --force --verbose s3-buildcache",
                 # Update the buildcache index after pushing (Spack 1.0+ requirement)
                 # This creates/updates the build_cache/index.json file
                 f"spack buildcache update-index s3-buildcache",
+                # Verify upload succeeded
+                "echo '==> Buildcache contents:'",
+                "spack buildcache list --allarch",
             ]
         )
 
-        # Join the script parts with &&
-        bash_script = " && ".join(bash_script_parts)
+        # Join the script parts with && and add set -e at the start for fail-fast
+        bash_script = "set -e && " + " && ".join(bash_script_parts)
 
         # Add image and command
         cmd.extend([image_tag, "bash", "-c", bash_script])
