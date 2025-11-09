@@ -304,27 +304,27 @@ def create_compiler_package(
     )
 
     try:
-        # If no_cache is enabled, clean up everything first
+        # Always prune Docker buildx cache for compiler builds to avoid stale cache issues
+        console.print("[dim]Pruning Docker buildx cache...[/dim]")
+        try:
+            subprocess.run(
+                ["docker", "buildx", "prune", "-f"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+            logger.debug("Docker buildx cache cleared")
+        except subprocess.CalledProcessError as e:
+            logger.warning(f"Could not clear Docker buildx cache: {e}")
+            if verbose:
+                console.print(f"[dim]Warning: Could not clear buildx cache: {escape(str(e))}[/dim]")
+
+        # If no_cache is enabled, clean up old images too
         if no_cache:
             console.print("[bold yellow]🗑️  Performing fresh build - cleaning all caches...[/bold yellow]")
 
             # Remove old Docker images
             _remove_old_docker_image(image_tag, verbose=verbose)
-
-            # Clear Docker build cache
-            console.print("[dim]Pruning Docker build cache...[/dim]")
-            try:
-                subprocess.run(
-                    ["docker", "builder", "prune", "-f"],
-                    check=True,
-                    capture_output=True,
-                    text=True,
-                )
-                logger.debug("Docker build cache cleared")
-            except subprocess.CalledProcessError as e:
-                logger.warning(f"Could not clear Docker build cache: {e}")
-                if verbose:
-                    console.print(f"[dim]Warning: Could not clear build cache: {escape(str(e))}[/dim]")
 
         # Generate Dockerfile for compiler-only build
         logger.debug("Generating compiler Dockerfile")
