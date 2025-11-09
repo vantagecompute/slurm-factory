@@ -101,14 +101,16 @@ def generate_compiler_bootstrap_config(
                 #    "roots": False,
                 #    "from": [{"type": "buildcache"}],
                 #},
-                # Disable using externals during concretization
+                # Disable using externals during concretization and enforce target
                 "targets": {
                     "host_compatible": False,
+                    "granularity": "microarchitectures",
                 },
             },
             "packages": {
                 "all": {
-                    "target": ["x86_64"],
+                    "target": ["x86_64_v3"],
+                    "require": "target=x86_64_v3",
                     "buildable": True,
                     # Prefer building from source over using externals
                     "prefer": ["~external"],
