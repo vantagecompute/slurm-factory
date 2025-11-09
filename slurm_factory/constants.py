@@ -525,7 +525,7 @@ BOOTSTRAP_YAML_EOF
 WORKDIR /root/compiler-bootstrap
 
 # Build the compiler toolchain
-# Note: The spack.yaml has "gcc": {"externals": [], "buildable": True} to prevent
+# Note: The spack.yaml has gcc externals set to empty list to prevent
 # gcc@13.3.0 from being used as an external package during concretization.
 # System gcc is still available in PATH to actually BUILD the new gcc.
 RUN bash << 'EOF'
