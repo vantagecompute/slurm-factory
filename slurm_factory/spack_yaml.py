@@ -101,18 +101,24 @@ def generate_compiler_bootstrap_config(
                     "roots": True,
                     "from": [{"type": "buildcache"}],
                 },
+                # Disable using externals during concretization
+                "targets": {
+                    "host_compatible": False,
+                },
             },
             "packages": {
                 "all": {
                     "target": ["x86_64_v3"],
                     "buildable": True,
+                    # Prefer building from source over using externals
+                    "prefer": ["~external"],
                 },
                 # CRITICAL: Prevent gcc from being used as external (Spack auto-detects and adds it)
-                # Use require to force building from source, not from externals
+                # Set externals to empty and require building from source
                 "gcc": {
                     "externals": [],
                     "buildable": True,
-                    "require": f"@{gcc_ver}",
+                    "prefer": [f"@{gcc_ver}"],
                 },
                 # Build autotools from source in compiler env
                 "autoconf": {"buildable": True},

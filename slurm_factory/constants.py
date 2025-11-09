@@ -524,20 +524,19 @@ BOOTSTRAP_YAML_EOF
 
 WORKDIR /root/compiler-bootstrap
 
-# Build the compiler toolchain
-# Note: The spack.yaml has gcc externals set to empty list to prevent
-# gcc@13.3.0 from being used as an external package during concretization.
-# System gcc is still available in PATH to actually BUILD the new gcc.
-RUN bash << 'EOF'
+# Build the compiler toolchain  
+# The packages config sets gcc externals to empty list, but we need to ensure
+# Spack doesn't auto-detect gcc as an external package during concretization.
+RUN bash << 'BASH_EOF'
 set -e
 source /opt/spack/share/spack/setup-env.sh
 eval $(spack env activate --sh .)
 # Clean any previous build failures
 spack clean -a 2>/dev/null || true
-# Concretize and install
+# Concretize with explicit preference to build from source
 spack -e . concretize -j $(( $(nproc) - 1 )) -f
 spack -e . install -j $(( $(nproc) - 1 )) --verbose
-EOF
+BASH_EOF
 
 # Register the newly built compiler with Spack at site scope
 # The view at /opt/spack-compiler is automatically created by the environment configuration
