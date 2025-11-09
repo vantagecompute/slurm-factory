@@ -525,18 +525,16 @@ BOOTSTRAP_YAML_EOF
 WORKDIR /root/compiler-bootstrap
 
 # Build the compiler toolchain
-# CRITICAL: Hide system gcc binaries ONLY during Spack environment activation
-# This prevents Spack v1.0.0 from auto-detecting and adding gcc as external
-# But we restore them before concretization so gcc can be used to BUILD gcc@11.4.0
+# CRITICAL: Clear any auto-detected compilers before concretization
+# Spack auto-detects compilers on first use - we need to remove them
+# This prevents gcc@13.3.0 from being added as external during concretization
 RUN bash << 'EOF'
-for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do
-    [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
-done
 source /opt/spack/share/spack/setup-env.sh
 eval $(spack env activate --sh .)
-for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13; do
-    [ -f /usr/bin/$f.hidden ] && mv /usr/bin/$f.hidden /usr/bin/$f || true
-done
+# Remove any auto-detected compilers (happens on first spack command)
+spack compiler list || true
+rm -f /root/.spack/linux/compilers.yaml
+rm -f /opt/spack/etc/spack/compilers.yaml
 spack -e . concretize -j $(( $(nproc) - 1 )) -f
 spack -e . install -j $(( $(nproc) - 1 )) --verbose
 EOF
