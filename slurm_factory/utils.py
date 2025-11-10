@@ -857,7 +857,8 @@ def publish_compiler_to_buildcache(
                 # Push ALL installed packages from the environment, including dependencies
                 # This ensures gcc-runtime and other dependencies are available in buildcache
                 # Use --force to overwrite existing packages
-                f"spack buildcache push {signing_flags} --force --verbose s3-buildcache",
+                # Use 'spack -e .' to push all packages in the current environment
+                f"spack -e . buildcache push {signing_flags} --force --verbose s3-buildcache",
                 # Update the buildcache index after pushing (Spack 1.0+ requirement)
                 # This creates/updates the build_cache/index.json file
                 # Allow update-index to fail gracefully for new/empty buildcaches
