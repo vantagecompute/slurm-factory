@@ -440,8 +440,8 @@ def generate_spack_config(
             # Force all packages to be buildable from source
             "packages": {
                 "all": {
-                    "target": ["x86_64"],
-                    "require": "target=x86_64",
+                    "target": ["x86_64_v3"],
+                    "require": "target=x86_64_v3",
                     "buildable": True,
                 },
                 "cmake": {
