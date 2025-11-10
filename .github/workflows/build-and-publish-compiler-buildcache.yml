@@ -24,7 +24,7 @@ jobs:
         run: |
           if [ "${{ inputs.compiler_versions }}" = "all" ]; then
             # Build all supported compiler versions
-            VERSIONS='["15.1.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
+            VERSIONS='["15.2.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
           else
             # Parse comma-separated list into JSON array
             IFS=',' read -ra VERS <<< "${{ inputs.compiler_versions }}"
