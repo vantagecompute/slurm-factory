@@ -71,6 +71,10 @@ jobs:
           # Clean up any previous compiler builds for this version
           rm -rf "$HOME/.slurm-factory/compilers/${{ matrix.compiler_version }}"
           docker images | grep "slurm-factory:compiler-${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+          
+          # Clean Spack cache directories to prevent state leakage between runs
+          # This ensures the buildcache test truly validates buildcache installation
+          rm -rf "$HOME/.spack"
 
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -149,6 +153,12 @@ jobs:
           # Clone Spack
           git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
           cd spack
+          
+          # Isolate Spack user data to prevent caching between runs
+          # This ensures we test buildcache installation, not cached/external packages
+          export SPACK_USER_CACHE_PATH="$TEST_DIR/spack-cache"
+          export SPACK_USER_CONFIG_PATH="$TEST_DIR/spack-config"
+          mkdir -p "$SPACK_USER_CACHE_PATH" "$SPACK_USER_CONFIG_PATH"
           
           # Initialize Spack (avoid sourcing which can have issues)
           export SPACK_ROOT="$(pwd)"
