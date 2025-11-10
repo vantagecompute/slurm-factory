@@ -278,8 +278,8 @@ class TestScriptTemplates:
         # Verify old code is not present
         assert "spack -e . compiler find --scope site" not in dockerfile
         
-        # Verify note about gcc-runtime not being built in compiler stage
-        assert "We do NOT build gcc-runtime or compiler-wrapper here!" in dockerfile
+        # Verify note about gcc-runtime being automatically included
+        assert "gcc-runtime is built automatically as a dependency" in dockerfile
 
 
 class TestConstantTypes:

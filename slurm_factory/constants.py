@@ -561,10 +561,9 @@ BASH_EOF
 RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \\
     spack compiler find --scope site /opt/spack-compiler'
 
-# NOTE: We do NOT build gcc-runtime or compiler-wrapper here!
-# They MUST be built during the Slurm build phase with the target compiler,
-# otherwise they will be built with the system compiler and have wrong linkage.
-# Spack will automatically build them as dependencies when needed.
+# NOTE: gcc-runtime is built automatically as a dependency of gcc and
+# is pushed to the buildcache to ensure completeness. This allows users
+# to install the compiler from buildcache with --cache-only.
 
 # Verify compiler installation
 RUN /opt/spack-compiler/bin/gcc --version && \\

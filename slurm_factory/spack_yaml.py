@@ -92,8 +92,8 @@ def generate_compiler_bootstrap_config(
                 "autoconf@2.72",
                 "automake@1.16.5",
                 "libtool@2.4.7",
-                # NOTE: gcc-runtime and compiler-wrapper will be built as dependencies
-                # during the Slurm build phase, not during compiler bootstrap
+                # gcc-runtime will be built automatically as a dependency of gcc
+                # and pushed to buildcache to ensure completeness
             ],
             "concretizer": {
                 "unify": "when_possible",
