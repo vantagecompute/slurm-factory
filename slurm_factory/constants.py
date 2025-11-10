@@ -234,8 +234,9 @@ def get_spack_build_script(compiler_version: str) -> str:
         Complete bash script for compiler bootstrap and Slurm build
 
     """
+    # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
     buildcache_url = (
-        f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache"
+        f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}"
     )
     return textwrap.dedent(f"""        source {SPACK_SETUP_SCRIPT}
         echo '==> Configuring buildcache mirror globally for compiler installation...'
@@ -260,7 +261,7 @@ spack:
       roots: true
       from:
       - type: buildcache
-        path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}/buildcache
+        path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}
 COMPILER_ENV_EOF
         echo '==> Checking if GCC is available in buildcache...'
         if ! spack buildcache list --allarch | grep -q "gcc@{compiler_version}"; then
