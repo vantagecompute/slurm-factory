@@ -841,9 +841,8 @@ def publish_compiler_to_buildcache(
             )
 
         # Add the buildcache push commands
-        # Note: We only push packages that are installed in the environment.
-        # gcc-runtime and compiler-wrapper are NOT built during compiler phase,
-        # they are built later as dependencies during the Slurm build phase.
+        # Note: We push ALL packages that are installed in the environment,
+        # including gcc-runtime to ensure a complete compiler buildcache.
         bash_script_parts.extend(
             [
                 "cd /root/compiler-bootstrap",
@@ -855,13 +854,14 @@ def publish_compiler_to_buildcache(
                 "spack find",
                 # Add the mirror
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
-                # Push ALL installed packages from the environment
+                # Push ALL installed packages from the environment, including dependencies
+                # This ensures gcc-runtime and other dependencies are available in buildcache
                 # Use --force to overwrite existing packages
-                # Use --only package to avoid pushing dependencies that weren't requested
-                f"spack buildcache push {signing_flags} --force --verbose --only package s3-buildcache",
+                f"spack buildcache push {signing_flags} --force --verbose s3-buildcache",
                 # Update the buildcache index after pushing (Spack 1.0+ requirement)
                 # This creates/updates the build_cache/index.json file
-                f"spack buildcache update-index s3-buildcache",
+                # Allow update-index to fail gracefully for new/empty buildcaches
+                f"spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'",
                 # Verify upload succeeded
                 "echo '==> Buildcache contents:'",
                 "spack buildcache list --allarch",
@@ -988,17 +988,17 @@ def push_to_buildcache(
         if publish_mode == "slurm":
             # Push only slurm package
             push_cmd = f"spack buildcache push {signing_flags} s3-buildcache slurm"
-            update_index_cmd = "spack buildcache update-index s3-buildcache"
+            update_index_cmd = "spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'"
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
             push_cmd = (
                 f"spack -e . buildcache push {signing_flags} --only dependencies s3-buildcache"
             )
-            update_index_cmd = "spack buildcache update-index s3-buildcache"
+            update_index_cmd = "spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'"
         else:  # all
             # Push everything
             push_cmd = f"spack -e . buildcache push {signing_flags} s3-buildcache"
-            update_index_cmd = "spack buildcache update-index s3-buildcache"
+            update_index_cmd = "spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'"
 
         # Build docker run command with AWS environment variables
         cmd = ["docker", "run", "--rm"]

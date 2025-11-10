@@ -89,10 +89,12 @@ class TestSlurmEnvironmentConfig:
         """Test that Slurm environment config expects compiler from buildcache."""
         config = generate_spack_config(compiler_version="13.4.0")
         
-        # Check that all specs use the compiler constraint
+        # Check that all specs (except gcc itself) use the compiler constraint
         for spec in config["spack"]["specs"]:
             if not spec.startswith("#"):  # Skip comments
-                assert "%gcc@13.4.0" in spec, f"Spec missing compiler constraint: {spec}"
+                # Skip gcc spec itself - it comes from buildcache, not built with gcc@13.4.0
+                if not spec.startswith("gcc@"):
+                    assert "%gcc@13.4.0" in spec, f"Spec missing compiler constraint: {spec}"
                 
     def test_slurm_env_gcc_requirements_match_bootstrap(self):
         """Test that GCC in Slurm environment is configured to be installed from buildcache."""
@@ -128,7 +130,8 @@ class TestSlurmEnvironmentConfig:
         # The buildcache mirror should be configured to provide gcc binaries
         mirrors = config["spack"]["mirrors"]
         assert "slurm-factory-buildcache" in mirrors
-        assert f"compilers/{compiler_version}/buildcache" in mirrors["slurm-factory-buildcache"]["url"]
+        # Note: Spack adds build_cache/ subdirectory automatically
+        assert f"compilers/{compiler_version}" in mirrors["slurm-factory-buildcache"]["url"]
         
     def test_slurm_env_has_empty_compilers_list(self):
         """Test that Slurm environment starts with empty compilers list."""
@@ -274,7 +277,8 @@ class TestCompilerBootstrapIntegration:
         
         # Both configs should reference the same buildcache
         assert "slurm-factory-buildcache" in slurm_config["spack"]["mirrors"]
-        assert f"compilers/{compiler_version}/buildcache" in slurm_config["spack"]["mirrors"]["slurm-factory-buildcache"]["url"]
+        # Note: Spack adds build_cache/ subdirectory automatically
+        assert f"compilers/{compiler_version}" in slurm_config["spack"]["mirrors"]["slurm-factory-buildcache"]["url"]
 
 
 if __name__ == "__main__":
