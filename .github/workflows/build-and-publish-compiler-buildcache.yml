@@ -188,7 +188,7 @@ jobs:
           # Try to install GCC from buildcache only (with signature verification)
           echo ""
           echo "Installing GCC ${{ matrix.compiler_version }} from buildcache with GPG verification..."
-          spack install --cache-only gcc@${{ matrix.compiler_version }} target=x86_64 2>&1 | tail -50
+          spack install --cache-only gcc@${{ matrix.compiler_version }} target=x86_64_v3 2>&1 | tail -50
           
           # Verify installation
           echo ""
