@@ -102,16 +102,9 @@ const config: Config = {
               filename: 'llms-index.txt',
               includePatterns: ['docs/index.md'],
               fullContent: true,
-              title: 'Slurm Factory Documentation Index',
-              description: 'Index reference for Slurm Factory'
+              title: 'Slurm Factory Documentation Index and Overview',
+              description: 'Complete index and overview reference for Slurm Factory'
             },
-            {
-              filename: 'llms-overview.txt',
-              includePatterns: ['docs/overview.md'],
-              fullContent: true,
-              title: 'Slurm Factory Overview Documentation',
-              description: 'Overview documentation for Slurm Factory'
-             },
             {
               filename: 'llms-installation.txt',
               includePatterns: ['docs/installation.md'],

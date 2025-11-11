@@ -10,8 +10,8 @@ slug: /
 
 ## Key Features
 
-- � **GPG-Signed Packages**: All packages cryptographically signed for security and integrity
-- �🚀 **Public Binary Cache**: Pre-built packages at `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- 🔐 **GPG-Signed Packages**: All packages cryptographically signed for security and integrity
+-  **Public Binary Cache**: Pre-built packages at `slurm-factory-spack-binary-cache.vantagecompute.ai`
 - ⚡ **Instant Deployment**: Install from cache in 5-15 minutes instead of 45-90 minutes of compilation
 - 📦 **Relocatable Packages**: Deploy to any filesystem path without recompilation
 - 🔧 **Two Simple Commands**: `build` for Slurm packages, `build-compiler` for GCC toolchains
@@ -19,6 +19,8 @@ slug: /
 - 🎮 **GPU Support**: CUDA/ROCm-enabled builds for GPU-accelerated HPC workloads
 - 🔄 **Automated CI/CD**: GitHub Actions workflows maintain the GPG-signed public buildcache
 - 📊 **Module System**: Lmod modules for easy environment management
+- 🌐 **Global CDN**: CloudFront distribution for fast worldwide access
+- 💾 **Intelligent Caching**: Multi-layer caching (Docker, binary packages, source archives)
 
 ## Support Matrix
 
@@ -68,11 +70,21 @@ https://slurm-factory-spack-binary-cache.vantagecompute.ai/
 All packages in the buildcache are cryptographically signed with GPG for security:
 
 **Key Information:**
+
 - **Key ID**: `DFB92630BCA5AB71`
+- **Fingerprint**: `9C4E 8B2F 3A1D 5E6C 7F8A  9B0D DFB9 2630 BCA5 AB71`
 - **Owner**: Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key)
 - **Email**: info@vantagecompute.ai
 
-Keys are automatically imported and trusted when using the buildcache.
+**Why GPG Signing?**
+
+- **Authenticity**: Verify packages were built by Vantage Compute
+- **Integrity**: Detect tampering or corruption during download
+- **Security**: Prevent man-in-the-middle attacks
+- **Trust Chain**: Establish provenance for production deployments
+- **Compliance**: Meets security requirements for production deployments
+
+Keys are automatically imported and trusted when using the buildcache. See [GPG Package Verification](#gpg-package-verification) below for details.
 
 ## Quick Start
 
@@ -240,6 +252,22 @@ spack install slurm@25.11
 - **Trust**: Cryptographic proof of package origin
 - **Compliance**: Meets security requirements for production deployments
 
+### Manual Key Verification
+
+For production environments, verify the key fingerprint:
+
+```bash
+# Import the public key
+spack buildcache keys --install --trust
+
+# Verify the fingerprint
+gpg --list-keys --keyid-format LONG
+
+# Should show:
+# pub   rsa4096/DFB92630BCA5AB71 2025-01-XX
+#       9C4E 8B2F 3A1D 5E6C 7F8A  9B0D DFB9 2630 BCA5 AB71
+```
+
 All packages are signed during the CI/CD build process and verified before deployment.
 
 ## Build Types Comparison
@@ -292,15 +320,105 @@ See [Contributing Guide](./contributing.md) for details on setting up CI/CD work
 - **Performance Testing**: Optimized builds for specific hardware configurations  
 - **Container Deployment**: Portable packages for containerized HPC environments
 - **Air-Gapped Installations**: Download buildcache once, deploy offline
+- **Research Computing Centers**: Standardize Slurm deployments across multiple clusters
+- **Cloud HPC Providers**: Rapidly provision clusters with consistent, tested software stacks
+- **Educational Institutions**: Provide reproducible HPC environments for teaching and research
+- **Industry HPC**: Deploy compliance-ready solutions with full audit trails and security
+- **CI/CD Pipelines**: Automated testing and validation of HPC software stacks
+
+## Architecture
+
+Slurm Factory uses a modern, modular architecture:
+
+```mermaid
+graph TB
+    subgraph "User Layer"
+        CLI[CLI Commands<br/>build / build-compiler]
+    end
+    
+    subgraph "Application Layer"
+        Config[Pydantic Config]
+        Builder[Build Orchestrator]
+        SpackYAML[Dynamic spack.yaml]
+        GPGSigning[GPG Signing]
+    end
+    
+    subgraph "Execution Layer"
+        Docker[Docker Container]
+        Spack[Spack v1.0.0]
+        CustomRepo[Custom Spack Repo]
+    end
+    
+    subgraph "Storage Layer"
+        LocalCache[Local Caches<br/>buildcache + sourcecache]
+        S3Cache[S3 Buildcache<br/>GPG-Signed Packages<br/>CloudFront CDN]
+        Outputs[Tarballs<br/>~/.slurm-factory/builds/]
+    end
+    
+    CLI --> Config
+    CLI --> Builder
+    Builder --> SpackYAML
+    Builder --> Docker
+    Builder --> GPGSigning
+    Docker --> Spack
+    Spack --> CustomRepo
+    Spack --> LocalCache
+    LocalCache -.Pull.-> S3Cache
+    Spack --> GPGSigning
+    GPGSigning --> Outputs
+    GPGSigning -.Publish.-> S3Cache
+    
+    style CLI fill:#4CAF50
+    style GPGSigning fill:#FF5722
+    style Outputs fill:#2196F3
+    style S3Cache fill:#FF9800
+```
+
+**Key Components:**
+
+- **Typer CLI**: Auto-completion, rich help text, type-safe command validation
+- **Pydantic Configuration**: Type-safe settings with environment variable support
+- **Docker Isolation**: Reproducible builds with version-controlled dependencies
+- **Dynamic spack.yaml**: Programmatically generated Spack environment specs
+- **GPG Signing**: Automatic cryptographic signing of all packages
+- **Multi-Layer Caching**: Docker layers, binary packages, source archives, compiler cache
+
+## Infrastructure
+
+Slurm Factory is supported by comprehensive AWS infrastructure:
+
+**Components:**
+
+- **S3 Buildcache Bucket**: `slurm-factory-spack-buildcache-4b670`
+- **CloudFront Distribution**: Global CDN for fast buildcache access
+- **Route53 DNS**: `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- **GitHub OIDC**: Secure, keyless authentication for CI/CD
+- **AWS CDK**: Infrastructure as code for reproducible deployments
+
+**CI/CD Workflows:**
+
+Three GitHub Actions workflows maintain the buildcache:
+
+1. **Compiler Buildcache**: Build and publish GCC toolchains
+2. **Slurm Dependencies**: Build Slurm packages for all compiler combinations  
+3. **Tarball Publishing**: Create and publish relocatable tarballs
+
+All workflows run on self-hosted runners with GPG signing and automated testing.
+
+See [Infrastructure](./infrastructure.md) and [GitHub Actions](./github-actions.md) for details.
 
 ## Next Steps
 
-- **[Installation Guide](./installation.md)**: Detailed setup instructions
+- **[Installing Slurm from Buildcache](./installing-slurm-from-buildcache.md)**: Fast installation using pre-built packages
+- **[Installing slurm-factory Tool](./installation.md)**: Setup for building custom packages
 - **[API Reference](./api-reference.md)**: Complete documentation of `build` and `build-compiler` commands
 - **[Build Artifacts](./build-artifacts.md)**: Understanding the buildcache and tarball outputs
-- **[Architecture](./architecture.md)**: Understanding the build system internals
+- **[Architecture](./architecture.md)**: Deep dive into the build system internals
 - **[Examples](./examples.md)**: Real-world usage scenarios
+- **[Deployment](./deployment.md)**: Installing and configuring built packages
 - **[Contributing](./contributing.md)**: Development workflow and submitting changes
+- **[Infrastructure](./infrastructure.md)**: AWS infrastructure and CDK deployment
+- **[GitHub Actions](./github-actions.md)**: CI/CD workflows and automation
 
 ---
 

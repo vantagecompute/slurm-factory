@@ -15,8 +15,7 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   // Manually curated sidebar for Slurm Factory documentation
   tutorialSidebar: [
-    'index', // Homepage/Overview
-    'overview', // Project Overview
+    'index', // Homepage/Overview (consolidated)
     {
       type: 'category',
       label: 'Getting Started',
