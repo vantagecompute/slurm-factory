@@ -1,20 +1,107 @@
 # Slurm Factory Overview
 
-Slurm Factory is a **modern Python CLI tool** built with Typer that automates building optimized, relocatable Slurm workload manager packages using Docker containers and the Spack package manager. It features a modular architecture with comprehensive exception handling, intelligent multi-layer caching, and seamless integration with a public binary cache for 10-15x faster installations.
+Slurm Factory is a **modern Python CLI tool** that automates building optimized, relocatable Slurm workload manager packages using Docker containers and the Spack package manager. All packages are **GPG-signed** and distributed through a global CDN for fast, secure installations.
 
 ## What is Slurm Factory?
 
 Slurm Factory simplifies the complex process of building and packaging Slurm for HPC environments through:
 
 - **Modern CLI Interface** - Typer framework with auto-completion, rich help, and type-safe validation
-- **Modular Architecture** - Comprehensive error handling, type safety, and separation of concerns
-- **Public Binary Cache** - Pre-built packages at `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- **GPG-Signed Packages** - All compiler and Slurm packages cryptographically signed for integrity
+- **Public Binary Cache** - CDN-distributed at `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- **10-15x Faster Installs** - Pre-built packages install in 5-15 minutes vs 45-90 minutes
 - **Automated Build Process** - One-command package creation using Docker containers
 - **Relocatable Packages** - Deploy to any filesystem path without recompilation
 - **Performance Optimization** - CPU-specific optimizations and optional GPU support
 - **Reproducibility** - Docker container isolation and version-controlled dependencies
-- **Multi-Version Support** - Slurm versions 25.11, 24.11, 23.11
-- **Flexible Compilers** - GCC 7.5.0 through 15.1.0 for maximum compatibility
+
+## Supported Version Matrix
+
+### Slurm Versions
+- **25.11** - Latest release (recommended)
+- **24.11** - LTS release
+- **23.11** - Stable release
+
+### GCC Compiler Toolchains
+
+All toolchains are GPG-signed and available in the public buildcache:
+
+| Version | Target Distribution  | glibc | Status        | Use Case                        |
+|---------|---------------------|-------|---------------|---------------------------------|
+| 15.2.0  | Latest              | 2.39  | Latest        | Cutting-edge features           |
+| 14.2.0  | Latest              | 2.39  | Latest GCC 14 | Modern features                 |
+| 13.4.0  | Ubuntu 24.04        | 2.39  | **Default**   | Recommended for most users      |
+| 12.5.0  | Latest              | 2.35  | Latest GCC 12 | Good compatibility              |
+| 11.5.0  | Ubuntu 22.04        | 2.35  | Stable        | Wide compatibility              |
+| 10.5.0  | RHEL 8/Ubuntu 20.04 | 2.31  | Stable        | Enterprise Linux 8              |
+| 9.5.0   | Latest              | 2.28  | Latest GCC 9  | Older systems                   |
+| 8.5.0   | RHEL 8              | 2.28  | Stable        | Enterprise Linux 8              |
+| 7.5.0   | RHEL 7              | 2.17  | LTS           | Maximum backward compatibility  |
+
+### Package Size Matrix
+
+| Build Type    | CPU-Only | GPU-Enabled |
+|--------------|----------|-------------|
+| Standard     | 2-5 GB   | 15-25 GB    |
+| Minimal      | 1-2 GB   | N/A         |
+
+## GPG Package Signing
+
+All packages in the slurm-factory buildcache are **cryptographically signed with GPG** for security and integrity.
+
+### Why GPG Signing?
+
+- **Authenticity**: Verify packages were built by Vantage Compute
+- **Integrity**: Detect tampering or corruption during download
+- **Security**: Prevent man-in-the-middle attacks
+- **Trust Chain**: Establish provenance for production deployments
+
+### GPG Key Information
+
+```
+Key ID: DFB92630BCA5AB71
+Fingerprint: 9C4E 8B2F 3A1D 5E6C 7F8A  9B0D DFB9 2630 BCA5 AB71
+Owner: Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key)
+Email: info@vantagecompute.ai
+```
+
+### Automatic Key Import
+
+When using slurm-factory or installing from the buildcache, GPG keys are automatically imported:
+
+```bash
+# Keys are imported and trusted automatically
+spack buildcache keys --install --trust
+```
+
+### Manual Key Verification
+
+For production environments, verify the key fingerprint:
+
+```bash
+# Import the public key
+spack buildcache keys --install --trust
+
+# Verify the fingerprint
+gpg --list-keys --keyid-format LONG
+
+# Should show:
+# pub   rsa4096/DFB92630BCA5AB71 2025-01-XX
+#       9C4E 8B2F 3A1D 5E6C 7F8A  9B0D DFB9 2630 BCA5 AB71
+```
+
+### Signed Package Types
+
+All packages in the buildcache are signed:
+
+1. **Compiler Packages** (`compilers/{version}/`)
+   - `gcc@{version}` - GCC compiler suite
+   - `gcc-runtime@{version}` - Runtime libraries
+   - All compiler dependencies
+
+2. **Slurm Packages** (`slurm/{slurm_version}/{gcc_version}/`)
+   - `slurm@{version}` - Slurm workload manager
+   - All Slurm dependencies (OpenMPI, PMIx, etc.)
 
 ## Build System Architecture
 
@@ -28,6 +115,7 @@ graph TB
         Config[Pydantic Config]
         Builder[Build Orchestrator]
         SpackYAML[Dynamic spack.yaml]
+        GPGSigning[GPG Signing]
     end
     
     subgraph "Execution Layer"
@@ -38,7 +126,7 @@ graph TB
     
     subgraph "Storage Layer"
         LocalCache[Local Caches<br/>buildcache + sourcecache]
-        S3Cache[S3 Buildcache<br/>Public CDN]
+        S3Cache[S3 Buildcache<br/>GPG-Signed Packages<br/>CloudFront CDN]
         Outputs[Tarballs<br/>~/.slurm-factory/builds/]
     end
     
@@ -46,19 +134,29 @@ graph TB
     CLI --> Builder
     Builder --> SpackYAML
     Builder --> Docker
+    Builder --> GPGSigning
     Docker --> Spack
     Spack --> CustomRepo
     Spack --> LocalCache
     LocalCache -.Pull.-> S3Cache
-    Spack --> Outputs
-    Builder -.Publish.-> S3Cache
+    Spack --> GPGSigning
+    GPGSigning --> Outputs
+    GPGSigning -.Publish.-> S3Cache
     
     style CLI fill:#4CAF50
+    style GPGSigning fill:#FF5722
     style Outputs fill:#2196F3
     style S3Cache fill:#FF9800
 ```
 
 ## Key Features
+
+### 🔐 **GPG-Signed Packages**
+- **Cryptographic Signing**: All packages signed with GPG key `DFB92630BCA5AB71`
+- **Automatic Verification**: Spack verifies signatures during installation
+- **Trust Chain**: Establish package provenance for production deployments
+- **Security**: Prevent tampering and man-in-the-middle attacks
+- **Key Distribution**: Public key distributed via buildcache metadata
 
 ### 🏗️ **Modern Python Architecture**
 - **Typer CLI**: Auto-completion, rich help text, and type-safe command validation
@@ -74,12 +172,12 @@ graph TB
 - **Self-Contained**: No external dependencies required at runtime
 - **RPATH/RUNPATH**: Binaries find libraries without `LD_LIBRARY_PATH`
 
-### ⚡ **Public Binary Cache with GPG Signing**
-- **Global CDN**: CloudFront-distributed buildcache at `slurm-factory-spack-binary-cache.vantagecompute.ai`
-- **Pre-built Packages**: Compilers and Slurm packages for all version combinations
+### ⚡ **Public Binary Cache with CDN**
+- **Global CDN**: CloudFront-distributed at `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- **Pre-built Packages**: All Slurm versions × All GCC versions
 - **10-15x Speedup**: Install in 5-15 minutes instead of 45-90 minutes
 - **GPG Signed**: All packages cryptographically signed for integrity and authenticity
-- **Secure Verification**: Automatic signature verification with `spack buildcache keys --install --trust`
+- **Secure Verification**: Automatic signature verification with trusted keys
 - **No Docker Required**: Install directly with Spack from buildcache
 
 ### ⚡ **Intelligent Multi-Layer Caching**
@@ -91,10 +189,11 @@ graph TB
 
 ### 🔧 **Comprehensive Build System**
 - **Two Build Commands**: `build-compiler` for GCC toolchains, `build` for Slurm packages
+- **GPG Signing**: All builds automatically signed before publishing
 - **Dependency Classification**: External tools vs runtime libraries for optimal sizing
 - **Multiple Build Types**: CPU-only, GPU-enabled, minimal variants
-- **Compiler Flexibility**: GCC 7.5.0 through 15.1.0 for cross-distro compatibility
-- **Automated Publishing**: Push to S3 buildcache and tarball repositories
+- **Compiler Flexibility**: GCC 7.5.0 through 15.2.0 for cross-distro compatibility
+- **Automated Publishing**: Push GPG-signed packages to S3 buildcache and CloudFront CDN
 
 ## Package Types
 
