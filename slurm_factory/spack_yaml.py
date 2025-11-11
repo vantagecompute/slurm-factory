@@ -382,7 +382,9 @@ def generate_spack_config(
     specs.append(f"slurm_factory.freeipmi@1.6.16 {compiler_spec}")
     specs.append(f"openmpi@5.0.3 schedulers=slurm fabrics=auto {compiler_spec}")
     specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
-    specs.append(f"mysql-connector-c {compiler_spec}")
+    # mysql-connector-c 6.1.11 has signal handler incompatibility with modern glibc
+    # Safe workaround: downgrade incompatible-pointer-types from error to warning
+    specs.append(f"mysql-connector-c cflags='-Wno-error=incompatible-pointer-types' {compiler_spec}")
     specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
     specs.append(
         f"slurm_factory.slurm@{slurm_package_version} {gpu_flags} sysconfdir=/etc/slurm {compiler_spec}"

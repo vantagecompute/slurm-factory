@@ -177,6 +177,37 @@ jobs:
           echo "Configuring system compiler for bootstrapping..."
           spack compiler find --scope site
           
+          # Verify compiler was found
+          echo "Checking for configured compilers..."
+          spack compiler list
+          
+          # If no compilers found, manually add gcc from /usr
+          if ! spack compiler list | grep -q gcc; then
+            echo "No compilers found by auto-detection. Adding system GCC manually..."
+            # Get system gcc version
+            GCC_VERSION=$(gcc -dumpversion)
+            # Create compiler config
+            mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
+            cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<EOF
+          compilers:
+          - compiler:
+              spec: gcc@${GCC_VERSION}
+              paths:
+                cc: /usr/bin/gcc
+                cxx: /usr/bin/g++
+                f77: /usr/bin/gfortran
+                fc: /usr/bin/gfortran
+              flags: {}
+              operating_system: ubuntu24.04
+              target: x86_64
+              modules: []
+              environment: {}
+              extra_rpaths: []
+          EOF
+            echo "Manually added GCC ${GCC_VERSION}"
+            spack compiler list
+          fi
+          
           # Add buildcache mirror (remove if exists first)
           MIRROR_URL="${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}"
           spack mirror remove slurm-factory-buildcache 2>/dev/null || true
