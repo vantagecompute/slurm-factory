@@ -211,22 +211,22 @@ jobs:
             
             # Create compiler configuration
             mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
-            cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<COMPILERCONFIG
-compilers:
-- compiler:
-    spec: gcc@${GCC_VERSION}
-    paths:
-      cc: /usr/bin/gcc
-      cxx: /usr/bin/g++
-      f77: /usr/bin/gfortran
-      fc: /usr/bin/gfortran
-    flags: {}
-    operating_system: ubuntu24.04
-    target: x86_64
-    modules: []
-    environment: {}
-    extra_rpaths: []
-COMPILERCONFIG
+            printf "%s\n" \
+              "compilers:" \
+              "- compiler:" \
+              "    spec: gcc@${GCC_VERSION}" \
+              "    paths:" \
+              "      cc: /usr/bin/gcc" \
+              "      cxx: /usr/bin/g++" \
+              "      f77: /usr/bin/gfortran" \
+              "      fc: /usr/bin/gfortran" \
+              "    flags: {}" \
+              "    operating_system: ubuntu24.04" \
+              "    target: x86_64" \
+              "    modules: []" \
+              "    environment: {}" \
+              "    extra_rpaths: []" \
+              > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml"
             
             echo "✓ Configured GCC ${GCC_VERSION}"
             spack compiler list
@@ -261,13 +261,13 @@ COMPILERCONFIG
             # Test compilation
             echo ""
             echo "Testing C compilation..."
-            cat > test.c <<TESTEOF
-#include <stdio.h>
-int main() {
-    printf("Hello from GCC!\n");
-    return 0;
-}
-TESTEOF
+            printf "%s\n" \
+              "#include <stdio.h>" \
+              "int main() {" \
+              "    printf(\"Hello from GCC!\\\\n\");" \
+              "    return 0;" \
+              "}" \
+              > test.c
             gcc test.c -o test
             ./test
             
