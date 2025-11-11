@@ -59,7 +59,7 @@ jobs:
           
           # Prepare compiler versions matrix
           if [ "${{ inputs.compiler_versions }}" = "all" ]; then
-            COMPILER_VERSIONS='["14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
+            COMPILER_VERSIONS='["15.2.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
           else
             IFS=',' read -ra VERS <<< "${{ inputs.compiler_versions }}"
             COMPILER_VERSIONS="["
