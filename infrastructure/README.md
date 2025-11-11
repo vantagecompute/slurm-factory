@@ -244,7 +244,7 @@ s3://slurm-factory-spack-binary-cache/
 │   │   ├── buildcache/
 │   │   │   ├── compilers/
 │   │   │   ├── indices/
-│   │   │   ├── patches/
+
 │   │   │   ├── providers/
 │   │   │   └── tags/
 │   │   └── gcc-11.5.0-compiler.tar.gz

@@ -220,7 +220,7 @@ slurm_factory/
 ├── constants.py       # Constants and templates
 ├── spack_yaml.py      # Spack configuration
 └── data/              # Data files
-    └── patches/       # Source patches
+
 ```
 
 ### Adding New Slurm Versions

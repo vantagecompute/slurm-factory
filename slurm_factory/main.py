@@ -413,7 +413,7 @@ def build(
     - Enhanced RPATH/RUNPATH configuration (Spack 1.x)
     - GCC runtime as separate package for clean ABI compatibility
     - Optional verification checks (--verify for CI)
-    - Global patches (shared across versions)
+
     - Professional Lmod modules with hierarchy support
 
     Examples:

@@ -86,32 +86,6 @@ The bug is intermittent because:
 - Makes `_cc_path()` return the correct path: `str(self.spec.prefix.bin.gcc)`
 - Prevents `compiler_pkg.cc` from being `None`
 
-### Defense-in-Depth: Improved compiler_wrapper Package
-
-**Location**: `patches/0001-Add-compiler_wrapper-package-with-better-None-handli.patch`
-
-**Purpose**: Fail fast with a clear error message if compiler paths are still `None`
-
-**Change** (in compiler_wrapper/package.py):
-```python
-compiler = getattr(compiler_pkg, attr_name)
-
-# CRITICAL FIX: Fail fast if compiler is None
-if compiler is None:
-    raise RuntimeError(
-        f"Compiler attribute '{attr_name}' for language '{language}' is None. "
-        f"Package: {compiler_pkg.name}, Spec: {compiler_pkg.spec}. "
-        f"This typically indicates the compiler package is not properly configured."
-    )
-
-env.set(spack_var_name, compiler)
-```
-
-**Benefits**:
-- Immediate, clear error message instead of cryptic "exec: None: not found"
-- Helps diagnose other potential compiler configuration issues
-- Defense against similar bugs in the future
-
 ## Testing
 
 ### Automated Test

@@ -15,7 +15,7 @@ This guide covers how to install the **slurm-factory build tool** - a Python CLI
 - Can publish to buildcaches with GPG signing
 
 **Install slurm-factory when you need:**
-- Custom build configurations or patches
+- Custom build configurations
 - To build for unsupported OS/architectures  
 - To create your own buildcache
 - Full control over the build process
