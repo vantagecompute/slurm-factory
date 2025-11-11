@@ -103,6 +103,7 @@ jobs:
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
           echo "🔨 Building GCC ${{ matrix.compiler_version }} compiler..."
           if [ -z "$GPG_KEY_ID" ]; then
@@ -113,13 +114,18 @@ jobs:
             echo "Error: GPG_PRIVATE_KEY is not set. Signed packages are required for publishing."
             exit 1
           fi
+          if [ -z "$GPG_PASSPHRASE" ]; then
+            echo "Error: GPG_PASSPHRASE is not set. Signed packages are required for publishing."
+            exit 1
+          fi
           echo "Using GPG signing key: $GPG_KEY_ID"
           uv run slurm-factory build-compiler \
             --compiler-version ${{ matrix.compiler_version }} \
             --publish=compiler \
             --no-cache \
             --signing-key "$GPG_KEY_ID" \
-            --gpg-private-key "$GPG_PRIVATE_KEY"
+            --gpg-private-key "$GPG_PRIVATE_KEY" \
+            --gpg-passphrase "$GPG_PASSPHRASE"
 
       - name: Verify buildcache upload
         run: |

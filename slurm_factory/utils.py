@@ -294,6 +294,7 @@ def create_compiler_package(
     publish: str = "none",
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
+    gpg_passphrase: str | None = None,
 ) -> None:
     """Create compiler package in a Docker container."""
     console.print("[bold blue]Creating compiler package in Docker container...[/bold blue]")
@@ -374,6 +375,7 @@ def create_compiler_package(
                 verbose=verbose,
                 signing_key=signing_key,
                 gpg_private_key=gpg_private_key,
+                gpg_passphrase=gpg_passphrase,
             )
 
         console.print("[bold green]✓ Compiler package built successfully[/bold green]")
@@ -406,6 +408,7 @@ def create_slurm_package(
     enable_hierarchy: bool = False,
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
+    gpg_passphrase: str | None = None,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
@@ -522,6 +525,7 @@ def create_slurm_package(
                 verbose=verbose,
                 signing_key=signing_key,
                 gpg_private_key=gpg_private_key,
+                gpg_passphrase=gpg_passphrase,
             )
 
         console.print("[bold green]✓ Slurm package built successfully[/bold green]")
@@ -733,6 +737,7 @@ def publish_compiler_to_buildcache(
     verbose: bool = False,
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
+    gpg_passphrase: str | None = None,
 ) -> None:
     """
     Publish compiler binaries to S3 buildcache using spack buildcache push.
@@ -747,6 +752,7 @@ def publish_compiler_to_buildcache(
         verbose: Whether to show detailed output
         signing_key: Optional GPG key ID for signing packages (e.g., "0xKEYID")
         gpg_private_key: Optional GPG private key (base64 encoded) to import into container
+        gpg_passphrase: Optional GPG key passphrase for signing packages
 
     """
     console.print("[bold blue]Publishing compiler to S3 buildcache...[/bold blue]")
@@ -808,6 +814,11 @@ def publish_compiler_to_buildcache(
             cmd.extend(["-e", f"GPG_PRIVATE_KEY={gpg_private_key}"])
             logger.debug("GPG private key will be imported into container")
 
+        # If GPG passphrase is provided, pass it as an environment variable
+        if gpg_passphrase:
+            cmd.extend(["-e", f"GPG_PASSPHRASE={gpg_passphrase}"])
+            logger.debug("GPG passphrase will be available in container")
+
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
@@ -817,6 +828,8 @@ def publish_compiler_to_buildcache(
 
         # If GPG private key is provided, import it before running buildcache commands
         if gpg_private_key:
+            # Use passphrase from environment if provided, otherwise empty string
+            passphrase_ref = '"${GPG_PASSPHRASE:-}"' if gpg_passphrase else '""'
             bash_script_parts.extend(
                 [
                     # Ensure /tmp has proper permissions for GPG temp files
@@ -832,17 +845,20 @@ def publish_compiler_to_buildcache(
                     # Kill any existing agent to ensure clean state
                     'gpgconf --homedir /opt/spack/var/spack/gpg --kill gpg-agent 2>/dev/null || true',
                     # Import GPG key into Spack's GPG keyring with batch mode
-                    'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --passphrase "" --import 2>&1 | grep -v "cannot open" || true',  # noqa: E501
+                    f'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --passphrase {passphrase_ref} --import 2>&1 | grep -v "cannot open" || true',  # noqa: E501
                     # Start GPG agent with our configuration
                     'gpg-connect-agent --homedir /opt/spack/var/spack/gpg /bye 2>&1 | grep -v "cannot open" || true',  # noqa: E501
-                    # Preset the passphrase as empty to avoid any prompts
-                    f'echo "" | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --quick-add-key {signing_key} default sign 0 2>&1 | grep -v "cannot open\\|already exists" || true',  # noqa: E501
+                    # Preset the passphrase to avoid any prompts
+                    f'echo {passphrase_ref} | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --quick-add-key {signing_key} default sign 0 2>&1 | grep -v "cannot open\\|already exists" || true',  # noqa: E501
                 ]
             )
 
         # Add the buildcache push commands
-        # Note: We push ALL packages that are installed in the environment,
-        # including gcc-runtime to ensure a complete compiler buildcache.
+        # Note: We only push packages that are installed in the environment.
+        # 
+        # This is changing:
+        # gcc-runtime and compiler-wrapper are NOT built during compiler phase,
+        # they are built later as dependencies during the Slurm build phase.
         bash_script_parts.extend(
             [
                 "cd /root/compiler-bootstrap",
@@ -857,12 +873,9 @@ def publish_compiler_to_buildcache(
                 # Push ALL installed packages from the environment, including dependencies
                 # This ensures gcc-runtime and other dependencies are available in buildcache
                 # Use --force to overwrite existing packages
-                # Use 'spack -e .' to push all packages in the current environment
-                f"spack -e . buildcache push {signing_flags} --force --verbose s3-buildcache",
-                # Update the buildcache index after pushing (Spack 1.0+ requirement)
-                # This creates/updates the build_cache/index.json file
-                # Allow update-index to fail gracefully for new/empty buildcaches
-                f"spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'",
+                # Use --update-index to regenerate index after pushing
+                # Note: --verbose doesn't exist in Spack v1.0.0
+                f"spack buildcache push {signing_flags} --force --update-index --fail-fast s3-buildcache",
                 # Verify upload succeeded
                 "echo '==> Buildcache contents:'",
                 "spack buildcache list --allarch",
@@ -921,6 +934,7 @@ def push_to_buildcache(
     verbose: bool = False,
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
+    gpg_passphrase: str | None = None,
 ) -> None:
     """
     Push Slurm specs to buildcache using spack buildcache push.
@@ -1013,6 +1027,11 @@ def push_to_buildcache(
             cmd.extend(["-e", f"GPG_PRIVATE_KEY={gpg_private_key}"])
             logger.debug("GPG private key will be imported into container")
 
+        # If GPG passphrase is provided, pass it as an environment variable
+        if gpg_passphrase:
+            cmd.extend(["-e", f"GPG_PASSPHRASE={gpg_passphrase}"])
+            logger.debug("GPG passphrase will be available in container")
+
         # Mount AWS credentials directory if not using environment credentials
         if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
@@ -1022,6 +1041,8 @@ def push_to_buildcache(
 
         # If GPG private key is provided, import it before running buildcache commands
         if gpg_private_key:
+            # Use passphrase from environment if provided, otherwise empty string
+            passphrase_ref = '"${GPG_PASSPHRASE:-}"' if gpg_passphrase else '""'
             bash_script_parts.extend(
                 [
                     # Ensure /tmp has proper permissions for GPG temp files
@@ -1037,11 +1058,11 @@ def push_to_buildcache(
                     # Kill any existing agent to ensure clean state
                     'gpgconf --homedir /opt/spack/var/spack/gpg --kill gpg-agent 2>/dev/null || true',
                     # Import GPG key into Spack's GPG keyring with batch mode
-                    'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --passphrase "" --import 2>&1 | grep -v "cannot open" || true',  # noqa: E501
+                    f'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --passphrase {passphrase_ref} --import 2>&1 | grep -v "cannot open" || true',  # noqa: E501
                     # Start GPG agent with our configuration
                     'gpg-connect-agent --homedir /opt/spack/var/spack/gpg /bye 2>&1 | grep -v "cannot open" || true',  # noqa: E501
-                    # Preset the passphrase as empty to avoid any prompts
-                    f'echo "" | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --quick-add-key {signing_key} default sign 0 2>&1 | grep -v "cannot open\\|already exists" || true',  # noqa: E501
+                    # Preset the passphrase to avoid any prompts
+                    f'echo {passphrase_ref} | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --quick-add-key {signing_key} default sign 0 2>&1 | grep -v "cannot open\\|already exists" || true',  # noqa: E501
                 ]
             )
 

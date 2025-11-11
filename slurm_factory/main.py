@@ -231,6 +231,13 @@ def build_compiler(
             help="Base64-encoded GPG private key to import into Docker container for signing",
         ),
     ] = None,
+    gpg_passphrase: Annotated[
+        str | None,
+        typer.Option(
+            "--gpg-passphrase",
+            help="GPG private key passphrase for signing packages",
+        ),
+    ] = None,
 ):
     """
     Build a GCC compiler toolchain for use in Slurm builds.
@@ -295,7 +302,7 @@ def build_compiler(
         if signing_key:
             console.print(f"[bold blue]Using GPG signing key: {signing_key}[/bold blue]")
 
-    builder_build_compiler(ctx, compiler_version, no_cache, publish, signing_key, gpg_private_key)
+    builder_build_compiler(ctx, compiler_version, no_cache, publish, signing_key, gpg_private_key, gpg_passphrase)
 
 
 @app.command("build")
@@ -353,6 +360,13 @@ def build(
         typer.Option(
             "--gpg-private-key",
             help="Base64-encoded GPG private key to import into Docker container for signing",
+        ),
+    ] = None,
+    gpg_passphrase: Annotated[
+        str | None,
+        typer.Option(
+            "--gpg-passphrase",
+            help="Passphrase for the GPG private key (if encrypted)",
         ),
     ] = None,
 ):
@@ -476,6 +490,7 @@ def build(
         enable_hierarchy,
         signing_key,
         gpg_private_key,
+        gpg_passphrase,
     )
 
 

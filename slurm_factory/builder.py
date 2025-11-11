@@ -37,6 +37,7 @@ def build_compiler(
     publish: str = "none",
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
+    gpg_passphrase: str | None = None,
 ):
     """Build a GCC compiler toolchain in a Docker container."""
     console = Console()
@@ -100,6 +101,7 @@ def build_compiler(
             publish=publish,
             signing_key=signing_key,
             gpg_private_key=gpg_private_key,
+            gpg_passphrase=gpg_passphrase,
         )
         logger.debug("Compiler package creation completed")
         console.print("[bold green]✓ Compiler package created successfully[/bold green]")
@@ -130,6 +132,7 @@ def build(
     ] = False,
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
+    gpg_passphrase: str | None = None,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -202,6 +205,7 @@ def build(
             enable_hierarchy=enable_hierarchy,
             signing_key=signing_key,
             gpg_private_key=gpg_private_key,
+            gpg_passphrase=gpg_passphrase,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")
