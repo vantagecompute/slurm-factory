@@ -879,15 +879,16 @@ WRAPPER''',
                 # Use --force to overwrite existing packages
                 # Use --update-index to regenerate index after pushing
                 # Note: --verbose doesn't exist in Spack v1.0.0
-                # Remove --fail-fast to ensure all packages are pushed even if one fails
-                f"spack buildcache push {signing_flags} --force --update-index s3-buildcache",
+                # Use --fail-fast to stop on first failure
+                f"spack buildcache push {signing_flags} --force --update-index --fail-fast s3-buildcache",
                 # Verify upload succeeded
                 "echo '==> Buildcache contents:'",
                 "spack buildcache list --allarch",
             ]
         )
 
-        # Join the script parts with &&
+        # Join the script parts with && 
+        # Use && to ensure each step succeeds before continuing
         bash_script = " && ".join(bash_script_parts)
 
         # Add image and command
@@ -914,7 +915,12 @@ WRAPPER''',
 
         # Always show buildcache push output for transparency
         if result.stdout:
-            console.print(f"[dim]{result.stdout}[/dim]")
+            console.print(f"[dim]Buildcache push output:\n{result.stdout}[/dim]")
+        else:
+            console.print("[dim]No buildcache push output (command may have failed silently)[/dim]")
+        
+        if result.stderr:
+            console.print(f"[yellow]Buildcache push stderr:\n{result.stderr}[/yellow]")
 
         console.print(f"[bold green]✓ Published compiler to {s3_mirror_url}[/bold green]")
         logger.debug(f"Successfully published compiler to {s3_mirror_url}")
@@ -1114,7 +1120,12 @@ WRAPPER''',
 
         # Always show buildcache push output for transparency
         if result.stdout:
-            console.print(f"[dim]{result.stdout}[/dim]")
+            console.print(f"[dim]Buildcache push output:\n{result.stdout}[/dim]")
+        else:
+            console.print("[dim]No buildcache push output (command may have failed silently)[/dim]")
+        
+        if result.stderr:
+            console.print(f"[yellow]Buildcache push stderr:\n{result.stderr}[/yellow]")
 
         console.print(f"[bold green]✓ Published to buildcache ({publish_mode})[/bold green]")
         logger.debug(f"Successfully published to {s3_mirror_url}")
