@@ -364,7 +364,6 @@ Typical package sizes by type:
 | Type | Size Range | Description |
 |------|------------|-------------|
 | **Default** | 2-5 GB | Full build with OpenMPI, PMIx, HDF5 |
-| **Minimal** | 1-2 GB | Basic Slurm only, no OpenMPI |
 | **GPU** | 15-25 GB | Includes CUDA/ROCm support |
 
 ## Build Metadata

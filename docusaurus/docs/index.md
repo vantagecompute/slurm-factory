@@ -157,9 +157,6 @@ slurm-factory build --slurm-version 25.11
 # GPU support (includes CUDA/ROCm, ~15-25GB)
 slurm-factory build --slurm-version 25.11 --gpu
 
-# Minimal build (no OpenMPI/extras, ~1-2GB)
-slurm-factory build --slurm-version 25.11 --minimal
-
 # Use specific compiler version
 slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
 
@@ -276,7 +273,6 @@ All packages are signed during the CI/CD build process and verified before deplo
 |------------|-------------|------|------------|-----------------|----------|
 | **CPU-only** | ~45 packages | 2-5GB | 35-45 min | 5-10 min | Production clusters |
 | **GPU-enabled** | ~180 packages | 15-25GB | 75-90 min | 15-20 min | GPU/CUDA clusters |
-| **Minimal** | ~20 packages | 1-2GB | 15-20 min | 3-5 min | Development/testing |
 
 ## Requirements
 

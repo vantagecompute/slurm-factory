@@ -256,12 +256,12 @@ const config: Config = {
           title: 'Documentation',
           items: [
             {
-              label: 'Installation',
-              to: '/installation',
+              label: 'Getting Started',
+              to: '/',
             },
             {
-              label: 'Overview',
-              to: '/overview',
+              label: 'Installation',
+              to: '/installation',
             },
             {
               label: 'Examples',

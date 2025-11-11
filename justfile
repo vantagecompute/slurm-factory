@@ -118,6 +118,16 @@ typecheck: lock
 # Run unit tests only
 [group("test")]
 unit: lock
+    {{uv_run}} pytest {{tests_dir}}/unit -v --tb=short --cov={{src_dir}} --cov-report=term-missing
+
+# Run integration tests only
+[group("test")]
+integration: lock
+    {{uv_run}} pytest {{tests_dir}}/integration -v --tb=short --cov={{src_dir}} --cov-report=term-missing
+
+# Run all tests (unit + integration)
+[group("test")]
+test: lock
     {{uv_run}} pytest {{tests_dir}} -v --tb=short --ignore=data --cov={{src_dir}} --cov-report=term-missing
 
 

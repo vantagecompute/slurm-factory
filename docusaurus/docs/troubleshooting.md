@@ -114,10 +114,7 @@ export DOCKER_BUILDKIT=1
 
 **Large package sizes:**
 ```bash
-# Use minimal build
-slurm-factory build --slurm-version 25.11 --minimal
-
-# Skip GPU if not needed
+# Skip GPU if not needed (builds are 2-5GB instead of 15-25GB)
 slurm-factory build --slurm-version 25.11  # no --gpu
 ```
 

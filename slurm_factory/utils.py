@@ -832,26 +832,34 @@ def publish_compiler_to_buildcache(
                 [
                     # Import GPG key using Spack's gpg trust command (imports to /opt/spack/opt/spack/gpg)
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/gpg-key.asc',
-                    'spack gpg trust /tmp/gpg-key.asc',
+                    "spack gpg trust /tmp/gpg-key.asc",
                     # Store passphrase for GPG wrapper to use
                     'echo "${GPG_PASSPHRASE}" > /tmp/gpg-passphrase.txt',
                     # Configure GPG with loopback pinentry
-                    'mkdir -p /opt/spack/opt/spack/gpg',
+                    "mkdir -p /opt/spack/opt/spack/gpg",
                     'echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf',
-                    'echo -e "allow-loopback-pinentry\\ndefault-cache-ttl 34560000\\nmax-cache-ttl 34560000" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
+                    (
+                        'echo -e "allow-loopback-pinentry\\ndefault-cache-ttl 34560000\\n'
+                        'max-cache-ttl 34560000" > /opt/spack/opt/spack/gpg/gpg-agent.conf'
+                    ),
                     # Kill and restart agent
-                    'gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true',
-                    'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye',
+                    "gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true",
+                    "gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye",
                     # Create GPG wrapper to inject passphrase when Spack calls gpg for signing
-                    'mv /usr/bin/gpg /usr/bin/gpg-real',
-                    r'''printf '#!/bin/bash\n# Wrapper to add passphrase for non-interactive signing\nif [[ "$*" == *"--clearsign"* ]]; then\n  exec /usr/bin/gpg-real --pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt "$@"\nelse\n  exec /usr/bin/gpg-real "$@"\nfi\n' > /usr/bin/gpg''',
-                    'chmod +x /usr/bin/gpg',
+                    "mv /usr/bin/gpg /usr/bin/gpg-real",
+                    (
+                        r"""printf '#!/bin/bash\n# Wrapper to add passphrase for non-interactive signing\n"""
+                        r"""if [[ "$*" == *"--clearsign"* ]]; then\n  exec /usr/bin/gpg-real """
+                        r"""--pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt "$@"\n"""
+                        r"""else\n  exec /usr/bin/gpg-real "$@"\nfi\n' > /usr/bin/gpg"""
+                    ),
+                    "chmod +x /usr/bin/gpg",
                 ]
             )
 
         # Add the buildcache push commands
         # Note: We only push packages that are installed in the environment.
-        # 
+        #
         # This is changing:
         # gcc-runtime and compiler-wrapper are NOT built during compiler phase,
         # they are built later as dependencies during the Slurm build phase.
@@ -879,7 +887,7 @@ def publish_compiler_to_buildcache(
             ]
         )
 
-        # Join the script parts with && 
+        # Join the script parts with &&
         # Use && to ensure each step succeeds before continuing
         bash_script = " && ".join(bash_script_parts)
 
@@ -910,7 +918,7 @@ def publish_compiler_to_buildcache(
             console.print(f"[dim]Buildcache push output:\n{result.stdout}[/dim]")
         else:
             console.print("[dim]No buildcache push output (command may have failed silently)[/dim]")
-        
+
         if result.stderr:
             console.print(f"[yellow]Buildcache push stderr:\n{result.stderr}[/yellow]")
 
@@ -953,6 +961,7 @@ def push_to_buildcache(
         verbose: Whether to show detailed output
         signing_key: Optional GPG key ID for signing packages (e.g., "0xKEYID")
         gpg_private_key: Optional GPG private key (base64 encoded) to import into container
+        gpg_passphrase: Optional GPG key passphrase for non-interactive signing
 
     """
     console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
@@ -1006,17 +1015,24 @@ def push_to_buildcache(
         if publish_mode == "slurm":
             # Push only slurm package
             push_cmd = f"spack buildcache push {signing_flags} s3-buildcache slurm"
-            update_index_cmd = "spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'"
+            update_index_cmd = (
+                "spack buildcache update-index s3-buildcache || "
+                "echo 'Warning: Could not update buildcache index'"
+            )
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
-            push_cmd = (
-                f"spack -e . buildcache push {signing_flags} --only dependencies s3-buildcache"
+            push_cmd = f"spack -e . buildcache push {signing_flags} --only dependencies s3-buildcache"
+            update_index_cmd = (
+                "spack buildcache update-index s3-buildcache || "
+                "echo 'Warning: Could not update buildcache index'"
             )
-            update_index_cmd = "spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'"
         else:  # all
             # Push everything
             push_cmd = f"spack -e . buildcache push {signing_flags} s3-buildcache"
-            update_index_cmd = "spack buildcache update-index s3-buildcache || echo 'Warning: Could not update buildcache index'"
+            update_index_cmd = (
+                "spack buildcache update-index s3-buildcache || "
+                "echo 'Warning: Could not update buildcache index'"
+            )
 
         # Build docker run command with AWS environment variables
         cmd = ["docker", "run", "--rm"]
@@ -1048,20 +1064,28 @@ def push_to_buildcache(
                 [
                     # Import GPG key using Spack's gpg trust command (imports to /opt/spack/opt/spack/gpg)
                     'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/gpg-key.asc',
-                    'spack gpg trust /tmp/gpg-key.asc',
+                    "spack gpg trust /tmp/gpg-key.asc",
                     # Store passphrase for GPG wrapper to use
                     'echo "${GPG_PASSPHRASE}" > /tmp/gpg-passphrase.txt',
                     # Configure GPG with loopback pinentry
-                    'mkdir -p /opt/spack/opt/spack/gpg',
+                    "mkdir -p /opt/spack/opt/spack/gpg",
                     'echo "pinentry-mode loopback" > /opt/spack/opt/spack/gpg/gpg.conf',
-                    'echo -e "allow-loopback-pinentry\\ndefault-cache-ttl 34560000\\nmax-cache-ttl 34560000" > /opt/spack/opt/spack/gpg/gpg-agent.conf',
+                    (
+                        'echo -e "allow-loopback-pinentry\\ndefault-cache-ttl 34560000\\n'
+                        'max-cache-ttl 34560000" > /opt/spack/opt/spack/gpg/gpg-agent.conf'
+                    ),
                     # Kill and restart agent
-                    'gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true',
-                    'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye',
+                    "gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true",
+                    "gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye",
                     # Create GPG wrapper to inject passphrase when Spack calls gpg for signing
-                    'mv /usr/bin/gpg /usr/bin/gpg-real',
-                    r'''printf '#!/bin/bash\n# Wrapper to add passphrase for non-interactive signing\nif [[ "$*" == *"--clearsign"* ]]; then\n  exec /usr/bin/gpg-real --pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt "$@"\nelse\n  exec /usr/bin/gpg-real "$@"\nfi\n' > /usr/bin/gpg''',
-                    'chmod +x /usr/bin/gpg',
+                    "mv /usr/bin/gpg /usr/bin/gpg-real",
+                    (
+                        r"""printf '#!/bin/bash\n# Wrapper to add passphrase for non-interactive signing\n"""
+                        r"""if [[ "$*" == *"--clearsign"* ]]; then\n  exec /usr/bin/gpg-real """
+                        r"""--pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt "$@"\n"""
+                        r"""else\n  exec /usr/bin/gpg-real "$@"\nfi\n' > /usr/bin/gpg"""
+                    ),
+                    "chmod +x /usr/bin/gpg",
                 ]
             )
 
@@ -1107,7 +1131,7 @@ def push_to_buildcache(
             console.print(f"[dim]Buildcache push output:\n{result.stdout}[/dim]")
         else:
             console.print("[dim]No buildcache push output (command may have failed silently)[/dim]")
-        
+
         if result.stderr:
             console.print(f"[yellow]Buildcache push stderr:\n{result.stderr}[/yellow]")
 

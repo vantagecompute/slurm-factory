@@ -214,7 +214,7 @@ All combinations of Slurm version × GCC compiler version are available:
 
 Each Slurm buildcache includes:
 - **Slurm** - Complete workload manager with all plugins
-- **OpenMPI** - MPI implementation (unless minimal build)
+- **OpenMPI** - MPI implementation
 - **PMIx** - Process Management Interface for Exascale
 - **Munge** - Authentication service
 - **OpenSSL** - TLS/SSL support

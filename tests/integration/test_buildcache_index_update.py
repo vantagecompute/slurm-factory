@@ -52,7 +52,7 @@ class TestBuildcacheIndexUpdate:
 
     def test_compiler_workflow_updates_index(self):
         """Test that compiler buildcache workflow updates index after adding mirror."""
-        workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
@@ -72,7 +72,7 @@ class TestBuildcacheIndexUpdate:
 
     def test_slurm_workflow_updates_index(self):
         """Test that slurm buildcache workflow updates index after adding mirrors."""
-        workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
@@ -94,42 +94,38 @@ class TestBuildcacheIndexUpdate:
 
     def test_compiler_workflow_structure(self):
         """Test that compiler workflow has proper structure for buildcache testing."""
-        workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
         
         run_script = test_step["run"]
         
-        # Verify the order of operations:
-        # 1. Remove old mirror
-        # 2. Add new mirror
-        # 3. Update index
-        # 4. List packages
-        # 5. Install from buildcache
+        # Verify the order of operations for Docker-based test:
+        # 1. Add mirror
+        # 2. Update index
+        # 3. List packages
+        # 4. Install from buildcache
         
-        mirror_remove_pos = run_script.find("spack mirror remove")
         mirror_add_pos = run_script.find("spack mirror add")
         update_index_pos = run_script.find("spack buildcache update-index")
         list_pos = run_script.find("spack buildcache list")
         install_pos = run_script.find("spack install")
         
         # All commands should be present
-        assert mirror_remove_pos >= 0, "mirror remove should be present"
         assert mirror_add_pos >= 0, "mirror add should be present"
         assert update_index_pos >= 0, "update-index should be present"
         assert list_pos >= 0, "buildcache list should be present"
         assert install_pos >= 0, "install should be present"
         
-        # Check order
-        assert mirror_remove_pos < mirror_add_pos, "remove should come before add"
+        # Check order (no mirror remove in Docker-based workflow)
         assert mirror_add_pos < update_index_pos, "add should come before update-index"
         assert update_index_pos < list_pos, "update-index should come before list"
         assert list_pos < install_pos, "list should come before install"
 
     def test_slurm_workflow_structure(self):
         """Test that slurm workflow has proper structure for buildcache testing."""
-        workflow_path = Path(__file__).parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"

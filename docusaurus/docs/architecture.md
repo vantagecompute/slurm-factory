@@ -383,9 +383,6 @@ slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
 # With GPU support (CUDA/ROCm)
 slurm-factory build --slurm-version 25.11 --gpu
 
-# Minimal (Slurm only, no OpenMPI)
-slurm-factory build --slurm-version 25.11 --minimal
-
 # Combined: RHEL 8 with GPU support
 slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu
 ```

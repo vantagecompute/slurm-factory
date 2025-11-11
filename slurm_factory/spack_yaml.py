@@ -97,10 +97,10 @@ def generate_compiler_bootstrap_config(
             ],
             "concretizer": {
                 "unify": "when_possible",
-                #"reuse": {
+                # "reuse": {
                 #    "roots": False,
                 #    "from": [{"type": "buildcache"}],
-                #},
+                # },
                 # Disable using externals during concretization and enforce target
                 "targets": {
                     "host_compatible": False,
@@ -160,12 +160,12 @@ def generate_compiler_bootstrap_config(
                     "binary": False,
                     "source": True,
                 },
-                #"slurm-factory-buildcache": {
+                # "slurm-factory-buildcache": {
                 #    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{gcc_ver}/buildcache",
                 #    "signed": True,
                 #    "binary": True,
                 #    "source": False,
-                #},
+                # },
             },
         }
     }
@@ -260,9 +260,7 @@ def generate_module_config(
             "lmod": {
                 "core_compilers": [f"gcc@{compiler_version}"],  # Mark gcc as core for relocatable binaries
                 "hierarchy": hierarchy,
-                "include": (
-                    ["slurm", "openmpi", "mysql-connector-c"]
-                ),
+                "include": (["slurm", "openmpi", "mysql-connector-c"]),
                 "slurm": {
                     "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
                     "autoload": "direct",
@@ -371,8 +369,8 @@ def generate_spack_config(
     specs = [
         # Install GCC first from buildcache (built separately with build-compiler command)
         # gcc-runtime will be built as a dependency of gcc
-        # NOTE: Do NOT specify compiler for gcc itself - it's built with system compiler (gcc@13.3.0 on Ubuntu 24.04)
-        # Specifying {compiler_spec} here causes a mismatch with buildcache and forces source build
+        # NOTE: Do NOT specify compiler for gcc itself - it's built with system compiler
+        # (gcc@13.3.0 on Ubuntu 24.04). Specifying {compiler_spec} causes buildcache mismatch.
         f"gcc@{compiler_version} +binutils +piclibs languages=c,c++,fortran",
         # All packages below will use %gcc@{compiler_version}
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
@@ -653,9 +651,7 @@ def generate_spack_config(
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
             # via spack compiler find (system compiler detection is disabled)
             "compilers": [],
-            "modules": generate_module_config(
-                slurm_version, gpu_support, compiler_version, enable_hierarchy
-            ),
+            "modules": generate_module_config(slurm_version, gpu_support, compiler_version, enable_hierarchy),
         }
     }
 

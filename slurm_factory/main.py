@@ -215,8 +215,7 @@ def build_compiler(
         typer.Option(
             "--publish",
             help=(
-                "Publish to buildcache: none (default), compiler (publish compiler), "
-                "all (same as compiler)"
+                "Publish to buildcache: none (default), compiler (publish compiler), all (same as compiler)"
             ),
         ),
     ] = "none",
@@ -302,7 +301,9 @@ def build_compiler(
         if signing_key:
             console.print(f"[bold blue]Using GPG signing key: {signing_key}[/bold blue]")
 
-    builder_build_compiler(ctx, compiler_version, no_cache, publish, signing_key, gpg_private_key, gpg_passphrase)
+    builder_build_compiler(
+        ctx, compiler_version, no_cache, publish, signing_key, gpg_private_key, gpg_passphrase
+    )
 
 
 @app.command("build")
@@ -455,9 +456,7 @@ def build(
         f"GCC {gcc_ver}, glibc {glibc_ver} ({description})"
     )
 
-    console.print(
-        f"[bold green]Starting build for Slurm {slurm_version}[/bold green]"
-    )
+    console.print(f"[bold green]Starting build for Slurm {slurm_version}[/bold green]")
     if no_cache:
         console.print("[bold yellow]Building with --no-cache (fresh build)[/bold yellow]")
 

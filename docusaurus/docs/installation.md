@@ -197,9 +197,6 @@ slurm-factory build --slurm-version 24.11 --compiler-version 7.5.0
 # Build with GPU support (CUDA/ROCm)
 slurm-factory build --slurm-version 25.11 --gpu
 
-# Build minimal package (smallest size)
-slurm-factory build --slurm-version 25.11 --minimal
-
 # Use custom project name (for container naming)
 slurm-factory --project-name production build --slurm-version 25.11 --compiler-version 13.4.0
 

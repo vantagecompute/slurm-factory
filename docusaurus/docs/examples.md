@@ -22,9 +22,6 @@ slurm-factory build --slurm-version 24.11
 # GPU support (~15-25GB)
 slurm-factory build --slurm-version 25.11 --gpu
 
-# Minimal (~1-2GB, no OpenMPI)
-slurm-factory build --slurm-version 25.11 --minimal
-
 # Verbose output
 slurm-factory --verbose build --slurm-version 25.11
 
@@ -140,10 +137,10 @@ from slurm_factory.builder import build
 from slurm_factory.config import Settings
 
 # Basic build
-build(slurm_version="25.11", gpu=False, minimal=False)
+build(slurm_version="25.11", gpu=False)
 
 # GPU build
-build(slurm_version="25.11", gpu=True, minimal=False)
+build(slurm_version="25.11", gpu=True)
 
 # With custom settings
 settings = Settings(project_name="custom")

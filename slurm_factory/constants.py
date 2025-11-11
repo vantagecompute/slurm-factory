@@ -524,7 +524,7 @@ BOOTSTRAP_YAML_EOF
 
 WORKDIR /root/compiler-bootstrap
 
-# Build the compiler toolchain  
+# Build the compiler toolchain
 # The packages config sets gcc externals to empty list, but we need to ensure
 # Spack doesn't auto-detect gcc as an external package during concretization.
 # Remove any cached Spack state first to ensure truly clean build

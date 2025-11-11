@@ -81,17 +81,17 @@ class TestGPGKeyImport:
             # Verify the bash script contains GPG configuration
             bash_script = cmd[-1]  # Last argument should be the bash script
 
-            # Check for GPG configuration commands
+            # Check for GPG configuration commands (updated for new implementation)
             assert "allow-loopback-pinentry" in bash_script
             assert "gpg-agent.conf" in bash_script
             assert "gpg.conf" in bash_script
-            assert "private-keys-v1.d" in bash_script
-            assert "chmod 700" in bash_script
-            assert "chmod 1777 /tmp" in bash_script
-            assert "--batch" in bash_script
-            assert "--yes" in bash_script
+            # New implementation uses spack gpg trust instead of manual import
+            assert "spack gpg trust" in bash_script
+            assert "/tmp/gpg-key.asc" in bash_script
             assert "--pinentry-mode loopback" in bash_script
-            assert "--no-tty" in bash_script
+            # GPG wrapper for non-interactive signing
+            assert "gpg-real" in bash_script
+            assert "/tmp/gpg-passphrase.txt" in bash_script
 
     def test_push_to_buildcache_gpg_configuration(self, mock_gpg_key, mock_aws_env):
         """Test that push_to_buildcache configures GPG correctly for non-interactive use."""
@@ -128,17 +128,17 @@ class TestGPGKeyImport:
             # Verify the bash script contains GPG configuration
             bash_script = cmd[-1]  # Last argument should be the bash script
 
-            # Check for GPG configuration commands
+            # Check for GPG configuration commands (updated for new implementation)
             assert "allow-loopback-pinentry" in bash_script
             assert "gpg-agent.conf" in bash_script
             assert "gpg.conf" in bash_script
-            assert "private-keys-v1.d" in bash_script
-            assert "chmod 700" in bash_script
-            assert "chmod 1777 /tmp" in bash_script
-            assert "--batch" in bash_script
-            assert "--yes" in bash_script
+            # New implementation uses spack gpg trust instead of manual import
+            assert "spack gpg trust" in bash_script
+            assert "/tmp/gpg-key.asc" in bash_script
             assert "--pinentry-mode loopback" in bash_script
-            assert "--no-tty" in bash_script
+            # GPG wrapper for non-interactive signing
+            assert "gpg-real" in bash_script
+            assert "/tmp/gpg-passphrase.txt" in bash_script
 
     def test_gpg_import_command_structure(self, mock_gpg_key, mock_aws_env):
         """Test that the GPG import command has the correct structure."""
@@ -173,10 +173,11 @@ class TestGPGKeyImport:
             # Verify the sequence includes:
             # 1. Creating GPG directory
             # 2. Configuring gpg-agent
-            # 3. Importing the key
+            # 3. Importing the key using spack gpg trust
             assert any("mkdir -p" in cmd and "gpg" in cmd for cmd in gpg_commands)
             assert any("allow-loopback-pinentry" in cmd for cmd in gpg_commands)
-            assert any("--import" in cmd and "--batch" in cmd for cmd in gpg_commands)
+            # Updated: We use 'spack gpg trust' instead of direct GPG import
+            assert any("spack gpg trust" in cmd and "/tmp/gpg-key.asc" in cmd for cmd in gpg_commands)
 
     def test_publish_compiler_without_gpg_key(self, mock_aws_env):
         """Test that publish_compiler_to_buildcache works without GPG key (unsigned mode)."""
@@ -307,8 +308,8 @@ class TestGPGKeyImport:
             cmd = call_args[0][0]
             bash_script = cmd[-1]
 
-            # Expected GPG homedir used by Spack
-            expected_homedir = "/opt/spack/var/spack/gpg"
+            # Expected GPG homedir used by Spack (updated to match actual implementation)
+            expected_homedir = "/opt/spack/opt/spack/gpg"
 
             # Verify homedir is used consistently
             script_lines = bash_script.split(" && ")
