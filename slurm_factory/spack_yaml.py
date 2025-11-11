@@ -495,8 +495,13 @@ def generate_spack_config(
                 "munge": {"buildable": True},  # Authentication - let Spack pick latest available
                 "json-c": {"buildable": True},  # JSON parsing - linked at runtime
                 "libpciaccess": {"buildable": True},  # PCI access library
+                # cyrus-sasl 2.1.28 has old-style function definitions incompatible with GCC 15+
+                # Add compiler flags to allow compilation (required by openldap -> curl -> slurm chain)
                 "cyrus-sasl": {
                     "buildable": True,
+                    "require": [
+                        "cflags=\"-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types -std=gnu89\""
+                    ],
                 },
                 "rapidjson": {"buildable": True},
                 "openldap": {
