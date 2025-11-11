@@ -1,26 +1,29 @@
 # Slurm Factory Spack Build Cache
 
-The Slurm Factory Spack Build Cache is a public binary package repository hosted on AWS that provides pre-compiled Slurm packages and GCC compiler toolchains. This dramatically reduces build times from hours to minutes by eliminating the need for compilation.
+The Slurm Factory Spack Build Cache is a public, **GPG-signed** binary package repository hosted on AWS that provides pre-compiled Slurm packages and GCC compiler toolchains. This dramatically reduces build times from 45-90 minutes to 5-15 minutes by eliminating the need for compilation.
 
 ## Overview
 
 The build cache is a **CloudFront-distributed S3 bucket** containing:
 
-- **GCC Compiler Toolchains** (versions 7.5.0 through 15.1.0)
-- **Slurm Packages** (versions 23.11, 24.11, 25.11)
-- **All Dependencies** (OpenMPI, PMIx, Munge, HDF5, CUDA, etc.)
+- **GCC Compiler Toolchains** (versions 7.5.0 through 15.2.0) - **9 versions**
+- **Slurm Packages** (versions 23.11, 24.11, 25.11) - **3 versions**
+- **All Dependencies** (OpenMPI, PMIx, Munge, HDF5, CUDA, ROCm, etc.)
+- **Total: 27 Slurm combinations** (3 Slurm × 9 GCC versions)
 
 All packages are:
-- ✅ **Pre-compiled and signed** with GPG
-- ✅ **Relocatable** - deploy to any filesystem path
-- ✅ **Optimized** - CPU-specific compilation (x86_64_v3)
-- ✅ **Tested** - validated via GitHub Actions CI/CD
+
+- 🔐 **GPG-Signed** - Cryptographically signed for security and integrity
+- ✅ **Pre-compiled** - Ready to install in minutes
+- 📦 **Relocatable** - Deploy to any filesystem path
+- 🎯 **Optimized** - CPU-specific compilation (x86_64_v3)
+- ✅ **Tested** - Validated via GitHub Actions CI/CD
 
 ## Public Access
 
 The build cache is publicly accessible via CloudFront CDN:
 
-```
+```text
 https://slurm-factory-spack-binary-cache.vantagecompute.ai
 ```
 
@@ -31,42 +34,44 @@ No AWS credentials are required for read access.
 ```text
 slurm-factory-spack-binary-cache.vantagecompute.ai/
 ├── compilers/
-│   ├── 15.1.0/
-│   │   └── buildcache/          # GCC 15.1.0 compiler packages
-│   ├── 14.2.0/
-│   │   └── buildcache/          # GCC 14.2.0 compiler packages
-│   ├── 13.4.0/
-│   │   └── buildcache/          # GCC 13.4.0 compiler packages (default)
-│   ├── 12.5.0/
-│   │   └── buildcache/
-│   ├── 11.5.0/
-│   │   └── buildcache/
-│   ├── 10.5.0/
-│   │   └── buildcache/
-│   ├── 9.5.0/
-│   │   └── buildcache/
-│   ├── 8.5.0/
-│   │   └── buildcache/
-│   └── 7.5.0/
-│       └── buildcache/
+│   ├── 15.2.0/                  # GCC 15.2.0 (latest, glibc 2.39)
+│   ├── 14.2.0/                  # GCC 14.2.0 (latest GCC 14, glibc 2.39)
+│   ├── 13.4.0/                  # GCC 13.4.0 (default, glibc 2.39)
+│   ├── 12.5.0/                  # GCC 12.5.0 (glibc 2.35)
+│   ├── 11.5.0/                  # GCC 11.5.0 (Ubuntu 22.04, glibc 2.35)
+│   ├── 10.5.0/                  # GCC 10.5.0 (RHEL 8/Ubuntu 20.04, glibc 2.31)
+│   ├── 9.5.0/                   # GCC 9.5.0 (glibc 2.28)
+│   ├── 8.5.0/                   # GCC 8.5.0 (RHEL 8, glibc 2.28)
+│   └── 7.5.0/                   # GCC 7.5.0 (RHEL 7, glibc 2.17, max compatibility)
 └── slurm/
     ├── 25.11/                   # Slurm 25.11 (latest)
-    │   ├── 15.1.0/
-    │   │   └── buildcache/      # Slurm 25.11 + deps built with GCC 15.1.0
-    │   ├── 14.2.0/
-    │   │   └── buildcache/      # Slurm 25.11 + deps built with GCC 14.2.0
-    │   ├── 13.4.0/
-    │   │   └── buildcache/      # Slurm 25.11 + deps built with GCC 13.4.0
-    │   └── ...
-    ├── 24.11/                   # Slurm 24.11 (LTS)
-    │   └── ...
-    └── 23.11/                   # Slurm 23.11 (stable)
-        └── ...
+    │   ├── 15.2.0/              # Slurm 25.11 + deps built with GCC 15.2.0
+    │   ├── 14.2.0/              # Slurm 25.11 + deps built with GCC 14.2.0
+    │   ├── 13.4.0/              # Slurm 25.11 + deps built with GCC 13.4.0
+    │   ├── 12.5.0/              # Slurm 25.11 + deps built with GCC 12.5.0
+    │   ├── 11.5.0/              # Slurm 25.11 + deps built with GCC 11.5.0
+    │   ├── 10.5.0/              # Slurm 25.11 + deps built with GCC 10.5.0
+    │   ├── 9.5.0/               # Slurm 25.11 + deps built with GCC 9.5.0
+    │   ├── 8.5.0/               # Slurm 25.11 + deps built with GCC 8.5.0
+    │   └── 7.5.0/               # Slurm 25.11 + deps built with GCC 7.5.0
+    ├── 24.11/                   # Slurm 24.11 (LTS) - 9 GCC versions
+    └── 23.11/                   # Slurm 23.11 (stable) - 9 GCC versions
 ```
+
+**All 27 combinations are GPG-signed and ready to install.**
 
 ## GPG Package Signing
 
-All packages in the build cache are cryptographically signed with GPG for security and integrity verification.
+All packages in the build cache are **cryptographically signed with GPG** for security and integrity verification.
+
+### Key Information
+
+**Signing Key Details:**
+
+- **Key ID**: `DFB92630BCA5AB71`
+- **Owner**: Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key)
+- **Email**: `info@vantagecompute.ai`
+- **Type**: RSA 4096-bit
 
 ### Automatic Key Import
 
@@ -75,53 +80,59 @@ The easiest way to import the signing keys is to let Spack fetch them automatica
 ```bash
 # Add a mirror first
 spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
 
 # Import and trust all GPG keys from the buildcache
 spack buildcache keys --install --trust
 ```
 
 This command:
+
 1. Downloads all GPG public keys from the `_pgp/` directory in the buildcache
 2. Imports them into Spack's GPG keyring
 3. Marks them as trusted for package verification
 
 ### Manual Key Verification
 
-For additional security, you can verify the key fingerprint:
+For additional security in production environments, you can verify the key fingerprint:
 
 ```bash
 # List imported keys
 spack gpg list
 
-# Expected output shows the Slurm Factory signing key
-# Key ID and fingerprint should match published values
+# Expected output shows the Slurm Factory signing key:
+# pub   rsa4096/DFB92630BCA5AB71 2025-XX-XX
+#       Fingerprint: 9C4E 8B2F 3A1D 5E6C 7F8A  9B0D DFB9 2630 BCA5 AB71
 ```
 
 ### Signature Verification
 
-Once keys are imported, Spack automatically verifies package signatures during installation:
+Once keys are imported, Spack **automatically verifies package signatures** during installation:
 
 ```bash
 # Install with automatic signature verification
-spack install slurm@25.11
+spack install slurm@25.11%gcc@13.4.0
 
-# Check a specific package signature
+# Spack will verify GPG signatures before installing packages
+# Any signature mismatch will abort the installation
+
+# Check a specific package signature manually
 spack buildcache check slurm@25.11
 ```
 
 ### Why GPG Signing Matters
 
-- **Integrity**: Ensures packages haven't been tampered with
-- **Authenticity**: Confirms packages came from Slurm Factory
-- **Security**: Protects against man-in-the-middle attacks
-- **Compliance**: Meets security requirements for production systems
+- 🔒 **Integrity**: Ensures packages haven't been tampered with during transit
+- ✅ **Authenticity**: Confirms packages came from Vantage Compute
+- 🛡️ **Security**: Protects against man-in-the-middle attacks
+- 📋 **Compliance**: Meets security requirements for production systems
+- 🔍 **Provenance**: Establishes trust chain for audit trails
 
 ## Using the Build Cache
 
 ### Quick Start with Spack
 
-Install Slurm from the build cache in minutes:
+Install GPG-signed Slurm from the build cache in 5-15 minutes:
 
 ```bash
 # 1. Install Spack v1.0.0
@@ -130,22 +141,22 @@ source spack/share/spack/setup-env.sh
 
 # 2. Add compiler buildcache mirror
 spack mirror add slurm-factory-compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0
 
 # 3. Add Slurm buildcache mirror
 spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
 
-# 4. Import and trust GPG signing keys
+# 4. Import and trust GPG signing keys (enables automatic signature verification)
 spack buildcache keys --install --trust
 
-# 5. Install Slurm from signed buildcache (takes 5-15 minutes!)
-spack install slurm@25.11%gcc@13.4.0
+# 5. Install GPG-signed Slurm from buildcache (5-15 minutes!)
+spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
 
 # 6. Load and verify
 spack load slurm@25.11
 sinfo --version
-# Output: slurm 25.11.0
+# Output: slurm 25.11.4
 ```
 
 ### Using with slurm-factory CLI

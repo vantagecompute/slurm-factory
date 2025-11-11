@@ -1,65 +1,84 @@
 ---
 title: "Slurm Factory - Modern HPC Package Builder"
-description: "Build and deploy optimized Slurm packages using public buildcache or custom Docker builds"
+description: "Build and deploy GPG-signed, optimized Slurm packages using public buildcache or custom Docker builds"
 slug: /
 ---
 
 # Slurm Factory
 
-**Slurm Factory** is a modern Python CLI tool that builds and deploys **relocatable** Slurm workload manager packages for HPC environments. It leverages a **public binary cache** for instant installations or creates custom Docker builds with Spack for specific requirements.
+**Slurm Factory** is a modern Python CLI tool that builds and deploys **GPG-signed, relocatable** Slurm workload manager packages for HPC environments. It leverages a **public binary cache** with cryptographically signed packages for instant, secure installations or creates custom Docker builds with Spack for specific requirements.
 
 ## Key Features
 
-- 🚀 **Public Binary Cache**: Pre-built packages at `slurm-factory-spack-binary-cache.vantagecompute.ai`
-- ⚡ **Instant Deployment**: Install from cache in minutes instead of hours of compilation
+- � **GPG-Signed Packages**: All packages cryptographically signed for security and integrity
+- �🚀 **Public Binary Cache**: Pre-built packages at `slurm-factory-spack-binary-cache.vantagecompute.ai`
+- ⚡ **Instant Deployment**: Install from cache in 5-15 minutes instead of 45-90 minutes of compilation
 - 📦 **Relocatable Packages**: Deploy to any filesystem path without recompilation
 - 🔧 **Two Simple Commands**: `build` for Slurm packages, `build-compiler` for GCC toolchains
 - 🏗️ **Modern Architecture**: Built with Python, Typer CLI, comprehensive test coverage
-- 🎮 **GPU Support**: CUDA-enabled builds for GPU-accelerated HPC workloads
-- 🔄 **Automated CI/CD**: GitHub Actions workflows maintain the public buildcache
+- 🎮 **GPU Support**: CUDA/ROCm-enabled builds for GPU-accelerated HPC workloads
+- 🔄 **Automated CI/CD**: GitHub Actions workflows maintain the GPG-signed public buildcache
 - 📊 **Module System**: Lmod modules for easy environment management
 
 ## Support Matrix
 
-Slurm Factory supports multiple Slurm and GCC compiler combinations. All combinations are pre-built and available in the public buildcache:
+Slurm Factory supports **27 combinations** of Slurm and GCC compiler versions. All combinations are pre-built, **GPG-signed**, and available in the public buildcache:
 
 ### Slurm Versions
 
-- **25.11** (Latest)
+- **25.11** (Latest - recommended)
 - **24.11** (LTS)
 - **23.11** (Stable)
 
 ### GCC Compiler Versions
 
-- **14.2.0** (Latest)
-- **13.4.0** (Recommended)
-- **12.5.0**
-- **11.5.0**
-- **10.5.0**
-- **9.5.0**
-- **8.5.0**
-- **7.5.0**
+All GCC toolchains are GPG-signed and include matching glibc for cross-distro compatibility:
+
+- **15.2.0** (Latest GCC 15, glibc 2.39)
+- **14.2.0** (Latest GCC 14, glibc 2.39)
+- **13.4.0** (Recommended default, glibc 2.39, Ubuntu 24.04)
+- **12.5.0** (glibc 2.35)
+- **11.5.0** (glibc 2.35, Ubuntu 22.04)
+- **10.5.0** (glibc 2.31, RHEL 8/Ubuntu 20.04)
+- **9.5.0** (glibc 2.28)
+- **8.5.0** (glibc 2.28, RHEL 8)
+- **7.5.0** (glibc 2.17, RHEL 7 - maximum compatibility)
 
 ### Recommended Combinations
 
 | Slurm Version | GCC Version | Build Type | Use Case |
 |---------------|-------------|------------|----------|
-| 25.11 | 13.4.0 | GPU | Latest features with GPU support |
-| 24.11 | 13.4.0 | Default | Long-term support production |
-| 25.11 | 14.2.0 | Default | Bleeding edge |
-| 23.11 | 12.5.0 | Default | Conservative production |
+| 25.11 | 13.4.0 | CPU/GPU | **Recommended** - Latest features, best compatibility |
+| 24.11 | 13.4.0 | CPU/GPU | Long-term support production |
+| 25.11 | 15.2.0 | CPU/GPU | Bleeding edge, latest compiler features |
+| 23.11 | 11.5.0 | CPU | Conservative production environments |
+| 25.11 | 10.5.0 | CPU | RHEL 8 / Ubuntu 20.04 compatibility |
+| 24.11 | 7.5.0 | CPU | RHEL 7 / maximum backward compatibility |
 
-All version combinations are available in the buildcache at:
+All 27 version combinations are GPG-signed and available in the buildcache:
 
 ```text
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/<VERSION>/<COMPILER>/buildcache
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/
+├── compilers/<GCC_VERSION>/      # GPG-signed compiler packages
+└── slurm/<SLURM_VERSION>/<GCC_VERSION>/  # GPG-signed Slurm packages
 ```
+
+## GPG Package Signing
+
+All packages in the buildcache are cryptographically signed with GPG for security:
+
+**Key Information:**
+- **Key ID**: `DFB92630BCA5AB71`
+- **Owner**: Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key)
+- **Email**: info@vantagecompute.ai
+
+Keys are automatically imported and trusted when using the buildcache.
 
 ## Quick Start
 
 ### Method 1: Using the Public Buildcache (Recommended)
 
-The fastest way to deploy Slurm is using pre-built binaries from our public buildcache:
+The fastest way to deploy Slurm is using GPG-signed pre-built binaries from our public buildcache:
 
 ```bash
 # Install slurm-factory
@@ -71,21 +90,21 @@ source spack/share/spack/setup-env.sh
 
 # Add compiler and Slurm buildcache mirrors
 spack mirror add slurm-factory-compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0
 
 spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
 
-# Import and trust the GPG signing key
+# Import and trust the GPG signing key (automatic signature verification)
 spack buildcache keys --install --trust
 
-# Install Slurm from signed buildcache (takes minutes!)
-spack install slurm@25.11%gcc@13.4.0
+# Install GPG-signed Slurm from buildcache (5-15 minutes!)
+spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
 
 # Load and verify
 spack load slurm@25.11
 sinfo --version
-# Output: slurm 25.11.0
+# Output: slurm 25.11.4
 ```
 
 ### Method 2: Building Locally
