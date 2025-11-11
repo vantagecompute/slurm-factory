@@ -192,12 +192,12 @@ jobs:
             
             # Configure system compiler for bootstrapping
             echo "Configuring system compiler for bootstrapping..."
-            GCC_VERSION=$(gcc -dumpversion)
+            GCC_VERSION=$(gcc -dumpfullversion -dumpversion)
             echo "Detected system GCC version: ${GCC_VERSION}"
             
             # Create compiler configuration
             mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
-            cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<EOF
+            cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<COMPILEREOF
             compilers:
             - compiler:
                 spec: gcc@${GCC_VERSION}
@@ -212,7 +212,7 @@ jobs:
                 modules: []
                 environment: {}
                 extra_rpaths: []
-            EOF
+            COMPILEREOF
             
             echo "✓ Configured GCC ${GCC_VERSION}"
             spack compiler list
@@ -247,13 +247,13 @@ jobs:
             # Test compilation
             echo ""
             echo "Testing C compilation..."
-            cat > test.c <<'"'"'CEOF'"'"'
+            cat > test.c <<TESTEOF
             #include <stdio.h>
             int main() {
                 printf("Hello from GCC!\n");
                 return 0;
             }
-            CEOF
+            TESTEOF
             gcc test.c -o test
             ./test
             
