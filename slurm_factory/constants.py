@@ -318,8 +318,7 @@ ${{LD_LIBRARY_PATH:-}}
         echo '==> Testing compiler with simple program...'
         cat > /tmp/test.c << 'CEOF'
 #include <stdio.h>
-int main() {{ printf("Compiler test OK
-"); return 0; }}
+int main() {{ printf("Compiler test OK\\n"); return 0; }}
 CEOF
         /opt/spack-compiler-view/bin/gcc /tmp/test.c -o /tmp/test && /tmp/test || {{
             echo 'ERROR: Compiler test failed'
