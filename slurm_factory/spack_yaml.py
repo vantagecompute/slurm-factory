@@ -355,7 +355,15 @@ def generate_spack_config(
     gpu_flags = "+nvml +rsmi" if gpu_support else "~nvml ~rsmi"
 
     # Spec definitions for packages
-    openldap_spec = f"openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl {compiler_spec}"
+    # cyrus-sasl 2.1.28 has old-style function definitions incompatible with GCC 15+
+    cyrus_sasl_spec = (
+        f"cyrus-sasl cflags='-Wno-error=implicit-function-declaration "
+        f"-Wno-error=incompatible-pointer-types -std=gnu89' {compiler_spec}"
+    )
+    openldap_spec = (
+        f"openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl "
+        f"^{cyrus_sasl_spec} {compiler_spec}"
+    )
     curl_spec = (
         f"slurm_factory.curl@8.15.0+nghttp2+libssh2+libssh+gssapi+ldap+librtmp+libidn2 "
         f"libs=shared,static tls=openssl {compiler_spec}"
@@ -495,14 +503,7 @@ def generate_spack_config(
                 "munge": {"buildable": True},  # Authentication - let Spack pick latest available
                 "json-c": {"buildable": True},  # JSON parsing - linked at runtime
                 "libpciaccess": {"buildable": True},  # PCI access library
-                # cyrus-sasl 2.1.28 has old-style function definitions incompatible with GCC 15+
-                # Add compiler flags to allow compilation (required by openldap -> curl -> slurm chain)
-                "cyrus-sasl": {
-                    "buildable": True,
-                    "require": [
-                        "cflags=\"-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types -std=gnu89\""
-                    ],
-                },
+                "cyrus-sasl": {"buildable": True},  # SASL authentication (cflags set in spec)
                 "rapidjson": {"buildable": True},
                 "openldap": {
                     "buildable": True,
