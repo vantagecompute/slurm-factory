@@ -837,22 +837,14 @@ def publish_compiler_to_buildcache(
                     'echo "${GPG_PASSPHRASE}" > /tmp/gpg-passphrase.txt',
                     # Configure GPG with loopback pinentry
                     'mkdir -p /opt/spack/opt/spack/gpg',
-                    'cat > /opt/spack/opt/spack/gpg/gpg.conf << EOF\npinentry-mode loopback\nEOF',
-                    'cat > /opt/spack/opt/spack/gpg/gpg-agent.conf << EOF\nallow-loopback-pinentry\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000\nEOF',
+                    "cat > /opt/spack/opt/spack/gpg/gpg.conf << 'EOF'\npinentry-mode loopback\nEOF",
+                    "cat > /opt/spack/opt/spack/gpg/gpg-agent.conf << 'EOF'\nallow-loopback-pinentry\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000\nEOF",
                     # Kill and restart agent
                     'gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true',
                     'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye',
                     # Create GPG wrapper to inject passphrase when Spack calls gpg for signing
                     'mv /usr/bin/gpg /usr/bin/gpg-real',
-                    r'''cat > /usr/bin/gpg << 'WRAPPER'
-#!/bin/bash
-# Wrapper to add passphrase for non-interactive signing
-if [[ "$*" == *"--clearsign"* ]]; then
-  exec /usr/bin/gpg-real --pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt "$@"
-else
-  exec /usr/bin/gpg-real "$@"
-fi
-WRAPPER''',
+                    "cat > /usr/bin/gpg << 'WRAPPER'\n#!/bin/bash\n# Wrapper to add passphrase for non-interactive signing\nif [[ \"$*\" == *\"--clearsign\"* ]]; then\n  exec /usr/bin/gpg-real --pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt \"$@\"\nelse\n  exec /usr/bin/gpg-real \"$@\"\nfi\nWRAPPER",
                     'chmod +x /usr/bin/gpg',
                 ]
             )
@@ -1061,22 +1053,14 @@ def push_to_buildcache(
                     'echo "${GPG_PASSPHRASE}" > /tmp/gpg-passphrase.txt',
                     # Configure GPG with loopback pinentry
                     'mkdir -p /opt/spack/opt/spack/gpg',
-                    'cat > /opt/spack/opt/spack/gpg/gpg.conf << EOF\npinentry-mode loopback\nEOF',
-                    'cat > /opt/spack/opt/spack/gpg/gpg-agent.conf << EOF\nallow-loopback-pinentry\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000\nEOF',
+                    "cat > /opt/spack/opt/spack/gpg/gpg.conf << 'EOF'\npinentry-mode loopback\nEOF",
+                    "cat > /opt/spack/opt/spack/gpg/gpg-agent.conf << 'EOF'\nallow-loopback-pinentry\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000\nEOF",
                     # Kill and restart agent
                     'gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true',
                     'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye',
                     # Create GPG wrapper to inject passphrase when Spack calls gpg for signing
                     'mv /usr/bin/gpg /usr/bin/gpg-real',
-                    r'''cat > /usr/bin/gpg << 'WRAPPER'
-#!/bin/bash
-# Wrapper to add passphrase for non-interactive signing
-if [[ "$*" == *"--clearsign"* ]]; then
-  exec /usr/bin/gpg-real --pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt "$@"
-else
-  exec /usr/bin/gpg-real "$@"
-fi
-WRAPPER''',
+                    "cat > /usr/bin/gpg << 'WRAPPER'\n#!/bin/bash\n# Wrapper to add passphrase for non-interactive signing\nif [[ \"$*\" == *\"--clearsign\"* ]]; then\n  exec /usr/bin/gpg-real --pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt \"$@\"\nelse\n  exec /usr/bin/gpg-real \"$@\"\nfi\nWRAPPER",
                     'chmod +x /usr/bin/gpg',
                 ]
             )
