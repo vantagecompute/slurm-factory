@@ -127,9 +127,9 @@ def generate_compiler_bootstrap_config(
                 "automake": {"buildable": True},
                 "libtool": {"buildable": True},
                 # Build tools as externals for speed
-                "cmake": {"externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}], "buildable": False},
-                "m4": {"externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}], "buildable": False},
-                "gmake": {"externals": [{"spec": "gmake@4.3", "prefix": "/usr"}], "buildable": False},
+                "cmake": {"buildable": True},
+                "m4": {"buildable": True},
+                "gmake": {"buildable": True},
                 # Pin binutils to 2.44 to avoid build failures with 2.45 while supporting newer GCC
                 "binutils": {"version": ["2.44"], "buildable": True},
             },
