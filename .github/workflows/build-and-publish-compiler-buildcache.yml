@@ -173,22 +173,14 @@ jobs:
           # Verify spack works
           spack --version
           
-          # Configure compiler (use system gcc as bootstrap)
+          # Configure system compiler directly (skip auto-detection for reliability)
           echo "Configuring system compiler for bootstrapping..."
-          spack compiler find --scope site
+          GCC_VERSION=$(gcc -dumpversion)
+          echo "Detected system GCC version: ${GCC_VERSION}"
           
-          # Verify compiler was found
-          echo "Checking for configured compilers..."
-          spack compiler list
-          
-          # If no compilers found, manually add gcc from /usr
-          if ! spack compiler list | grep -q gcc; then
-            echo "No compilers found by auto-detection. Adding system GCC manually..."
-            # Get system gcc version
-            GCC_VERSION=$(gcc -dumpversion)
-            # Create compiler config
-            mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
-            cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<EOF
+          # Create compiler configuration
+          mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
+          cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<EOF
           compilers:
           - compiler:
               spec: gcc@${GCC_VERSION}
@@ -204,9 +196,9 @@ jobs:
               environment: {}
               extra_rpaths: []
           EOF
-            echo "Manually added GCC ${GCC_VERSION}"
-            spack compiler list
-          fi
+          
+          echo "✓ Configured GCC ${GCC_VERSION}"
+          spack compiler list
           
           # Add buildcache mirror (remove if exists first)
           MIRROR_URL="${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}"
