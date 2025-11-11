@@ -879,15 +879,16 @@ WRAPPER''',
                 # Use --force to overwrite existing packages
                 # Use --update-index to regenerate index after pushing
                 # Note: --verbose doesn't exist in Spack v1.0.0
-                f"spack buildcache push {signing_flags} --force --update-index --fail-fast s3-buildcache",
+                # Remove --fail-fast to ensure all packages are pushed even if one fails
+                f"spack buildcache push {signing_flags} --force --update-index s3-buildcache",
                 # Verify upload succeeded
                 "echo '==> Buildcache contents:'",
                 "spack buildcache list --allarch",
             ]
         )
 
-        # Join the script parts with && and add set -e at the start for fail-fast
-        bash_script = "set -e && " + " && ".join(bash_script_parts)
+        # Join the script parts with &&
+        bash_script = " && ".join(bash_script_parts)
 
         # Add image and command
         cmd.extend([image_tag, "bash", "-c", bash_script])
@@ -907,12 +908,12 @@ WRAPPER''',
         if result.returncode != 0:
             msg = f"Failed to push to buildcache: {result.stderr}"
             logger.error(msg)
-            if verbose:
-                console.print(f"[dim]stdout: {result.stdout}[/dim]")
+            console.print(f"[dim]stdout: {result.stdout}[/dim]")
             console.print(f"[bold red]{escape(msg)}[/bold red]")
             raise SlurmFactoryError(msg)
 
-        if verbose and result.stdout:
+        # Always show buildcache push output for transparency
+        if result.stdout:
             console.print(f"[dim]{result.stdout}[/dim]")
 
         console.print(f"[bold green]✓ Published compiler to {s3_mirror_url}[/bold green]")
@@ -1107,12 +1108,12 @@ WRAPPER''',
         if result.returncode != 0:
             msg = f"Failed to push to buildcache: {result.stderr}"
             logger.error(msg)
-            if verbose:
-                console.print(f"[dim]stdout: {result.stdout}[/dim]")
+            console.print(f"[dim]stdout: {result.stdout}[/dim]")
             console.print(f"[bold red]{escape(msg)}[/bold red]")
             raise SlurmFactoryError(msg)
 
-        if verbose and result.stdout:
+        # Always show buildcache push output for transparency
+        if result.stdout:
             console.print(f"[dim]{result.stdout}[/dim]")
 
         console.print(f"[bold green]✓ Published to buildcache ({publish_mode})[/bold green]")
