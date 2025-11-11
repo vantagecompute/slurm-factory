@@ -162,70 +162,81 @@ jobs:
           echo "📋 Checking buildcache contents..."
           aws s3 ls "s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache/" --recursive | head -20 || echo "Warning: Could not list buildcache contents"
 
-      - name: Setup Python 3.12 for Spack test
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Test buildcache installation
         shell: bash
         run: |
           set -e
-          echo "Testing dependency installation from buildcache..."
+          echo "Testing dependency installation from buildcache in Docker container..."
           
-          # Create test directory
-          TEST_DIR="/tmp/test-deps-buildcache-${{ matrix.slurm_version }}-${{ matrix.compiler_version }}"
-          rm -rf "$TEST_DIR"
-          mkdir -p "$TEST_DIR"
-          cd "$TEST_DIR"
-          
-          # Clone Spack
-          git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
-          cd spack
-          
-          # Isolate Spack user data to prevent caching between runs
-          # This ensures we test buildcache installation, not cached/external packages
-          export SPACK_USER_CACHE_PATH="$TEST_DIR/spack-cache"
-          export SPACK_USER_CONFIG_PATH="$TEST_DIR/spack-config"
-          mkdir -p "$SPACK_USER_CACHE_PATH" "$SPACK_USER_CONFIG_PATH"
-          
-          # Initialize Spack (avoid sourcing which can have issues)
-          export SPACK_ROOT="$(pwd)"
-          export PATH="$SPACK_ROOT/bin:$PATH"
-          
-          # Verify spack works
-          spack --version
-          
-          # Add buildcache mirrors (remove if exists first)
-          COMPILER_MIRROR_URL="${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}/buildcache"
-          DEPS_MIRROR_URL="${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache"
-          spack mirror remove compiler-buildcache 2>/dev/null || true
-          spack mirror remove deps-buildcache 2>/dev/null || true
-          spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
-          spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
-          
-          # Update the buildcache index to ensure we have the latest packages
-          # Allow these to fail gracefully if the buildcaches are new/empty
-          echo "Updating buildcache indexes..."
-          spack buildcache update-index compiler-buildcache || echo "Warning: Could not update compiler-buildcache index (buildcache may be new/empty)"
-          spack buildcache update-index deps-buildcache || echo "Warning: Could not update deps-buildcache index (buildcache may be new/empty)"
-          
-          # List available packages
-          echo "Available packages in buildcache:"
-          spack buildcache list --allarch | head -30
-          
-          # Try to install a common dependency from buildcache only (e.g., openssl, munge)
-          echo ""
-          echo "Installing sample dependencies from buildcache..."
-          spack install --no-check-signature --cache-only openssl@3: 2>&1 | tail -30 || echo "Note: openssl may not be in buildcache yet"
-          spack install --no-check-signature --cache-only munge 2>&1 | tail -30 || echo "Note: munge may not be in buildcache yet"
-          
-          echo ""
-          echo "Buildcache test completed!"
-          
-          # Cleanup
-          cd /
-          rm -rf "$TEST_DIR"
+          # Run test in Docker container with same base image as build
+          docker run --rm \
+            -e CLOUDFRONT_URL="${{ env.CLOUDFRONT_URL }}" \
+            -e SLURM_VERSION="${{ matrix.slurm_version }}" \
+            -e COMPILER_VERSION="${{ matrix.compiler_version }}" \
+            ubuntu:24.04 \
+            bash -c '
+            set -e
+            
+            # Install required packages
+            apt-get update
+            apt-get install -y --no-install-recommends \
+              build-essential \
+              ca-certificates \
+              curl \
+              git \
+              gnupg2 \
+              python3 \
+              python3-pip
+            
+            # Create test directory
+            TEST_DIR="/tmp/test-buildcache"
+            mkdir -p "$TEST_DIR"
+            cd "$TEST_DIR"
+            
+            # Clone Spack
+            git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+            cd spack
+            
+            # Isolate Spack user data
+            export SPACK_USER_CACHE_PATH="$TEST_DIR/spack-cache"
+            export SPACK_USER_CONFIG_PATH="$TEST_DIR/spack-config"
+            mkdir -p "$SPACK_USER_CACHE_PATH" "$SPACK_USER_CONFIG_PATH"
+            
+            # Initialize Spack
+            export SPACK_ROOT="$(pwd)"
+            export PATH="$SPACK_ROOT/bin:$PATH"
+            
+            # Verify spack works
+            spack --version
+            
+            # Add buildcache mirrors
+            COMPILER_MIRROR_URL="${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}/buildcache"
+            DEPS_MIRROR_URL="${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}/buildcache"
+            spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
+            spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
+            
+            # Import GPG keys for signature verification
+            echo "Importing GPG keys..."
+            spack buildcache keys --install --trust || echo "Warning: Could not import GPG keys"
+            
+            # Update buildcache indexes
+            echo "Updating buildcache indexes..."
+            spack buildcache update-index compiler-buildcache || echo "Warning: Could not update compiler-buildcache index (buildcache may be new/empty)"
+            spack buildcache update-index deps-buildcache || echo "Warning: Could not update deps-buildcache index (buildcache may be new/empty)"
+            
+            # List available packages
+            echo "Available packages in buildcache:"
+            spack buildcache list --allarch | head -30
+            
+            # Install sample dependencies from buildcache
+            echo ""
+            echo "Installing sample dependencies from buildcache..."
+            spack install --use-buildcache only openssl@3: 2>&1 | tail -30 || echo "Note: openssl may not be in buildcache yet"
+            spack install --use-buildcache only munge 2>&1 | tail -30 || echo "Note: munge may not be in buildcache yet"
+            
+            echo ""
+            echo "✓ Buildcache test completed!"
+            '
 
       - name: Summary
         if: always()

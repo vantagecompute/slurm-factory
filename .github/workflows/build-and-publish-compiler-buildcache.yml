@@ -148,106 +148,118 @@ jobs:
         shell: bash
         run: |
           set -e
-          echo "Testing compiler installation from buildcache..."
+          echo "Testing compiler installation from buildcache in Docker container..."
           
-          # Create test directory
-          TEST_DIR="/tmp/test-buildcache-${{ matrix.compiler_version }}"
-          rm -rf "$TEST_DIR"
-          mkdir -p "$TEST_DIR"
-          cd "$TEST_DIR"
-          
-          # Clone Spack
-          git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
-          cd spack
-          
-          # Isolate Spack user data to prevent caching between runs
-          # This ensures we test buildcache installation, not cached/external packages
-          export SPACK_USER_CACHE_PATH="$TEST_DIR/spack-cache"
-          export SPACK_USER_CONFIG_PATH="$TEST_DIR/spack-config"
-          mkdir -p "$SPACK_USER_CACHE_PATH" "$SPACK_USER_CONFIG_PATH"
-          
-          # Initialize Spack (avoid sourcing which can have issues)
-          export SPACK_ROOT="$(pwd)"
-          export PATH="$SPACK_ROOT/bin:$PATH"
-          
-          # Verify spack works
-          spack --version
-          
-          # Configure system compiler directly (skip auto-detection for reliability)
-          echo "Configuring system compiler for bootstrapping..."
-          GCC_VERSION=$(gcc -dumpversion)
-          echo "Detected system GCC version: ${GCC_VERSION}"
-          
-          # Create compiler configuration
-          mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
-          cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<EOF
-          compilers:
-          - compiler:
-              spec: gcc@${GCC_VERSION}
-              paths:
-                cc: /usr/bin/gcc
-                cxx: /usr/bin/g++
-                f77: /usr/bin/gfortran
-                fc: /usr/bin/gfortran
-              flags: {}
-              operating_system: ubuntu24.04
-              target: x86_64
-              modules: []
-              environment: {}
-              extra_rpaths: []
-          EOF
-          
-          echo "✓ Configured GCC ${GCC_VERSION}"
-          spack compiler list
-          
-          # Add buildcache mirror (remove if exists first)
-          MIRROR_URL="${{ env.CLOUDFRONT_URL }}/compilers/${{ matrix.compiler_version }}"
-          spack mirror remove slurm-factory-buildcache 2>/dev/null || true
-          spack mirror add slurm-factory-buildcache "$MIRROR_URL"
-          
-          # Import GPG keys for signature verification
-          echo "Importing GPG keys..."
-          spack buildcache keys --install --trust || echo "Warning: Could not import GPG keys"
-          
-          # Update the buildcache index to ensure we have the latest packages
-          # Allow this to fail gracefully if the buildcache is new/empty
-          echo "Updating buildcache index..."
-          spack buildcache update-index slurm-factory-buildcache || echo "Warning: Could not update buildcache index (buildcache may be new/empty)"
-          
-          # List available packages
-          echo "Available packages in buildcache:"
-          spack buildcache list --allarch | head -20
-          
-          # Try to install GCC from buildcache only (with signature verification)
-          echo ""
-          echo "Installing GCC ${{ matrix.compiler_version }} from buildcache with GPG verification..."
-          spack install --use-buildcache only gcc@${{ matrix.compiler_version }} target=x86_64_v3 2>&1 | tail -50
-          
-          # Verify installation
-          echo ""
-          echo "Verifying GCC installation..."
-          eval $(spack load --sh gcc@${{ matrix.compiler_version }})
-          gcc --version
-          
-          # Test compilation
-          echo ""
-          echo "Testing C compilation..."
-          cat > test.c <<'CEOF'
-          #include <stdio.h>
-          int main() {
-              printf("Hello from GCC!\n");
-              return 0;
-          }
-          CEOF
-          gcc test.c -o test
-          ./test
-          
-          echo ""
-          echo "Buildcache test successful!"
-          
-          # Cleanup
-          cd /
-          rm -rf "$TEST_DIR"
+          # Run test in Docker container with same base image as build
+          docker run --rm \
+            -e CLOUDFRONT_URL="${{ env.CLOUDFRONT_URL }}" \
+            -e COMPILER_VERSION="${{ matrix.compiler_version }}" \
+            ubuntu:24.04 \
+            bash -c '
+            set -e
+            
+            # Install required packages
+            apt-get update
+            apt-get install -y --no-install-recommends \
+              build-essential \
+              ca-certificates \
+              curl \
+              git \
+              gnupg2 \
+              python3 \
+              python3-pip
+            
+            # Create test directory
+            TEST_DIR="/tmp/test-buildcache"
+            mkdir -p "$TEST_DIR"
+            cd "$TEST_DIR"
+            
+            # Clone Spack
+            git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+            cd spack
+            
+            # Isolate Spack user data to prevent caching between runs
+            export SPACK_USER_CACHE_PATH="$TEST_DIR/spack-cache"
+            export SPACK_USER_CONFIG_PATH="$TEST_DIR/spack-config"
+            mkdir -p "$SPACK_USER_CACHE_PATH" "$SPACK_USER_CONFIG_PATH"
+            
+            # Initialize Spack
+            export SPACK_ROOT="$(pwd)"
+            export PATH="$SPACK_ROOT/bin:$PATH"
+            
+            # Verify spack works
+            spack --version
+            
+            # Configure system compiler for bootstrapping
+            echo "Configuring system compiler for bootstrapping..."
+            GCC_VERSION=$(gcc -dumpversion)
+            echo "Detected system GCC version: ${GCC_VERSION}"
+            
+            # Create compiler configuration
+            mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
+            cat > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml" <<EOF
+            compilers:
+            - compiler:
+                spec: gcc@${GCC_VERSION}
+                paths:
+                  cc: /usr/bin/gcc
+                  cxx: /usr/bin/g++
+                  f77: /usr/bin/gfortran
+                  fc: /usr/bin/gfortran
+                flags: {}
+                operating_system: ubuntu24.04
+                target: x86_64
+                modules: []
+                environment: {}
+                extra_rpaths: []
+            EOF
+            
+            echo "✓ Configured GCC ${GCC_VERSION}"
+            spack compiler list
+            
+            # Add buildcache mirror
+            MIRROR_URL="${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+            spack mirror add slurm-factory-buildcache "$MIRROR_URL"
+            
+            # Import GPG keys for signature verification
+            echo "Importing GPG keys..."
+            spack buildcache keys --install --trust || echo "Warning: Could not import GPG keys"
+            
+            # Update the buildcache index
+            echo "Updating buildcache index..."
+            spack buildcache update-index slurm-factory-buildcache || echo "Warning: Could not update buildcache index (buildcache may be new/empty)"
+            
+            # List available packages
+            echo "Available packages in buildcache:"
+            spack buildcache list --allarch | head -20
+            
+            # Install GCC from buildcache only (with signature verification)
+            echo ""
+            echo "Installing GCC ${COMPILER_VERSION} from buildcache with GPG verification..."
+            spack install --use-buildcache only gcc@${COMPILER_VERSION} target=x86_64_v3 2>&1 | tail -50
+            
+            # Verify installation
+            echo ""
+            echo "Verifying GCC installation..."
+            eval $(spack load --sh gcc@${COMPILER_VERSION})
+            gcc --version
+            
+            # Test compilation
+            echo ""
+            echo "Testing C compilation..."
+            cat > test.c <<'"'"'CEOF'"'"'
+            #include <stdio.h>
+            int main() {
+                printf("Hello from GCC!\n");
+                return 0;
+            }
+            CEOF
+            gcc test.c -o test
+            ./test
+            
+            echo ""
+            echo "✓ Buildcache test successful!"
+            '
 
       - name: Summary
         if: always()
