@@ -116,8 +116,15 @@ const config: Config = {
               filename: 'llms-installation.txt',
               includePatterns: ['docs/installation.md'],
               fullContent: true,
-              title: 'Slurm Factory Installation Documentation',
-              description: 'Installation documentation for Slurm Factory'
+              title: 'Slurm Factory Tool Installation Documentation',
+              description: 'Installation documentation for the slurm-factory build tool'
+            },
+            {
+              filename: 'llms-installing-slurm-from-buildcache.txt',
+              includePatterns: ['docs/installing-slurm-from-buildcache.md'],
+              fullContent: true,
+              title: 'Installing Slurm from Buildcache Documentation',
+              description: 'Guide for installing pre-built Slurm binaries from the public buildcache using Spack'
             },
             {
               filename: 'llms-deployment.txt',

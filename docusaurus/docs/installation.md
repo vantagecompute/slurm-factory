@@ -1,7 +1,29 @@
 
-# Installation Guide
+# Installing slurm-factory Tool
 
-This guide covers the different ways to install and set up Slurm Factory for building optimized, relocatable Slurm packages using our modern Python CLI.
+This guide covers how to install the **slurm-factory build tool** - a Python CLI for building custom Slurm packages. 
+
+> **Note:** If you just want to install pre-built Slurm binaries, you don't need this tool. See [Installing Slurm from Buildcache](installing-slurm-from-buildcache.md) instead.
+
+## What is slurm-factory?
+
+`slurm-factory` is a Python command-line tool that:
+- Builds custom Slurm packages from source
+- Uses Docker for isolated, reproducible builds
+- Leverages Spack for dependency management
+- Creates relocatable tarballs for easy deployment
+- Can publish to buildcaches with GPG signing
+
+**Install slurm-factory when you need:**
+- Custom build configurations or patches
+- To build for unsupported OS/architectures  
+- To create your own buildcache
+- Full control over the build process
+
+**Don't install slurm-factory if:**
+- You just want to use pre-built binaries ([see here](installing-slurm-from-buildcache.md))
+- You don't need custom builds
+- You want the fastest deployment (buildcache is 5-15 min vs 45-90 min building)
 
 ## Prerequisites
 

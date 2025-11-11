@@ -21,7 +21,8 @@ const sidebars: SidebarsConfig = {
       type: 'category',
       label: 'Getting Started',
       items: [
-        'installation',
+        'installing-slurm-from-buildcache', // Installing pre-built Slurm
+        'installation', // Installing slurm-factory tool
         'examples',
       ],
     },

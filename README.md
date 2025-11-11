@@ -18,20 +18,36 @@ Build relocatable, **GPG-signed** Slurm packages using Docker and Spack.
 
 ## Quick Start
 
+### Option 1: Install Pre-built Slurm from Buildcache (Fastest!)
+
+Use Spack to install GPG-signed pre-built binaries (**no slurm-factory tool needed**):
+
 ```bash
-# Install slurm-factory
+# Install Spack
+git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+source spack/share/spack/setup-env.sh
+
+# Add buildcache and install Slurm (5-15 min!)
+spack mirror add slurm-factory https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+spack buildcache keys --install --trust
+spack install slurm@25.11%gcc@13.4.0
+```
+
+**→ Full guide:** [Installing Slurm from Buildcache](https://vantagecompute.github.io/slurm-factory/installing-slurm-from-buildcache)
+
+### Option 2: Build Custom Slurm with slurm-factory Tool
+
+Install the slurm-factory tool to build custom packages:
+
+```bash
+# Install Docker and the slurm-factory build tool
 pip install slurm-factory
 
 # Build Slurm with default compiler (GCC 13.4.0)
 slurm-factory build --slurm-version 25.11
-
-# Or install pre-built GPG-signed packages from buildcache (5-15 min!)
-git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
-source spack/share/spack/setup-env.sh
-spack mirror add slurm-factory https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
-spack buildcache keys --install --trust  # Import GPG keys
-spack install slurm@25.11%gcc@13.4.0    # Install signed package
 ```
+
+**→ Full guide:** [Installing slurm-factory Tool](https://vantagecompute.github.io/slurm-factory/installation)
 
 ## Supported Versions
 

@@ -76,64 +76,42 @@ Keys are automatically imported and trusted when using the buildcache.
 
 ## Quick Start
 
-### Method 1: Using the Public Buildcache (Recommended)
+Choose your installation method:
 
-The fastest way to deploy Slurm is using GPG-signed pre-built binaries from our public buildcache:
+### Option 1: Install Pre-built Slurm from Buildcache (Recommended - Fastest!)
+
+**No slurm-factory tool needed** - just Spack:
 
 ```bash
-# Install slurm-factory
-pip install slurm-factory
-
 # Install Spack v1.0.0
 git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
 source spack/share/spack/setup-env.sh
 
-# Add compiler and Slurm buildcache mirrors
-spack mirror add slurm-factory-compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0
-
-spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
-
-# Import and trust the GPG signing key (automatic signature verification)
+# Add buildcache and install Slurm (5-15 minutes)
+spack mirror add slurm-factory https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
 spack buildcache keys --install --trust
-
-# Install GPG-signed Slurm from buildcache (5-15 minutes!)
 spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
-
-# Load and verify
-spack load slurm@25.11
-sinfo --version
-# Output: slurm 25.11.4
 ```
 
-### Method 2: Building Locally
+**→ See the complete guide:** [Installing Slurm from Buildcache](installing-slurm-from-buildcache.md)
 
-For custom configurations or when you need specific build options:
+### Option 2: Build Custom Slurm with slurm-factory Tool
+
+**Install the slurm-factory tool** for custom builds:
 
 ```bash
 # Install Docker
 curl -fsSL https://get.docker.com | sh
 sudo usermod -aG docker $USER && newgrp docker
 
-# Install slurm-factory
+# Install slurm-factory from PyPI
 pip install slurm-factory
 
-# Build a compiler toolchain (one-time, ~15-20 minutes)
-slurm-factory build-compiler --compiler-version 13.4.0
-
-# Build Slurm with that compiler (~35-45 minutes)
+# Build Slurm (~45 minutes)
 slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
-
-# Extract the tarball
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
-
-# Run installation script
-cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
-
-# Load the module
-module load slurm/25.11
 ```
+
+**→ See the complete guide:** [Installing slurm-factory Tool](installation.md)
 
 ## Two Primary Commands
 
