@@ -828,28 +828,32 @@ def publish_compiler_to_buildcache(
 
         # If GPG private key is provided, import it before running buildcache commands
         if gpg_private_key:
-            # Use passphrase from environment if provided, otherwise empty string
-            passphrase_ref = '"${GPG_PASSPHRASE:-}"' if gpg_passphrase else '""'
             bash_script_parts.extend(
                 [
-                    # Ensure /tmp has proper permissions for GPG temp files
-                    'chmod 1777 /tmp',
-                    # Create full GPG directory structure with correct permissions
-                    'mkdir -p /opt/spack/var/spack/gpg/private-keys-v1.d',
-                    'chmod 700 /opt/spack/var/spack/gpg',
-                    'chmod 700 /opt/spack/var/spack/gpg/private-keys-v1.d',
-                    # Configure GPG agent for non-interactive use with no passphrase prompt
-                    'cat > /opt/spack/var/spack/gpg/gpg-agent.conf << EOF\nallow-loopback-pinentry\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000\nEOF',  # noqa: E501
-                    # Configure GPG for batch mode with loopback pinentry and no tty
-                    'cat > /opt/spack/var/spack/gpg/gpg.conf << EOF\nuse-agent\npinentry-mode loopback\nbatch\nyes\nno-tty\nEOF',  # noqa: E501
-                    # Kill any existing agent to ensure clean state
-                    'gpgconf --homedir /opt/spack/var/spack/gpg --kill gpg-agent 2>/dev/null || true',
-                    # Import GPG key into Spack's GPG keyring with batch mode
-                    f'echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --no-tty --passphrase {passphrase_ref} --import 2>&1 | grep -v "cannot open" || true',  # noqa: E501
-                    # Start GPG agent with our configuration
-                    'gpg-connect-agent --homedir /opt/spack/var/spack/gpg /bye 2>&1 | grep -v "cannot open" || true',  # noqa: E501
-                    # Preset the passphrase to avoid any prompts
-                    f'echo {passphrase_ref} | gpg --homedir /opt/spack/var/spack/gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 --quick-add-key {signing_key} default sign 0 2>&1 | grep -v "cannot open\\|already exists" || true',  # noqa: E501
+                    # Import GPG key using Spack's gpg trust command (imports to /opt/spack/opt/spack/gpg)
+                    'echo "$GPG_PRIVATE_KEY" | base64 -d > /tmp/gpg-key.asc',
+                    'spack gpg trust /tmp/gpg-key.asc',
+                    # Store passphrase for GPG wrapper to use
+                    'echo "${GPG_PASSPHRASE}" > /tmp/gpg-passphrase.txt',
+                    # Configure GPG with loopback pinentry
+                    'mkdir -p /opt/spack/opt/spack/gpg',
+                    'cat > /opt/spack/opt/spack/gpg/gpg.conf << EOF\npinentry-mode loopback\nEOF',
+                    'cat > /opt/spack/opt/spack/gpg/gpg-agent.conf << EOF\nallow-loopback-pinentry\ndefault-cache-ttl 34560000\nmax-cache-ttl 34560000\nEOF',
+                    # Kill and restart agent
+                    'gpgconf --homedir /opt/spack/opt/spack/gpg --kill gpg-agent 2>/dev/null || true',
+                    'gpg-connect-agent --homedir /opt/spack/opt/spack/gpg /bye',
+                    # Create GPG wrapper to inject passphrase when Spack calls gpg for signing
+                    'mv /usr/bin/gpg /usr/bin/gpg-real',
+                    r'''cat > /usr/bin/gpg << 'WRAPPER'
+#!/bin/bash
+# Wrapper to add passphrase for non-interactive signing
+if [[ "$*" == *"--clearsign"* ]]; then
+  exec /usr/bin/gpg-real --pinentry-mode loopback --passphrase-file /tmp/gpg-passphrase.txt "$@"
+else
+  exec /usr/bin/gpg-real "$@"
+fi
+WRAPPER''',
+                    'chmod +x /usr/bin/gpg',
                 ]
             )
 
