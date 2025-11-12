@@ -200,7 +200,7 @@ class TestScriptTemplates:
         assert "cd /tmp/compiler-install" in script
         
         # Test that the compiler environment YAML is properly configured
-        assert "spack.yaml << 'COMPILER_ENV_EOF'" in script
+        assert "printf '%s\\n'" in script or "printf \"%s\\n\"" in script
         assert f"- gcc@{compiler_version}" in script
         assert "view: /opt/spack-compiler-view" in script
         assert "type: buildcache" in script

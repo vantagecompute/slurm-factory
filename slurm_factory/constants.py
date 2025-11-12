@@ -250,19 +250,20 @@ def get_spack_build_script(compiler_version: str) -> str:
         echo '==> Creating temporary environment to install GCC compiler from buildcache...'
         mkdir -p /tmp/compiler-install
         cd /tmp/compiler-install
-        cat > spack.yaml << 'COMPILER_ENV_EOF'
-spack:
-  specs:
-  - gcc@{compiler_version} languages=c,c++,fortran
-  view: /opt/spack-compiler-view
-  concretizer:
-    unify: false
-    reuse:
-      roots: true
-      from:
-      - type: buildcache
-        path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}
-COMPILER_ENV_EOF
+        printf '%s\\n' \\
+          'spack:' \\
+          '  specs:' \\
+          '  - gcc@{compiler_version} languages=c,c++,fortran' \\
+          '  view: /opt/spack-compiler-view' \\
+          '  concretizer:' \\
+          '    unify: false' \\
+          '    reuse:' \\
+          '      roots: true' \\
+          '      from:' \\
+          '      - type: buildcache' \\
+          '        path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/' \\
+          'compilers/{compiler_version}' \\
+          > spack.yaml
         echo '==> Checking if GCC is available in buildcache...'
         if ! spack buildcache list --allarch | grep -q "gcc@{compiler_version}"; then
             echo 'ERROR: gcc@{compiler_version} not found in buildcache!'
@@ -316,10 +317,10 @@ ${{LD_LIBRARY_PATH:-}}
         echo '==> Compiler info for gcc@{compiler_version}:'
         spack compiler info gcc@{compiler_version}
         echo '==> Testing compiler with simple program...'
-        cat > /tmp/test.c << 'CEOF'
-#include <stdio.h>
-int main() {{ printf("Compiler test OK\\n"); return 0; }}
-CEOF
+        printf '%s\\n' \\
+          '#include <stdio.h>' \\
+          'int main() {{ printf("Compiler test OK\\\\n"); return 0; }}' \\
+          > /tmp/test.c
         /opt/spack-compiler-view/bin/gcc /tmp/test.c -o /tmp/test && /tmp/test || {{
             echo 'ERROR: Compiler test failed'
             /opt/spack-compiler-view/bin/gcc -v /tmp/test.c -o /tmp/test 2>&1 || true
