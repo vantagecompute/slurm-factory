@@ -250,6 +250,7 @@ def get_spack_build_script(compiler_version: str) -> str:
         echo '==> Creating temporary environment to install GCC compiler from buildcache...'
         mkdir -p /tmp/compiler-install
         cd /tmp/compiler-install
+        BUILDCACHE_URL="https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}"
         printf '%s\\n' \\
           'spack:' \\
           '  specs:' \\
@@ -261,8 +262,7 @@ def get_spack_build_script(compiler_version: str) -> str:
           '      roots: true' \\
           '      from:' \\
           '      - type: buildcache' \\
-          '        path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/' \\
-          'compilers/{compiler_version}' \\
+          "        path: $BUILDCACHE_URL" \\
           > spack.yaml
         echo '==> Checking if GCC is available in buildcache...'
         if ! spack buildcache list --allarch | grep -q "gcc@{compiler_version}"; then

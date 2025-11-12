@@ -205,7 +205,8 @@ class TestScriptTemplates:
         assert "view: /opt/spack-compiler-view" in script
         assert "type: buildcache" in script
         # NOTE: Spack automatically appends /build_cache/ subdirectory - mirror URL should not include /buildcache
-        assert f"path: https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}" in script
+        assert f'BUILDCACHE_URL="https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}"' in script
+        assert 'path: $BUILDCACHE_URL' in script
         
         # Test that it installs compiler (will use buildcache when available, build from source if needed)
         assert "spack -e . install" in script
