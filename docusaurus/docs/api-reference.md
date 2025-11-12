@@ -60,7 +60,7 @@ Builds Slurm packages using Docker containers and Spack. Supports multiple GCC v
 
 All compilers are built with Spack for relocatability:
 
-- **15.2.0**: GCC 15.2, glibc 2.39, latest GCC 15
+- **15.2.0**: GCC 15.2, glibc 2.40, latest GCC 15
 - **14.2.0**: GCC 14.2, glibc 2.39, latest stable
 - **13.4.0** (default): GCC 13.4, glibc 2.39, Ubuntu 24.04 compatible
 - **12.5.0**: GCC 12.5, glibc 2.35, Ubuntu 22.04 compatible
@@ -154,7 +154,7 @@ Builds a relocatable GCC compiler toolchain using Spack and optionally publishes
 
 All toolchains are built with Spack for relocatability:
 
-- **15.2.0**: GCC 15.2, glibc 2.39, latest GCC 15
+- **15.2.0**: GCC 15.2, glibc 2.40, latest GCC 15
 - **14.2.0**: GCC 14.2, glibc 2.39, latest stable
 - **13.4.0** (default): GCC 13.4, glibc 2.39, Ubuntu 24.04 compatible
 - **12.5.0**: GCC 12.5, glibc 2.35, Ubuntu 22.04 compatible

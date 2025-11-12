@@ -34,7 +34,7 @@ No AWS credentials are required for read access.
 ```text
 slurm-factory-spack-binary-cache.vantagecompute.ai/
 ├── compilers/
-│   ├── 15.2.0/                  # GCC 15.2.0 (latest, glibc 2.39)
+│   ├── 15.2.0/                  # GCC 15.2.0 (latest, glibc 2.40)
 │   ├── 14.2.0/                  # GCC 14.2.0 (latest GCC 14, glibc 2.39)
 │   ├── 13.4.0/                  # GCC 13.4.0 (default, glibc 2.39)
 │   ├── 12.5.0/                  # GCC 12.5.0 (glibc 2.35)

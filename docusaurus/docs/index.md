@@ -36,7 +36,7 @@ Slurm Factory supports **27 combinations** of Slurm and GCC compiler versions. A
 
 All GCC toolchains are GPG-signed and include matching glibc for cross-distro compatibility:
 
-- **15.2.0** (Latest GCC 15, glibc 2.39)
+- **15.2.0** (Latest GCC 15, glibc 2.40)
 - **14.2.0** (Latest GCC 14, glibc 2.39)
 - **13.4.0** (Recommended default, glibc 2.39, Ubuntu 24.04)
 - **12.5.0** (glibc 2.35)
@@ -142,7 +142,7 @@ slurm-factory build-compiler --compiler-version 14.2.0
 slurm-factory build-compiler --compiler-version 13.4.0 --publish
 ```
 
-**Supported Versions**: 14.2.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
+**Supported Versions**: 15.2.0, 14.2.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
 
 **Output**: Docker image and optional buildcache upload to S3
 
@@ -177,7 +177,7 @@ Pre-built packages are available at `slurm-factory-spack-binary-cache.vantagecom
 #### Compilers
 
 - **URL**: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache`
-- **Versions**: GCC 7.5.0 through 14.2.0
+- **Versions**: GCC 7.5.0 through 15.2.0
 - **Includes**: gcc, gcc-runtime, binutils, gmp, mpfr, mpc, zlib-ng, zstd
 
 #### Slurm Packages
