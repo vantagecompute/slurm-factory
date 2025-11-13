@@ -224,8 +224,8 @@ jobs:
             spack --version
             
             # Add buildcache mirrors
-            COMPILER_MIRROR_URL="${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}/buildcache"
-            DEPS_MIRROR_URL="${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}/buildcache"
+            COMPILER_MIRROR_URL="${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+            DEPS_MIRROR_URL="${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
             spack mirror add compiler-buildcache "$COMPILER_MIRROR_URL"
             spack mirror add deps-buildcache "$DEPS_MIRROR_URL"
             

@@ -1014,21 +1014,21 @@ def push_to_buildcache(
         # Determine what to push based on publish_mode
         if publish_mode == "slurm":
             # Push only slurm package
-            push_cmd = f"spack buildcache push {signing_flags} s3-buildcache slurm"
+            push_cmd = f"spack buildcache push {signing_flags} --force --update-index s3-buildcache slurm"
             update_index_cmd = (
                 "spack buildcache update-index s3-buildcache || "
                 "echo 'Warning: Could not update buildcache index'"
             )
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
-            push_cmd = f"spack -e . buildcache push {signing_flags} --only dependencies s3-buildcache"
+            push_cmd = f"spack -e . buildcache push {signing_flags} --force --update-index --only dependencies s3-buildcache"
             update_index_cmd = (
                 "spack buildcache update-index s3-buildcache || "
                 "echo 'Warning: Could not update buildcache index'"
             )
         else:  # all
             # Push everything
-            push_cmd = f"spack -e . buildcache push {signing_flags} s3-buildcache"
+            push_cmd = f"spack -e . buildcache push {signing_flags} --force --update-index s3-buildcache"
             update_index_cmd = (
                 "spack buildcache update-index s3-buildcache || "
                 "echo 'Warning: Could not update buildcache index'"

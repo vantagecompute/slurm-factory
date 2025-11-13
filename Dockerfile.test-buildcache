@@ -40,9 +40,8 @@ SHELL ["/bin/bash", "-l", "-c"]
 # ========================================================================
 
 # Add the Slurm Factory Spack repository for package definitions
-# Note: We need this for slurm@25.11 definition, not for building
-# Use main branch since we're installing pre-built binaries from buildcache
-RUN git clone --depth 1 --branch main \
+# We need this to know about slurm@25.11, even though we're installing from buildcache
+RUN git clone --depth 1 --branch fix-dependency-types \
     https://github.com/vantagecompute/slurm-factory-spack-repo.git /tmp/slurm-factory-spack-repo && \
     spack repo add /tmp/slurm-factory-spack-repo/spack_repo/slurm_factory
 
@@ -58,8 +57,8 @@ RUN echo "==> Checking GCC availability in buildcache..." && \
     spack buildcache list --allarch | grep gcc@7.5.0 && \
     echo "✓ GCC 7.5.0 found in buildcache"
 
-# Install GCC 7.5.0 from buildcache
-# Use --cache-only to ensure it comes from buildcache, not built from source
+# Install GCC 7.5.0 from buildcache with all dependencies
+# Use --cache-only to ensure everything comes from buildcache, not built from source
 RUN echo "==> Installing GCC 7.5.0 from buildcache..." && \
     spack install -j $(nproc) --cache-only gcc@7.5.0 languages=c,c++,fortran && \
     echo "✓ GCC 7.5.0 installed from buildcache"
@@ -70,6 +69,7 @@ RUN spack compiler find $(spack location -i gcc@7.5.0)
 # Verify the compiler is registered
 RUN spack compiler list | grep gcc@7.5.0 && \
     echo "✓ GCC 7.5.0 registered as Spack compiler"
+
 # ========================================================================
 # Stage 2: Install Slurm 25.11 from buildcache
 # ========================================================================
@@ -78,15 +78,19 @@ RUN spack compiler list | grep gcc@7.5.0 && \
 RUN spack mirror add slurm-factory-slurm \
     https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/7.5.0
 
+# Install and trust buildcache keys for Slurm mirror
+RUN spack buildcache keys --install --trust
+
 # Verify Slurm is available in buildcache
 RUN echo "==> Checking Slurm availability in buildcache..." && \
     spack buildcache list --allarch | grep -i slurm && \
     echo "✓ Slurm packages found in buildcache"
 
 # Install Slurm 25.11 with GCC 7.5.0 from buildcache
-# Use --reuse to prefer buildcache packages over building from source
+# Use --use-buildcache only (Spack v1.0.0 syntax) to ensure binaries only
+# Specify target=x86_64_v3 to match the buildcache architecture
 RUN echo "==> Installing Slurm 25.11 with dependencies from buildcache..." && \
-    spack install -j $(nproc) --reuse slurm@25.11%gcc@7.5.0 && \
+    spack install -j $(nproc) --use-buildcache only slurm@25.11%gcc@7.5.0 target=x86_64_v3 && \
     echo "✓ Slurm 25.11 installed"
 
 # Verify installation
