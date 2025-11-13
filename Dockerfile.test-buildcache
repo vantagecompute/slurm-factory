@@ -82,7 +82,7 @@ RUN echo "==> Checking Slurm availability in buildcache..." && \
 
 # Install Slurm 25.11 with GCC 7.5.0 from buildcache
 # Use --use-buildcache only (Spack v1.0.0 syntax) to ensure binaries only
-# No need to specify target - buildcache is built for x86_64 baseline
+# No need to specify target - buildcache is built for x86_64 baseline (maximum compatibility)
 RUN echo "==> Installing Slurm 25.11 with dependencies from buildcache..." && \
     spack install -j $(nproc) --use-buildcache only slurm@25.11%gcc@7.5.0 && \
     echo "✓ Slurm 25.11 installed"
