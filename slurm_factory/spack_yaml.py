@@ -402,11 +402,11 @@ def generate_spack_config(
             "repos": {
                 "slurm_factory": {
                     "git": "https://github.com/vantagecompute/slurm-factory-spack-repo.git",
-                    "branch": "main",
+                    "branch": "fix-dependency-types",
                 },
             },
             "concretizer": {
-                "unify": True,  # Allow compiler to differ from dependencies
+                "unify": "when_possible",  # Changed from True to avoid concretizer internal errors with new dependency types
                 "reuse": {
                     "roots": True,
                     "from": [{"type": "buildcache"}],
@@ -445,29 +445,66 @@ def generate_spack_config(
                 },
                 "db_lock_timeout": 120,  # Database lock timeout in seconds
             },
-            # Force all packages to be buildable from source/buildcache - NO EXTERNALS
+            # Package configuration: Build runtime dependencies, use system build tools
+            # Build tools (cmake, python, etc.) are build-only deps - not included in Slurm runtime
+            # Libraries are runtime deps - must be built for self-contained Slurm
             "packages": {
                 "all": {
                     "target": ["x86_64_v3"],
                     "require": "target=x86_64_v3",
                     "buildable": True,
                 },
-                # Build ALL packages from source/buildcache
-                "cmake": {"buildable": True},
-                "python": {"buildable": True},
+                # System build tools (build-time only, NOT runtime dependencies of Slurm)
+                "cmake": {
+                    "externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "python": {
+                    "externals": [{"spec": "python@3.12.3", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "gmake": {
+                    "externals": [{"spec": "gmake@4.3", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "m4": {
+                    "externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "pkgconf": {
+                    "externals": [{"spec": "pkgconf@1.8.1", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "diffutils": {
+                    "externals": [{"spec": "diffutils@3.10", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "findutils": {
+                    "externals": [{"spec": "findutils@4.9.0", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "gettext": {
+                    "externals": [{"spec": "gettext@0.21", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "libbsd": {
+                    "externals": [{"spec": "libbsd@0.12.1", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "libsigsegv": {
+                    "externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                "tar": {
+                    "externals": [{"spec": "tar@1.34", "prefix": "/usr"}],
+                    "buildable": False,
+                },
+                # Build autotools from source for libjwt compatibility
                 "autoconf": {"buildable": True},
                 "automake": {"buildable": True},
                 "libtool": {"buildable": True},
-                "gmake": {"buildable": True},
-                "m4": {"buildable": True},
-                "pkgconf": {"buildable": True},
-                "diffutils": {"buildable": True},
-                "findutils": {"buildable": True},
-                "gettext": {"buildable": True},
+                # Build runtime libraries (these ARE Slurm dependencies)
                 "libmd": {"buildable": True},
-                "libbsd": {"buildable": True},
-                "libsigsegv": {"buildable": True},
-                "tar": {"buildable": True},
                 # Build xz and bzip2 from source to avoid library version conflicts
                 "xz": {"buildable": True},
                 "bzip2": {"buildable": True},
@@ -581,8 +618,19 @@ def generate_spack_config(
                     "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
                     "projections": {"all": "."},  # Merge all packages into unified FHS structure
                     # No 'select' - include all installed packages automatically
-                    # Exclude packages that would create conflicts or aren't needed in view
+                    # Exclude build tools (external, not runtime deps) and compiler
                     "exclude": [
+                        "cmake",
+                        "python",
+                        "gmake",
+                        "m4",
+                        "pkgconf",
+                        "diffutils",
+                        "findutils",
+                        "gettext",
+                        "libbsd",
+                        "libsigsegv",
+                        "tar",
                         "gcc",  # Compiler is in separate location
                     ]
                     + (["cuda", "rocm-core", "rocm-smi-lib"] if gpu_support else []),
