@@ -109,7 +109,7 @@ def generate_compiler_bootstrap_config(
             },
             "packages": {
                 "all": {
-                    "target": ["x86_64", "x86_64_v2", "x86_64_v3", "x86_64_v4"],
+                    "target": ["x86_64"],
                     "buildable": True,
                     # Prefer building from source over using externals
                     "prefer": ["~external"],
@@ -449,7 +449,7 @@ def generate_spack_config(
             # Libraries are runtime deps - must be built for self-contained Slurm
             "packages": {
                 "all": {
-                    "target": ["x86_64", "x86_64_v2", "x86_64_v3", "x86_64_v4"],
+                    "target": ["x86_64"],
                     "buildable": True,
                 },
                 # System build tools (build-time only, NOT runtime dependencies of Slurm)
