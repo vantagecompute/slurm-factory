@@ -445,54 +445,29 @@ def generate_spack_config(
                 },
                 "db_lock_timeout": 120,  # Database lock timeout in seconds
             },
-            # Force all packages to be buildable from source
+            # Force all packages to be buildable from source/buildcache - NO EXTERNALS
             "packages": {
                 "all": {
                     "target": ["x86_64_v3"],
                     "require": "target=x86_64_v3",
                     "buildable": True,
                 },
-                "cmake": {
-                    "externals": [{"spec": "cmake@3.28.3", "prefix": "/usr"}],
-                    "buildable": False,
-                    "require": "@3.28.3",
-                },
-                "python": {
-                    "externals": [{"spec": "python@3.12.3", "prefix": "/usr"}],
-                    "buildable": False,
-                    "require": "@3.12.3",
-                },
-                "autoconf": {
-                    "buildable": True,  # Build from source for libjwt compatibility
-                },
-                "automake": {
-                    "buildable": True,  # Build from source for libjwt compatibility
-                },
-                "libtool": {
-                    "buildable": True,  # Build from source for libjwt compatibility
-                },
-                "gmake": {"externals": [{"spec": "gmake@4.3", "prefix": "/usr"}], "buildable": False},
-                "m4": {"externals": [{"spec": "m4@1.4.18", "prefix": "/usr"}], "buildable": False},
-                "pkgconf": {"externals": [{"spec": "pkgconf@1.8.1", "prefix": "/usr"}], "buildable": False},
-                "diffutils": {
-                    "externals": [{"spec": "diffutils@3.10", "prefix": "/usr"}],
-                    "buildable": False,
-                },
-                "findutils": {
-                    "externals": [{"spec": "findutils@4.9.0", "prefix": "/usr"}],
-                    "buildable": False,
-                },
-                "gettext": {"externals": [{"spec": "gettext@0.21", "prefix": "/usr"}], "buildable": False},
-                # Build libmd from source to ensure relocatability
-                # libmd provides message digest functions needed by some packages at runtime
+                # Build ALL packages from source/buildcache
+                "cmake": {"buildable": True},
+                "python": {"buildable": True},
+                "autoconf": {"buildable": True},
+                "automake": {"buildable": True},
+                "libtool": {"buildable": True},
+                "gmake": {"buildable": True},
+                "m4": {"buildable": True},
+                "pkgconf": {"buildable": True},
+                "diffutils": {"buildable": True},
+                "findutils": {"buildable": True},
+                "gettext": {"buildable": True},
                 "libmd": {"buildable": True},
-                # Use system build tools to avoid compiler wrapper issues during configure
-                "libbsd": {"externals": [{"spec": "libbsd@0.12.1", "prefix": "/usr"}], "buildable": False},
-                "libsigsegv": {
-                    "externals": [{"spec": "libsigsegv@2.14", "prefix": "/usr"}],
-                    "buildable": False,
-                },
-                "tar": {"externals": [{"spec": "tar@1.34", "prefix": "/usr"}], "buildable": False},
+                "libbsd": {"buildable": True},
+                "libsigsegv": {"buildable": True},
+                "tar": {"buildable": True},
                 # Build xz and bzip2 from source to avoid library version conflicts
                 "xz": {"buildable": True},
                 "bzip2": {"buildable": True},
@@ -606,26 +581,9 @@ def generate_spack_config(
                     "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
                     "projections": {"all": "."},  # Merge all packages into unified FHS structure
                     # No 'select' - include all installed packages automatically
-                    # Only exclude external packages that are system-provided
+                    # Exclude packages that would create conflicts or aren't needed in view
                     "exclude": [
-                        "cmake",
-                        "autoconf",
-                        "automake",
-                        "libtool",
-                        "python",
-                        "gmake",
-                        "m4",
-                        "pkgconf",
-                        "diffutils",
-                        "findutils",
-                        "gettext",
-                        "libbsd",
-                        "libsigsegv",
-                        "tar",
-                        "bison",
-                        "flex",
-                        "glibc",
-                        "gcc",
+                        "gcc",  # Compiler is in separate location
                     ]
                     + (["cuda", "rocm-core", "rocm-smi-lib"] if gpu_support else []),
                 }
