@@ -39,6 +39,13 @@ SHELL ["/bin/bash", "-l", "-c"]
 # Stage 1: Install GCC 7.5.0 from buildcache
 # ========================================================================
 
+# Add the Slurm Factory Spack repository for package definitions
+# Note: We need this for slurm@25.11 definition, not for building
+# Use main branch since we're installing pre-built binaries from buildcache
+RUN git clone --depth 1 --branch main \
+    https://github.com/vantagecompute/slurm-factory-spack-repo.git /tmp/slurm-factory-spack-repo && \
+    spack repo add /tmp/slurm-factory-spack-repo/spack_repo/slurm_factory
+
 # Add compiler buildcache mirror
 RUN spack mirror add slurm-factory-gcc \
     https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/7.5.0
