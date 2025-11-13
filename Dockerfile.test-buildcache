@@ -39,12 +39,6 @@ SHELL ["/bin/bash", "-l", "-c"]
 # Stage 1: Install GCC 7.5.0 from buildcache
 # ========================================================================
 
-# Add the Slurm Factory Spack repository for package definitions
-# We need this to know about slurm@25.11, even though we're installing from buildcache
-RUN git clone --depth 1 --branch fix-dependency-types \
-    https://github.com/vantagecompute/slurm-factory-spack-repo.git /tmp/slurm-factory-spack-repo && \
-    spack repo add /tmp/slurm-factory-spack-repo/spack_repo/slurm_factory
-
 # Add compiler buildcache mirror
 RUN spack mirror add slurm-factory-gcc \
     https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/7.5.0
@@ -88,9 +82,9 @@ RUN echo "==> Checking Slurm availability in buildcache..." && \
 
 # Install Slurm 25.11 with GCC 7.5.0 from buildcache
 # Use --use-buildcache only (Spack v1.0.0 syntax) to ensure binaries only
-# Specify target=x86_64_v3 to match the buildcache architecture
+# No need to specify target - buildcache is built for x86_64 baseline
 RUN echo "==> Installing Slurm 25.11 with dependencies from buildcache..." && \
-    spack install -j $(nproc) --use-buildcache only slurm@25.11%gcc@7.5.0 target=x86_64_v3 && \
+    spack install -j $(nproc) --use-buildcache only slurm@25.11%gcc@7.5.0 && \
     echo "✓ Slurm 25.11 installed"
 
 # Verify installation
