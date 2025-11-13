@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-# Test Dockerfile - Install GCC 8.5.0 and Slurm 25.11 from buildcache
+# Test Dockerfile - Install GCC 7.5.0 and Slurm 25.11 from buildcache
 # This demonstrates using the public Slurm Factory buildcache
 
 FROM ubuntu:24.04
@@ -36,56 +36,58 @@ RUN echo '. /opt/spack/share/spack/setup-env.sh' >> /etc/profile.d/spack.sh && \
 SHELL ["/bin/bash", "-l", "-c"]
 
 # ========================================================================
-# Stage 1: Install GCC 8.5.0 from buildcache
+# Stage 1: Install GCC 7.5.0 from buildcache
 # ========================================================================
 
 # Add the Slurm Factory Spack repository (contains slurm@25.11 package definition)
 # Use fix-dependency-types branch for updated dependency classifications
+# Add cache-busting to always get latest changes
+ARG CACHEBUST=1
 RUN git clone --depth 1 --branch fix-dependency-types \
     https://github.com/vantagecompute/slurm-factory-spack-repo.git /tmp/slurm-factory-spack-repo && \
     spack repo add /tmp/slurm-factory-spack-repo/spack_repo/slurm_factory
 
 # Add compiler buildcache mirror
 RUN spack mirror add slurm-factory-gcc \
-    https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/8.5.0
+    https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/7.5.0
 
 # Install and trust buildcache keys
 RUN spack buildcache keys --install --trust
 
 # Verify GCC is available in buildcache
 RUN echo "==> Checking GCC availability in buildcache..." && \
-    spack buildcache list --allarch | grep gcc@8.5.0 && \
-    echo "✓ GCC 8.5.0 found in buildcache"
+    spack buildcache list --allarch | grep gcc@7.5.0 && \
+    echo "✓ GCC 7.5.0 found in buildcache"
 
-# Install GCC 8.5.0 from buildcache
+# Install GCC 7.5.0 from buildcache
 # Use --cache-only to ensure it comes from buildcache, not built from source
-RUN echo "==> Installing GCC 8.5.0 from buildcache..." && \
-    spack install -j $(nproc) --cache-only gcc@8.5.0 languages=c,c++,fortran && \
-    echo "✓ GCC 8.5.0 installed from buildcache"
+RUN echo "==> Installing GCC 7.5.0 from buildcache..." && \
+    spack install -j $(nproc) --cache-only gcc@7.5.0 languages=c,c++,fortran && \
+    echo "✓ GCC 7.5.0 installed from buildcache"
 
 # Add GCC to Spack's compiler configuration
-RUN spack compiler find $(spack location -i gcc@8.5.0)
+RUN spack compiler find $(spack location -i gcc@7.5.0)
 
 # Verify the compiler is registered
-RUN spack compiler list | grep gcc@8.5.0 && \
-    echo "✓ GCC 8.5.0 registered as Spack compiler"
+RUN spack compiler list | grep gcc@7.5.0 && \
+    echo "✓ GCC 7.5.0 registered as Spack compiler"
 # ========================================================================
 # Stage 2: Install Slurm 25.11 from buildcache
 # ========================================================================
 
-# Add Slurm buildcache mirror (for Slurm built with GCC 8.5.0)
+# Add Slurm buildcache mirror (for Slurm built with GCC 7.5.0)
 RUN spack mirror add slurm-factory-slurm \
-    https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/8.5.0
+    https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/7.5.0
 
 # Verify Slurm is available in buildcache
 RUN echo "==> Checking Slurm availability in buildcache..." && \
     spack buildcache list --allarch | grep -i slurm && \
     echo "✓ Slurm packages found in buildcache"
 
-# Install Slurm 25.11 with GCC 8.5.0 from buildcache
+# Install Slurm 25.11 with GCC 7.5.0 from buildcache
 # Use --reuse to prefer buildcache packages over building from source
 RUN echo "==> Installing Slurm 25.11 with dependencies from buildcache..." && \
-    spack install -j $(nproc) --reuse slurm@25.11%gcc@8.5.0 && \
+    spack install -j $(nproc) --reuse slurm@25.11%gcc@7.5.0 && \
     echo "✓ Slurm 25.11 installed"
 
 # Verify installation
