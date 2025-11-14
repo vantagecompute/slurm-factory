@@ -104,7 +104,7 @@ def generate_compiler_bootstrap_config(
                 # Disable using externals during concretization and enforce target
                 "targets": {
                     "host_compatible": False,
-                    "granularity": "microarchitectures",
+                    "granularity": "generic",
                 },
             },
             "packages": {
