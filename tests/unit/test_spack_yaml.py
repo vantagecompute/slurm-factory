@@ -342,13 +342,8 @@ class TestParameterValidation:
         # All valid combinations should work without errors
         for version in SLURM_VERSIONS.keys():
             for gpu in [True, False]:
-                for verify in [True, False]:
-                    config = generate_spack_config(
-                        slurm_version=version,
-                        gpu_support=gpu,
-                        enable_verification=verify
-                    )
-                    assert "spack" in config
+                config = generate_spack_config(slurm_version=version, gpu_support=gpu)
+                assert "spack" in config
 
 
 if __name__ == "__main__":

@@ -71,26 +71,26 @@ class TestBuildcacheIndexUpdate:
             "buildcache update-index should come after mirror add"
 
     def test_slurm_workflow_updates_index(self):
-        """Test that slurm buildcache workflow updates index after adding mirrors."""
+        """Test that slurm buildcache workflow trusts keys and lists packages."""
         workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
         
-        # Check that the step includes buildcache update-index command
+        # Check that the step includes buildcache keys command (modern approach)
         run_script = test_step["run"]
-        assert "spack buildcache update-index" in run_script, \
-            "Workflow should update buildcache index after adding mirrors"
+        assert "spack buildcache keys --install --trust" in run_script, \
+            "Workflow should install and trust buildcache keys"
         
-        # Should update both mirrors
-        assert run_script.count("spack buildcache update-index") >= 2, \
-            "Workflow should update both compiler-buildcache and deps-buildcache mirrors"
+        # Should list buildcache to verify contents
+        assert "spack buildcache list" in run_script, \
+            "Workflow should list buildcache packages"
         
-        # Ensure update-index comes after mirror add
-        mirror_add_pos = run_script.find("spack mirror add")
-        update_index_pos = run_script.find("spack buildcache update-index")
-        assert mirror_add_pos < update_index_pos, \
-            "buildcache update-index should come after mirror add"
+        # Ensure keys are installed before listing/installing
+        keys_pos = run_script.find("spack buildcache keys")
+        list_pos = run_script.find("spack buildcache list")
+        assert keys_pos < list_pos, \
+            "buildcache keys should be installed before listing packages"
 
     def test_compiler_workflow_structure(self):
         """Test that compiler workflow has proper structure for buildcache testing."""
@@ -132,27 +132,26 @@ class TestBuildcacheIndexUpdate:
         
         run_script = test_step["run"]
         
-        # Verify the order of operations:
-        # 1. Remove old mirrors
-        # 2. Add new mirrors
-        # 3. Update indexes
-        # 4. List packages
-        # 5. Install from buildcache
+        # Verify the order of operations (modern Spack 1.0+ approach):
+        # 1. Add mirrors
+        # 2. Install and trust keys
+        # 3. List packages (implicit index update)
+        # 4. Install from buildcache
         
         first_mirror_add = run_script.find("spack mirror add")
-        first_update_index = run_script.find("spack buildcache update-index")
+        keys_pos = run_script.find("spack buildcache keys")
         list_pos = run_script.find("spack buildcache list")
         install_pos = run_script.find("spack install")
         
         # All commands should be present
         assert first_mirror_add >= 0, "mirror add should be present"
-        assert first_update_index >= 0, "update-index should be present"
+        assert keys_pos >= 0, "buildcache keys should be present"
         assert list_pos >= 0, "buildcache list should be present"
         assert install_pos >= 0, "install should be present"
         
         # Check order
-        assert first_mirror_add < first_update_index, "mirror add should come before update-index"
-        assert first_update_index < list_pos, "update-index should come before list"
+        assert first_mirror_add < keys_pos, "mirror add should come before keys install"
+        assert keys_pos < list_pos, "keys install should come before list"
         assert list_pos < install_pos, "list should come before install"
 
 

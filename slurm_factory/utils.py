@@ -398,7 +398,6 @@ def create_slurm_package(
     version: str = "25.11",
     compiler_version: str = "13.4.0",
     gpu_support: bool = False,
-    verify: bool = False,
     cache_dir: str = "",
     verbose: bool = False,
     no_cache: bool = False,
@@ -415,9 +414,8 @@ def create_slurm_package(
 
     logger.debug(
         f"Building Slurm package: version={version}, compiler_version={compiler_version}, "
-        f"gpu={gpu_support}, verify={verify}, no_cache={no_cache}, "
-        f"use_local_buildcache={use_local_buildcache}, publish_s3={publish_s3}, "
-        f"publish={publish}, enable_hierarchy={enable_hierarchy}"
+        f"gpu={gpu_support}, no_cache={no_cache}, use_local_buildcache={use_local_buildcache}, "
+        f"publish_s3={publish_s3}, publish={publish}, enable_hierarchy={enable_hierarchy}"
     )
 
     try:
@@ -455,7 +453,6 @@ def create_slurm_package(
             slurm_version=version,
             compiler_version=compiler_version,
             gpu_support=gpu_support,
-            enable_verification=verify,
             enable_hierarchy=enable_hierarchy,
         )
         logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")

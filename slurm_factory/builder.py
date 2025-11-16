@@ -195,7 +195,6 @@ def build(
             version=version,
             compiler_version=compiler_version,
             gpu_support=gpu,
-            verify=verify,
             cache_dir=str(settings.home_cache_dir),
             verbose=verbose,
             no_cache=no_cache,

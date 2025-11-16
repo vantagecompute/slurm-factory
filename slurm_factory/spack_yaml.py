@@ -298,10 +298,6 @@ def generate_module_config(
         },
     }
 
-    # Remove unnecessary GPU PATH duplication - RPATH covers libs and PATH already includes {prefix}/bin
-    if gpu_support:
-        pass  # nothing to add here; RPATH covers libs and PATH already includes {prefix}/bin
-
     openmpi_config: Dict[str, Any] = {
         "environment": {"set": {"OMPI_MCA_plm": "slurm"}},
     }
@@ -318,7 +314,6 @@ def generate_spack_config(
     gpu_support: bool = False,
     install_tree_root: str = "/opt/slurm/software",
     view_root: str = "/opt/slurm/view",  # Use separate view directory
-    enable_verification: bool = False,
     compiler_version: str = "13.4.0",
     enable_hierarchy: bool = False,
 ) -> Dict[str, Any]:
@@ -330,7 +325,6 @@ def generate_spack_config(
         gpu_support: Whether to include GPU support (NVML, RSMI)
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view
-        enable_verification: Whether to enable relocatability verification checks
         compiler_version: GCC compiler version to use (always built by Spack)
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
 
@@ -361,10 +355,10 @@ def generate_spack_config(
         f"openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl "
         f"^{cyrus_sasl_spec} {compiler_spec}"
     )
-    # Match curl spec from slurm package.py: libs=shared,static +nghttp2 +libssh2 +ldap
+    # Match curl spec from slurm package.py: libs=shared,static +nghttp2 +libssh2 +ldap +gssapi +libidn2
     # Using slurm_factory.curl with exact variants to match slurm dependency requirements
     curl_spec = (
-        f"slurm_factory.curl@8.15.0 libs=shared,static +nghttp2+libssh2+ldap "
+        f"slurm_factory.curl@8.15.0 libs=shared,static +nghttp2+libssh2+ldap+gssapi+libidn2 "
         f"tls=openssl ^openssl@3.6.0 ^openldap@2.6.8 {compiler_spec}"
     )
     specs = [
@@ -387,7 +381,7 @@ def generate_spack_config(
     # Using slurm_factory.freeipmi@1.6.16 for GCC 14 compatibility
     # (1.6.9 has implicit function declaration errors)
     specs.append(f"slurm_factory.freeipmi@1.6.16 {compiler_spec}")
-    specs.append(f"openmpi@5.0.3 schedulers=slurm fabrics=auto {compiler_spec}")
+    specs.append(f"openmpi@5.0.8 schedulers=slurm fabrics=auto {compiler_spec}")
     specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
     # mysql-connector-c 6.1.11 has signal handler incompatibility with modern glibc
     # Safe workaround: downgrade incompatible-pointer-types from error to warning
@@ -414,6 +408,11 @@ def generate_spack_config(
                 },
             },
             "config": {
+                "verify": {
+                    "relocatable": True,  # Verify binaries are relocatable
+                    "dependencies": True,  # Verify all dependencies are present
+                    "shared_libraries": True,  # Check shared library dependencies
+                },
                 "install_tree": {
                     "root": install_tree_root,
                     # Padding enables buildcache relocation from shorter to longer paths.
@@ -430,7 +429,7 @@ def generate_spack_config(
                 # "misc_cache": sourcecache_root,
                 # "binary_index_root": binary_index_root,
                 "checksum": True,
-                "deprecated": True,
+                "deprecated": False,
                 # Spack 1.x performance enhancements
                 "build_jobs": 4,  # Parallel build jobs
                 "ccache": False,  # Disabled - system ccache incompatible with Spack-built compilers
@@ -446,13 +445,14 @@ def generate_spack_config(
                 },
                 "db_lock_timeout": 120,  # Database lock timeout in seconds
             },
-            # Package configuration: Build runtime dependencies, use system build tools
+            # Package configuration: Build runtime dependencies, use build tools from compiler bootstrap env
             # Build tools (cmake, python, etc.) are build-only deps - not included in Slurm runtime
             # Libraries are runtime deps - must be built for self-contained Slurm
             "packages": {
                 "all": {
                     "target": ["x86_64"],
                     "buildable": True,
+                    "providers": {"mpi": ["openmpi"]},
                 },
                 # System build tools (build-time only, NOT runtime dependencies of Slurm)
                 "cmake": {"buildable": True},
@@ -532,9 +532,7 @@ def generate_spack_config(
                 },  # JWT token support - essential for Slurm REST API
                 # MySQL client library for Slurm accounting storage
                 "mysql-connector-c": {"buildable": True},
-                "librdkafka": {
-                    "buildable": True,
-                },
+                "librdkafka": {"buildable": True},
                 # PMIx configuration for consistent version
                 "pmix": {
                     "buildable": True,
@@ -573,7 +571,7 @@ def generate_spack_config(
                 # OpenMPI configuration for consistent build
                 "openmpi": {
                     "buildable": True,
-                    "version": ["5.0.3"],
+                    "version": ["5.0.8"],
                     "variants": "schedulers=slurm fabrics=auto",
                 },
             },
@@ -597,6 +595,10 @@ def generate_spack_config(
                         "libbsd",
                         "libsigsegv",
                         "tar",
+                        "flex",  # Build-only tool - lexer generator
+                        "bison",  # Build-only tool - parser generator
+                        "autoconf",  # Build-only tool - configure script generator
+                        "automake",  # Build-only tool - makefile generator
                         "gcc",  # Compiler is in separate location
                     ]
                     + (["cuda", "rocm-core", "rocm-smi-lib"] if gpu_support else []),
@@ -627,16 +629,7 @@ def generate_spack_config(
         }
     }
 
-    # Add MPI provider configuration only for full builds (when OpenMPI is included)
-    config["spack"]["packages"]["all"]["providers"] = {"mpi": ["openmpi"]}
 
-    # Add verification settings if enabled (useful for CI and pre-release checks)
-    if enable_verification:
-        config["spack"]["config"]["verify"] = {
-            "relocatable": True,  # Verify binaries are relocatable
-            "dependencies": True,  # Verify all dependencies are present
-            "shared_libraries": True,  # Check shared library dependencies
-        }
 
     return config
 
@@ -654,7 +647,6 @@ def generate_yaml_string(
     slurm_version: str = "25.11",
     compiler_version: str = "13.4.0",
     gpu_support: bool = False,
-    enable_verification: bool = False,
     enable_hierarchy: bool = False,
 ) -> str:
     """
@@ -664,7 +656,6 @@ def generate_yaml_string(
         slurm_version: Slurm version to build
         compiler_version: GCC compiler version to use (always built by Spack)
         gpu_support: Whether to include GPU support
-        enable_verification: Whether to enable relocatability verification checks
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
 
     Returns:
@@ -677,7 +668,6 @@ def generate_yaml_string(
         slurm_version=slurm_version,
         compiler_version=compiler_version,
         gpu_support=gpu_support,
-        enable_verification=enable_verification,
         enable_hierarchy=enable_hierarchy,
     )
     header = get_comment_header(slurm_version, gpu_support)
@@ -689,25 +679,19 @@ def generate_yaml_string(
 
 
 # Convenience functions for common configurations
-def cpu_only_config(slurm_version: str = "25.11", enable_verification: bool = False) -> Dict[str, Any]:
+def cpu_only_config(slurm_version: str = "25.11") -> Dict[str, Any]:
     """Generate CPU-only configuration (default, optimized for size)."""
-    return generate_spack_config(
-        slurm_version=slurm_version, gpu_support=False, enable_verification=enable_verification
-    )
+    return generate_spack_config(slurm_version=slurm_version, gpu_support=False)
 
 
-def gpu_enabled_config(slurm_version: str = "25.11", enable_verification: bool = False) -> Dict[str, Any]:
+def gpu_enabled_config(slurm_version: str = "25.11") -> Dict[str, Any]:
     """Generate GPU-enabled configuration (larger, includes CUDA/ROCm)."""
-    return generate_spack_config(
-        slurm_version=slurm_version, gpu_support=True, enable_verification=enable_verification
-    )
+    return generate_spack_config(slurm_version=slurm_version, gpu_support=True)
 
 
 def verification_config(slurm_version: str = "25.11", gpu_support: bool = False) -> Dict[str, Any]:
     """Generate configuration with verification enabled (for CI and pre-release checks)."""
-    return generate_spack_config(
-        slurm_version=slurm_version, gpu_support=gpu_support, enable_verification=True
-    )
+    return generate_spack_config(slurm_version=slurm_version, gpu_support=gpu_support)
 
 
 if __name__ == "__main__":
@@ -722,4 +706,4 @@ if __name__ == "__main__":
     print(generate_yaml_string("25.11", compiler_version="10.5.0", gpu_support=False))
 
     print("\n=== CPU-only Slurm 25.11 with Verification (CI) ===")
-    print(generate_yaml_string("25.11", gpu_support=False, enable_verification=True))
+    print(generate_yaml_string("25.11", gpu_support=False))

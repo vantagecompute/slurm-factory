@@ -11,6 +11,75 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+# .commitlintrc.yml
+# Enforces: <type>[(<scope>)]: [<task-id>] <summary> (#<pr-number>)
+# - scope is optional
+# - [task-id] is optional
+# - "(#<pr-number>)" is optional
+# - No "type!:"; use BREAKING CHANGE footer instead.
 
 extends:
-  - '@commitlint/config-conventional'
+  - "@commitlint/config-conventional"
+
+parserPreset:
+  # Inline custom parser (no external package needed)
+  parserOpts:
+    headerPattern: "^([a-z]+)(?:\\(([^)]+)\\))?:\\s(?:\\[(.+?)\\]\\s)?(.+?)(?:\\s\\(#\\d+\\))?$"
+    headerCorrespondence:
+      - type
+      - scope
+      - task
+      - subject
+
+rules:
+  # Allowed types
+  type-enum:
+    - 2
+    - always
+    - [fix, feat, cherry-pick, chore, security, ci, docs, test, refactor, perf, release]
+
+  type-case:
+    - 2
+    - always
+    - lower-case
+
+  # Scope is optional; if present, keep it lowercase
+  scope-case:
+    - 2
+    - always
+    - lower-case
+
+  # Require concise subject (your "summary")
+  subject-empty:
+    - 2
+    - never
+  subject-max-length:
+    - 2
+    - always
+    - 80
+  subject-full-stop:
+    - 2
+    - never
+
+  # Enforce blank lines before body/footer when present
+  body-leading-blank:
+    - 2
+    - always
+  footer-leading-blank:
+    - 2
+    - always
+
+  # Soft cap on full header length (subject already capped to 80)
+  header-max-length:
+    - 1
+    - always
+    - 120
+
+  type-empty:
+    - 2
+    - never
+
+  # Disallow "!" in the subject; "type!:" is already blocked by headerPattern
+  subject-exclamation-mark:
+    - 2
+    - never

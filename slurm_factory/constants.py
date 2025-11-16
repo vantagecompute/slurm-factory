@@ -254,15 +254,17 @@ def get_spack_build_script(compiler_version: str) -> str:
           'spack:' \\
           '  specs:' \\
           '  - gcc@{compiler_version} languages=c,c++,fortran' \\
-          '  view: /opt/spack-compiler-view' \\
+          '  view:' \\
+          '    default:' \\
+          '      root: /opt/spack-compiler-view' \\
+          '      link_type: symlink' \\
           '  concretizer:' \\
           '    unify: false' \\
           '    reuse:' \\
           '      roots: true' \\
           '      from:' \\
           '      - type: buildcache' \\
-          '        path: https://slurm-factory-spack-binary-cache.vantagecompute.ai' \\
-          '/compilers/{compiler_version}' \\
+          '        path: {buildcache_url}' \\
           > spack.yaml
         echo '==> Checking if GCC is available in buildcache...'
         if ! spack buildcache list --allarch | grep -q "gcc@{compiler_version}"; then
@@ -295,8 +297,8 @@ def get_spack_build_script(compiler_version: str) -> str:
         ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
         /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
         echo '==> Setting up compiler runtime library path...'
-        export LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:\\
-${{LD_LIBRARY_PATH:-}}
+        export \
+            LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
         echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
         echo '==> Detecting newly installed GCC compiler...'
         spack compiler find --scope site /opt/spack-compiler-view
@@ -352,14 +354,23 @@ ${{LD_LIBRARY_PATH:-}}
         }}
         echo '==> Verifying compiler is still available in environment...'
         spack compiler list || {{
-            echo 'ERROR: No compilers found in environment'
+            echo 'ERROR: No compilers found'
             exit 1
         }}
-        spack compiler info gcc@{compiler_version} || {{
-            echo 'ERROR: gcc@{compiler_version} not found in environment scope'
-            echo 'Available compilers:'
+        # Check for compiler in site scope (where it was registered)
+        if ! spack compiler list --scope site | grep -q "gcc@{compiler_version}"; then
+            echo 'ERROR: gcc@{compiler_version} not found in site scope'
+            echo 'Site compilers:'
+            spack compiler list --scope site
+            echo 'All compilers:'
             spack compiler list
             exit 1
+        fi
+        echo '✓ gcc@{compiler_version} available in site scope'
+        spack compiler info gcc@{compiler_version} || {{
+            echo 'WARNING: Could not get compiler info, but compiler is registered'
+            echo 'Available compilers:'
+            spack compiler list
         }}
         rm -f spack.lock
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
@@ -447,8 +458,8 @@ def get_package_tarball_script(
         fi && \\
         echo "DEBUG: Packaging view directly (projections create FHS layout)..." && \\
         cd {CONTAINER_SLURM_DIR}/view && \\
-        {gpu_handling_script}
-        find . -name "include" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
+        {gpu_handling_script if gpu_handling_script else ""}\\
+            find . -name "include" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/lib/pkgconfig" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/share/doc" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/share/man" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
@@ -552,7 +563,8 @@ WORKDIR /root/compiler-bootstrap
 RUN rm -rf /opt/spack/var/spack/cache/* \
            /opt/spack/var/spack/junit-report/* \
            /opt/spack-compiler-install/.spack-db \
-           /opt/spack-compiler-install/.spack-empty 2>/dev/null || true
+           /opt/spack-compiler-install/.spack-empty \
+           2>/dev/null || true
 
 RUN bash << 'BASH_EOF'
 set -e

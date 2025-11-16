@@ -1,0 +1,123 @@
+# syntax=docker/dockerfile:1
+# Test Dockerfile - Install GCC 15.2.0 and Slurm 25.11 from buildcache
+# This demonstrates using the public Slurm Factory buildcache
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install minimal system dependencies for Spack
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    gcc \
+    g++ \
+    gfortran \
+    git \
+    gnupg2 \
+    python3 \
+    python3-pip \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Spack v1.0.0
+RUN git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
+
+ENV SPACK_ROOT=/opt/spack
+ENV PATH=$SPACK_ROOT/bin:$PATH
+
+# Source Spack setup in shell startup
+RUN echo '. /opt/spack/share/spack/setup-env.sh' >> /etc/profile.d/spack.sh && \
+    chmod +x /etc/profile.d/spack.sh
+
+SHELL ["/bin/bash", "-l", "-c"]
+
+# ========================================================================
+# Stage 1: Install GCC 15.2.0 from buildcache
+# ========================================================================
+
+# Add compiler buildcache mirror
+RUN spack mirror add slurm-factory-gcc \
+    https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/15.2.0
+
+# Install and trust buildcache keys
+RUN spack buildcache keys --install --trust
+
+# Verify GCC is available in buildcache
+RUN echo "==> Checking GCC availability in buildcache..." && \
+    spack buildcache list --allarch | grep gcc@15.2.0 && \
+    echo "✓ GCC 15.2.0 found in buildcache"
+
+# Install GCC 15.2.0 from buildcache with all dependencies
+# Use --cache-only to ensure everything comes from buildcache, not built from source
+RUN echo "==> Installing GCC 15.2.0 from buildcache..." && \
+    spack install -j $(nproc) --cache-only gcc@15.2.0 languages=c,c++,fortran && \
+    echo "✓ GCC 15.2.0 installed from buildcache"
+
+# Add GCC to Spack's compiler configuration
+RUN spack compiler find $(spack location -i gcc@15.2.0)
+
+# Verify the compiler is registered
+RUN spack compiler list | grep gcc@15.2.0 && \
+    echo "✓ GCC 15.2.0 registered as Spack compiler"
+
+# ========================================================================
+# Stage 2: Install Slurm 25.11 from buildcache
+# ========================================================================
+
+# Add Slurm buildcache mirror (for Slurm built with GCC 15.2.0)
+RUN spack mirror add slurm-factory-slurm \
+    https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/15.2.0
+
+
+# Install and trust buildcache keys for Slurm mirror
+RUN spack buildcache keys --install --trust
+
+# Verify Slurm is available in buildcache
+RUN echo "==> Checking Slurm availability in buildcache..." && \
+    spack buildcache list --allarch | grep -i slurm && \
+    echo "✓ Slurm packages found in buildcache"
+
+# Install GCC 15.2.0 from buildcache and register it as a compiler
+RUN echo "==> Installing GCC 15.2.0 compiler from buildcache..." && \
+    spack install gcc@15.2.0 && \
+    spack compiler find $(spack location -i gcc@15.2.0) && \
+    spack compiler list && \
+    echo "✓ GCC 15.2.0 compiler registered"
+
+# Add custom Spack repository for slurm-factory namespace packages
+RUN echo "==> Adding slurm-factory-spack-repo..." && \
+    git clone --depth 1 https://github.com/vantagecompute/slurm-factory-spack-repo.git /opt/slurm-factory-spack-repo && \
+    spack repo add /opt/slurm-factory-spack-repo/spack_repo/slurm_factory && \
+    spack repo list && \
+    echo "✓ Custom repository added"
+
+# Install Slurm 25.11 with GCC 15.2.0 from buildcache
+# Install by hash to ensure we get the exact spec from the buildcache
+# Hash ysm2idt corresponds to slurm@25-11-0-1%gcc@15.2.0 target=x86_64
+RUN echo "==> Installing Slurm 25.11 with dependencies from buildcache..." && \
+    spack install -j $(nproc) --cache-only /ysm2idt && \
+    echo "✓ Slurm 25.11 installed"
+
+# Verify installation
+RUN spack find slurm && \
+    spack location -i slurm && \
+    echo "✓ Slurm installation verified"
+
+# Show installed packages
+RUN echo "==> Installed packages:" && \
+    spack find -v
+
+# Test Slurm installation
+RUN SLURM_DIR=$(spack location -i slurm) && \
+    echo "Slurm installed at: $SLURM_DIR" && \
+    ls -la "$SLURM_DIR/" && \
+    find "$SLURM_DIR" -type f -name "slurmctld" -o -name "slurmd" && \
+    echo "✓ Slurm binaries found"
+
+# Create a simple entrypoint
+WORKDIR /root
+CMD ["/bin/bash"]
