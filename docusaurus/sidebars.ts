@@ -21,6 +21,7 @@ const sidebars: SidebarsConfig = {
       label: 'Getting Started',
       items: [
         'installing-slurm-from-buildcache', // Installing pre-built Slurm
+        'installing-slurm-from-tarball', // Installing Slurm tarballs
         'installation', // Installing slurm-factory tool
         'examples',
       ],
