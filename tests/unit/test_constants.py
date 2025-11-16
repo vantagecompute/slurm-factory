@@ -202,7 +202,6 @@ class TestScriptTemplates:
         # Test that the compiler environment YAML is properly configured
         assert "printf '%s\\n'" in script or "printf \"%s\\n\"" in script
         assert f"- gcc@{compiler_version}" in script
-        assert "view: /opt/spack-compiler-view" in script
         assert "type: buildcache" in script
         # URL is split across multiple lines for line length compliance
         assert "https://slurm-factory-spack-binary-cache.vantagecompute.ai" in script

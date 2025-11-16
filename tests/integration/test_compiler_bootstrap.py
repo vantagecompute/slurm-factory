@@ -245,10 +245,10 @@ class TestCompilerBootstrapIntegration:
         # Builder stage should copy spack.yaml
         assert "spack.yaml" in dockerfile
         
-        # Builder stage should run build script
+        # Builder stage should run build script (uses spack -e . for environment commands)
         assert "spack env activate" in dockerfile
-        assert "spack concretize" in dockerfile
-        assert "spack install" in dockerfile
+        assert "concretize" in dockerfile  # Can be "spack concretize" or "spack -e . concretize"
+        assert "spack install" in dockerfile or "spack -e . install" in dockerfile
         
     def test_compiler_and_slurm_yaml_compatibility(self):
         """Test that compiler bootstrap and Slurm configs are compatible."""

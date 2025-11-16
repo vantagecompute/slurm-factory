@@ -134,32 +134,14 @@ test: lock
 # Print spack.yaml configuration for CPU-only build (standard)
 [group("config")]
 show-config-cpu:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', False, False))"
+    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', False))"
 
 # Print spack.yaml configuration for GPU-enabled build
 [group("config")]
 show-config-gpu:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', True, False))"
-
-# Print spack.yaml configuration for minimal build (CPU-only, no OpenMPI)
-[group("config")]
-show-config-minimal:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', False, True))"
-
-# Print spack.yaml configuration for minimal GPU build (with GPU support, no OpenMPI)
-[group("config")]
-show-config-minimal-gpu:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', True, True))"
-
-# Print spack.yaml configuration with verification enabled (for CI/debugging)
-[group("config")]
-show-config-verify:
-    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', False, False, True))"
+    {{uv_run}} python -c "from slurm_factory.spack_yaml import generate_yaml_string; print(generate_yaml_string('25.11', True))"
 
 # List all available Slurm versions
 [group("config")]
 show-versions:
     {{uv_run}} python -c "from slurm_factory.constants import SLURM_VERSIONS; print('Available Slurm versions:'); [print(f'  {k}: {v}') for k, v in SLURM_VERSIONS.items()]"
-
-aws-sync:
-    aws s3 cp --profile james-vantage-runtimes /home/bdx/.slurm-factory/slurm-25.11-software.tar.gz s3://vantage-public-assets/slurm/25.11/slurm-latest.tar.gz --acl public-read

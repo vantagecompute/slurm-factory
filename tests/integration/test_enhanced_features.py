@@ -75,34 +75,6 @@ class TestBuildcacheSupport:
         assert "spack-public" in mirrors
         assert "buildcache" not in mirrors
 
-    # Local buildcache feature removed - remote Spack buildcache mirror used instead
-    # def test_buildcache_enabled(self):
-    #     """Test buildcache configuration when enabled."""
-    #     config = generate_spack_config()
-    #     mirrors = config["spack"]["mirrors"]
-    #     
-    #     # Should have buildcache mirror
-    #     assert "buildcache" in mirrors
-    #     assert mirrors["buildcache"]["signed"] is False
-    #     assert "file://" in mirrors["buildcache"]["url"]
-
-    # def test_buildcache_config_paths(self):
-    #     """Test that buildcache adds necessary config paths."""
-    #     config = generate_spack_config()
-    #     spack_config = config["spack"]["config"]
-    #     
-    #     # Should have source_cache and misc_cache configured
-    #     assert "source_cache" in spack_config
-    #     assert "misc_cache" in spack_config
-
-    # def test_buildcache_padded_length(self):
-    #     """Test that buildcache enables padded install paths."""
-    #     config = generate_spack_config()
-    #     install_tree = config["spack"]["config"]["install_tree"]
-    #     
-    #     # Should use padded length for relocatability
-    #     assert install_tree["padded_length"] == 128
-
 
 class TestEnhancedRPATH:
     """Test enhanced RPATH configuration for Spack 1.x."""
@@ -212,22 +184,9 @@ class TestYAMLGenerationWithNewFeatures:
         assert "hierarchy" in modules
         assert modules["hierarchy"] == ["mpi"]
 
-    # def test_yaml_generation_with_buildcache(self):
-    #     """Test YAML generation with buildcache enabled."""
-    #     yaml_string = generate_yaml_string()
-    #     
-    #     parsed = yaml.safe_load(yaml_string)
-    #     mirrors = parsed["spack"]["mirrors"]
-    #     
-    #     # Should have buildcache mirror
-    #     assert "buildcache" in mirrors
-
     def test_yaml_generation_with_all_features(self):
         """Test YAML generation with all features enabled."""
-        yaml_string = generate_yaml_string(
-            enable_hierarchy=True,
-            enable_verification=True,
-        )
+        yaml_string = generate_yaml_string(enable_hierarchy=True)
         
         parsed = yaml.safe_load(yaml_string)
         

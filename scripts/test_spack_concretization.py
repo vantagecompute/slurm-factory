@@ -173,7 +173,6 @@ def main():
         slurm_version=args.slurm_version,
         compiler_version=args.compiler_version,
         gpu_support=False,
-        minimal=False,
     )
     
     print(f"✓ Generated spack.yml ({len(yaml_content)} bytes)")
