@@ -71,9 +71,9 @@ jobs:
         uses: actions/checkout@v4
 
       - name: "Set up Python"
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version-file: "pyproject.toml"
+          python-version-file: ".python-version"
 
       - name: Install uv
         run: |
@@ -142,6 +142,7 @@ jobs:
             --gpg-passphrase "$GPG_PASSPHRASE"
           
           # Cleanup build cache
+          for i in `docker image list --format json | jq -r .ID`; do docker rmi $i -f; done
           docker buildx prune -f
 
       - name: Verify buildcache upload
@@ -155,11 +156,6 @@ jobs:
           echo ""
           echo "📋 Checking buildcache contents..."
           aws s3 ls "s3://${{ env.S3_BUCKET }}/compilers/${{ matrix.compiler_version }}/" --recursive | head -10 || echo "Warning: Could not list buildcache contents"
-
-      - name: Setup Python 3.12 for Spack test
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
 
       - name: Test buildcache installation
         shell: bash

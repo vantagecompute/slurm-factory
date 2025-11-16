@@ -89,12 +89,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: "Set up Python"
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
-          python-version-file: "pyproject.toml"
+          python-version-file: ".python-version"
 
       - name: Install uv
         run: |
@@ -164,12 +164,13 @@ jobs:
             --gpg-passphrase "$GPG_PASSPHRASE"
 
           # Cleanup build cache
+          for i in `docker image list --format json | jq -r .ID`; do docker rmi $i -f; done
           docker buildx prune -f
 
       - name: Upload tarball to S3
         run: |
-          TARBALL_NAME="slurm-${{ inputs.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
-          TARBALL_PATH="$HOME/.slurm-factory/${{ inputs.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
+          TARBALL_PATH="$HOME/.slurm-factory/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
           
           echo "📦 Uploading: $TARBALL_NAME"
           aws s3 cp "$TARBALL_PATH" \
@@ -190,7 +191,7 @@ jobs:
 
           echo ""
           echo "📋 Checking tarball build existence"
-          TARBALL_NAME="slurm-${{ inputs.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
           aws s3 ls "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME" | head -20 || echo "Warning: Could not list buildcache contents"
 
       - name: Test buildcache installation

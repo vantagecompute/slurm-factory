@@ -458,8 +458,8 @@ def get_package_tarball_script(
         fi && \\
         echo "DEBUG: Packaging view directly (projections create FHS layout)..." && \\
         cd {CONTAINER_SLURM_DIR}/view && \\
-        {gpu_handling_script if gpu_handling_script else ""}\\
-            find . -name "include" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
+        {gpu_handling_script if gpu_handling_script else ""}find . -name "include" -type d \\
+            -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/lib/pkgconfig" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/share/doc" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/share/man" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\

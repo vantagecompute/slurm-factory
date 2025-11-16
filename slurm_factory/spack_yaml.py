@@ -600,34 +600,6 @@ def generate_spack_config(
                         "autoconf",  # Build-only tool - configure script generator
                         "automake",  # Build-only tool - makefile generator
                         "gcc",  # Compiler is in separate location
-                        # Development and compression tools (not needed at runtime)
-                        "berkeley-db",  # Provides db_* utilities
-                        "sqlite",  # Provides sqlite3
-                        "openssl",  # Provides openssl, c_rehash (runtime libs still included via deps)
-                        "libgpg-error",  # Provides gpg-error, gpgrt-config
-                        "elfutils",  # Provides eu-* utilities
-                        "hdf5",  # Provides h5* utilities
-                        "lua",  # Provides lua interpreter (lmod uses embedded lua)
-                        "luarocks",  # Provides luarocks package manager
-                        "patchelf",  # Build tool for modifying ELF binaries
-                        "openldap",  # Provides ldap* client utilities
-                        "libxml2",  # Provides xml2-config, xmlcatalog, xmllint
-                        "expat",  # Provides xmlwf
-                        "libidn2",  # Provides idn2 utility
-                        "gdbm",  # Provides gdbm_dump, gdbm_load, gdbmtool
-                        "e2fsprogs",  # Provides compile_et
-                        "gss",  # Provides gss-client
-                        "glib",  # Provides glib-*, gio*, gobject-query, etc.
-                        "dbus",  # Provides dbus-* utilities
-                        "krb5",  # Provides kerberos client utilities (runtime libs still included)
-                        "ncurses",  # Provides ncurses-config, tabs, captoinfo, etc. (runtime libs included)
-                        "pigz",  # Compression utility
-                        "lz4",  # Compression utility
-                        "xz",  # Compression utility (provides xz, lzma, etc.)
-                        "bzip2",  # Compression utility
-                        "zstd",  # Compression utility
-                        "zip",  # Compression utility (provides zip tools)
-                        "unzip",  # Compression utility
                     ]
                     + (["cuda", "rocm-core", "rocm-smi-lib"] if gpu_support else []),
                 }
@@ -656,8 +628,6 @@ def generate_spack_config(
             "modules": generate_module_config(slurm_version, gpu_support, compiler_version, enable_hierarchy),
         }
     }
-
-
 
     return config
 
