@@ -944,7 +944,7 @@ def publish_compiler_to_buildcache(
             cmd,
             capture_output=True,
             text=True,
-            timeout=1800,  # 30 minutes for large uploads
+            timeout=7200,  # 120 minutes for large uploads
         )
 
         if result.returncode != 0:
@@ -967,7 +967,7 @@ def publish_compiler_to_buildcache(
         logger.debug(f"Successfully published compiler to {s3_mirror_url}")
 
     except subprocess.TimeoutExpired:
-        msg = "Publishing timed out (>30 minutes)"
+        msg = "Publishing timed out (>120 minutes)"
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
@@ -1160,7 +1160,7 @@ def push_to_buildcache(
             cmd,
             capture_output=True,
             text=True,
-            timeout=3600,  # 60 minutes for large uploads
+            timeout=7200,  # 120 minutes for large uploads
         )
 
         if result.returncode != 0:
@@ -1183,7 +1183,7 @@ def push_to_buildcache(
         logger.debug(f"Successfully published to {s3_mirror_url}")
 
     except subprocess.TimeoutExpired:
-        msg = "Publishing timed out (>60 minutes)"
+        msg = "Publishing timed out (>120 minutes)"
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
