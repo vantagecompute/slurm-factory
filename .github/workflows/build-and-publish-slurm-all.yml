@@ -292,8 +292,8 @@ jobs:
           echo "✅ Slurm dependencies buildcache published successfully!"
           echo "📦 Slurm Version: ${{ matrix.slurm_version }}"
           echo "📦 Compiler: GCC ${{ matrix.compiler_version }}"
-          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.compiler_version }}/${{ matrix.slurm_version }}/"
-          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.compiler_version }}/${{ matrix.slurm_version }}/"
+          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/"
+          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/"
           
           # Verify files exist in S3
           echo ""
@@ -343,6 +343,9 @@ jobs:
             spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
             # Trust keys
             spack buildcache keys --install --trust
+            # Update buildcache index
+            spack buildcache update-index slurm-factory-gcc || echo "Warning: Could not update GCC buildcache index"
+            spack buildcache update-index slurm-factory-slurm || echo "Warning: Could not update Slurm buildcache index"
             # Verify GCC in buildcache
             spack buildcache list --allarch | grep gcc@${COMPILER_VERSION}
             # Install GCC from buildcache
@@ -366,7 +369,7 @@ jobs:
             SLURM_DIR=$(spack location -i slurm)
             echo "Slurm installed at: $SLURM_DIR"
             ls -la "$SLURM_DIR/"
-            find "$SLURM_DIR" -type f ( -name "slurmctld" -o -name "slurmd" )
+            find "$SLURM_DIR" -type f -name "slurmctld" -o -name "slurmd"
             echo "✓ Slurm binaries found"
             spack find -v
             echo "✓ Buildcache test completed!"
