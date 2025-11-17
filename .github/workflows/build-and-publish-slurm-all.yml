@@ -35,11 +35,13 @@ env:
 jobs:
   prepare-matrix:
     runs-on: self-hosted
+    timeout-minutes: 3600
     outputs:
       slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
       compiler_matrix: ${{ steps.set-matrix.outputs.compiler_matrix }}
     steps:
       - name: Prepare version matrices
+        timeout-minutes: 360
         id: set-matrix
         run: |
           # Prepare Slurm versions matrix
@@ -75,7 +77,7 @@ jobs:
   build-slurm-deps:
     needs: prepare-matrix
     runs-on: self-hosted
-    timeout-minutes: 480
+    timeout-minutes: 3600
     environment: release
     permissions:
       contents: read
@@ -89,19 +91,23 @@ jobs:
 
     steps:
       - name: Checkout
+        timeout-minutes: 360
         uses: actions/checkout@v5
 
       - name: "Set up Python"
+        timeout-minutes: 360
         uses: actions/setup-python@v6
         with:
           python-version-file: ".python-version"
 
       - name: Install uv
+        timeout-minutes: 360
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
       - name: Clean previous builds
+        timeout-minutes: 360
         run: |
           # Clean up any previous builds for this version/compiler combo
           docker images | grep "slurm-factory:${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
@@ -111,6 +117,7 @@ jobs:
           rm -rf "$HOME/.spack"
 
       - name: Configure AWS credentials
+        timeout-minutes: 360
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
@@ -118,6 +125,7 @@ jobs:
           role-duration-seconds: 10800  # 3 hours for long-running builds
 
       - name: Validate GPG secrets
+        timeout-minutes: 360
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
@@ -134,6 +142,7 @@ jobs:
           echo "  GPG_KEY_ID: $GPG_KEY_ID"
 
       - name: Build Slurm dependencies and publish to buildcache
+        timeout-minutes: 360
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
@@ -167,22 +176,124 @@ jobs:
           for i in `docker image list --format json | jq -r .ID`; do docker rmi $i -f; done
           docker buildx prune -f
 
-      - name: Upload tarball to S3
+      - name: Sign tarball with GPG
+        timeout-minutes: 360
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
+          TARBALL_DIR="$HOME/.slurm-factory/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}"
+          TARBALL_PATH="$TARBALL_DIR/$TARBALL_NAME"
+          
+          # Verify tarball exists
+          if [ ! -f "$TARBALL_PATH" ]; then
+            echo "Error: Tarball not found at $TARBALL_PATH"
+            exit 1
+          fi
+          
+          # Create temporary directory for signing
+          SIGN_DIR=$(mktemp -d)
+          cd "$SIGN_DIR"
+          
+          # Create Dockerfile for signing
+          cat > Dockerfile.sign <<'EOF'
+          FROM ubuntu:24.04
+          
+          RUN apt-get update && \
+              apt-get install -y gnupg && \
+              rm -rf /var/lib/apt/lists/*
+          
+          # Import GPG key
+          ARG GPG_PRIVATE_KEY
+          ARG GPG_PASSPHRASE
+          ARG GPG_KEY_ID
+          
+          RUN echo "$GPG_PRIVATE_KEY" | base64 -d | \
+              gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
+                  --pinentry-mode loopback --import
+          
+          # Mount tarball and sign it
+          WORKDIR /workspace
+          
+          CMD echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+              --pinentry-mode loopback \
+              --local-user "$GPG_KEY_ID" \
+              --detach-sign \
+              --armor \
+              --output /workspace/tarball.tar.gz.asc \
+              /workspace/tarball.tar.gz && \
+              echo "✓ Tarball signed successfully"
+          EOF
+          
+          # Build signing image
+          docker build \
+            --build-arg GPG_PRIVATE_KEY="$GPG_PRIVATE_KEY" \
+            --build-arg GPG_PASSPHRASE="$GPG_PASSPHRASE" \
+            --build-arg GPG_KEY_ID="$GPG_KEY_ID" \
+            -f Dockerfile.sign \
+            -t tarball-signer .
+          
+          # Run signing container
+          docker run --rm \
+            -v "$TARBALL_PATH:/workspace/tarball.tar.gz:ro" \
+            -v "$TARBALL_DIR:/output" \
+            -e GPG_PASSPHRASE="$GPG_PASSPHRASE" \
+            -e GPG_KEY_ID="$GPG_KEY_ID" \
+            tarball-signer \
+            bash -c 'echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+              --pinentry-mode loopback \
+              --local-user "$GPG_KEY_ID" \
+              --detach-sign \
+              --armor \
+              --output /output/'"$TARBALL_NAME"'.asc \
+              /workspace/tarball.tar.gz && \
+              echo "✓ Tarball signed successfully"'
+          
+          # Cleanup
+          docker rmi tarball-signer
+          rm -rf "$SIGN_DIR"
+          
+          echo "✓ Signature created at $TARBALL_DIR/$TARBALL_NAME.asc"
+
+      - name: Upload tarball and signature to S3
+        timeout-minutes: 360
         run: |
           TARBALL_NAME="slurm-${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
           TARBALL_PATH="$HOME/.slurm-factory/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
+          SIGNATURE_PATH="$TARBALL_PATH.asc"
           
-          echo "📦 Uploading: $TARBALL_NAME"
+          # Verify both files exist
+          if [ ! -f "$TARBALL_PATH" ]; then
+            echo "Error: Tarball not found at $TARBALL_PATH"
+            exit 1
+          fi
+          
+          if [ ! -f "$SIGNATURE_PATH" ]; then
+            echo "Error: Signature not found at $SIGNATURE_PATH"
+            exit 1
+          fi
+          
+          # Upload tarball and signature to S3
+          echo "📦 Uploading tarball: $TARBALL_NAME"
           aws s3 cp "$TARBALL_PATH" \
             "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME"
+          
+          echo "📦 Uploading signature: $TARBALL_NAME.asc"
+          aws s3 cp "$SIGNATURE_PATH" \
+            "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME.asc"
+          
+          echo "✓ Upload complete"
 
       - name: Verify buildcache upload
+        timeout-minutes: 360
         run: |
           echo "✅ Slurm dependencies buildcache published successfully!"
           echo "📦 Slurm Version: ${{ matrix.slurm_version }}"
           echo "📦 Compiler: GCC ${{ matrix.compiler_version }}"
-          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/"
-          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/"
+          echo "🔗 S3 Bucket: s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.compiler_version }}/${{ matrix.slurm_version }}/"
+          echo "🔗 CloudFront URL: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.compiler_version }}/${{ matrix.slurm_version }}/"
           
           # Verify files exist in S3
           echo ""
@@ -195,6 +306,7 @@ jobs:
           aws s3 ls "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME" | head -20 || echo "Warning: Could not list buildcache contents"
 
       - name: Test buildcache installation
+        timeout-minutes: 360
         shell: bash
         run: |
           set -e
@@ -242,7 +354,7 @@ jobs:
             spack repo add /opt/slurm-factory-spack-repo/spack_repo/slurm_factory
             spack repo list
             # Find slurm hash in buildcache
-            SLURM_HASH=$(spack buildcache list --allarch | grep "slurm@${SLURM_VERSION}" | grep "%gcc@${COMPILER_VERSION}" | grep "target=x86_64" | awk '{print $1}' | head -1)
+            SLURM_HASH=$(spack buildcache list --allarch | grep "slurm@${SLURM_VERSION}" | grep "%gcc@${COMPILER_VERSION}" | grep "target=x86_64" | awk '\''{print $1}'\'' | head -1)
             if [[ -z "$SLURM_HASH" ]]; then
               echo "Error: No matching slurm hash found in buildcache for slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION} target=x86_64"
               exit 1
@@ -254,13 +366,14 @@ jobs:
             SLURM_DIR=$(spack location -i slurm)
             echo "Slurm installed at: $SLURM_DIR"
             ls -la "$SLURM_DIR/"
-            find "$SLURM_DIR" -type f -name "slurmctld" -o -name "slurmd"
+            find "$SLURM_DIR" -type f ( -name "slurmctld" -o -name "slurmd" )
             echo "✓ Slurm binaries found"
             spack find -v
             echo "✓ Buildcache test completed!"
             '
 
       - name: Summary
+        timeout-minutes: 360
         if: always()
         run: |
           echo "## Slurm Dependencies Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
@@ -284,9 +397,11 @@ jobs:
   summary:
     needs: build-slurm-deps
     runs-on: self-hosted
+    timeout-minutes: 3600
     if: always()
     steps:
       - name: Build Summary
+        timeout-minutes: 360
         run: |
           echo "## Overall Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
