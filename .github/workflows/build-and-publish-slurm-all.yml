@@ -254,7 +254,7 @@ jobs:
             SLURM_DIR=$(spack location -i slurm)
             echo "Slurm installed at: $SLURM_DIR"
             ls -la "$SLURM_DIR/"
-            find "$SLURM_DIR" -type f -name "slurmctld" -o -name "slurmd"
+            find "$SLURM_DIR" -type f \( -name "slurmctld" -o -name "slurmd" \)
             echo "✓ Slurm binaries found"
             spack find -v
             echo "✓ Buildcache test completed!"
