@@ -16,6 +16,7 @@
 
 import logging
 import subprocess
+import sys
 from pathlib import Path
 
 from rich.console import Console
@@ -30,6 +31,36 @@ from .spack_yaml import generate_yaml_string
 # Set up logging following craft-providers pattern
 logger = logging.getLogger(__name__)
 console = Console()
+
+
+def get_data_dir() -> Path:
+    """
+    Get the path to the data directory.
+
+    When installed as a wheel, data files are in share/slurm-factory/
+    When running from source, data files are in data/ at the repository root.
+
+    Returns
+    -------
+        Path to the data directory
+
+    """
+    # Try installed location first (venv/share/slurm-factory/)
+    installed_data = None
+    if sys.prefix != sys.base_prefix:  # We're in a venv
+        installed_data = Path(sys.prefix) / "share" / "slurm-factory"
+        if installed_data.exists():
+            return installed_data
+
+    # Fall back to development/source location (repo_root/data/)
+    package_dir = Path(__file__).parent.parent
+    source_data = package_dir / "data"
+    if source_data.exists():
+        return source_data
+
+    raise FileNotFoundError(
+        f"Could not find data directory. Tried:\n  - {installed_data or 'N/A'}\n  - {source_data}"
+    )
 
 
 def _build_docker_image(
@@ -88,6 +119,19 @@ def _build_docker_image(
             logger.warning(f"Could not find repository root, using current directory: {repo_root}")
         else:
             logger.debug(f"Using repository root as build context: {repo_root}")
+
+        # Ensure data files are available in the build context
+        # If running from installed wheel, copy data files to build context
+        data_source = get_data_dir()
+        data_target = repo_root / "data"
+
+        if data_source != data_target:
+            logger.debug(f"Staging data files from {data_source} to {data_target}")
+            import shutil
+
+            if data_target.exists():
+                shutil.rmtree(data_target)
+            shutil.copytree(data_source, data_target)
 
         # Ensure cache directory exists and is absolute
         if cache_dir:
