@@ -278,11 +278,11 @@ jobs:
           # Upload tarball and signature to S3
           echo "📦 Uploading tarball: $TARBALL_NAME"
           aws s3 cp "$TARBALL_PATH" \
-            "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME"
+            "s3://${{ env.S3_BUCKET }}/builds/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME"
           
           echo "📦 Uploading signature: $TARBALL_NAME.asc"
           aws s3 cp "$SIGNATURE_PATH" \
-            "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME.asc"
+            "s3://${{ env.S3_BUCKET }}/builds/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/$TARBALL_NAME.asc"
           
           echo "✓ Upload complete"
 
