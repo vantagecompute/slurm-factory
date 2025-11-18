@@ -373,7 +373,10 @@ def get_spack_build_script(compiler_version: str) -> str:
             spack compiler list
         }}
         echo '==> Updating buildcache indices...'
-        spack buildcache update-index || echo 'Warning: Failed to update buildcache index'
+        spack buildcache update-index slurm-factory-slurm-buildcache || \\
+            echo 'Warning: Failed to update slurm buildcache index'
+        spack buildcache update-index slurm-factory-compiler-buildcache || \\
+            echo 'Warning: Failed to update compiler buildcache index'
         rm -f spack.lock
         echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
         spack -e . concretize -j $(nproc) -f --fresh
