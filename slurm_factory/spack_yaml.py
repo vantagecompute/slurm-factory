@@ -605,30 +605,29 @@ def generate_spack_config(
                 }
             },
             "mirrors": {
-                # Only use spack-public mirror for source downloads, not binaries
-                # In single-stage builds, we build everything from source
+                # Use slurm-factory buildcache for Slurm dependencies (binaries + sources)
+                # This mirror contains pre-built dependencies for Slurm (munge, pmix, hdf5, etc.)
+                # Spack will use binaries when available, falling back to sources from this mirror
+                # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
+                "slurm-factory-slurm-buildcache": {
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}",
+                    "signed": True,
+                    "binary": True,
+                    "source": True,
+                },
+                # Use slurm-factory buildcache for compiler binaries + sources
+                "slurm-factory-compiler-buildcache": {
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}",
+                    "signed": True,
+                    "binary": True,
+                    "source": True,
+                },
+                # Fallback to public Spack mirror for source downloads only (lowest priority)
                 "spack-public": {
                     "url": "https://mirror.spack.io",
                     "signed": False,
                     "binary": False,
                     "source": True,
-                },
-                # Use slurm-factory buildcache for compiler binaries
-                # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
-                "slurm-factory-compiler-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}",
-                    "signed": True,
-                    "binary": True,
-                    "source": False,
-                },
-                # Use slurm-factory buildcache for Slurm dependencies
-                # This mirrors contains pre-built dependencies for Slurm (munge, pmix, hdf5, etc.)
-                # Spack will use these binaries when available, falling back to source builds when not
-                "slurm-factory-slurm-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}",
-                    "signed": True,
-                    "binary": True,
-                    "source": False,
                 },
             },
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
