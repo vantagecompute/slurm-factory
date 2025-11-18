@@ -899,11 +899,6 @@ def publish_compiler_to_buildcache(
             )
 
         # Add the buildcache push commands
-        # Note: We only push packages that are installed in the environment.
-        #
-        # This is changing:
-        # gcc-runtime and compiler-wrapper are NOT built during compiler phase,
-        # they are built later as dependencies during the Slurm build phase.
         bash_script_parts.extend(
             [
                 "cd /root/compiler-bootstrap",
@@ -913,6 +908,9 @@ def publish_compiler_to_buildcache(
                 # List what we're about to push for debugging
                 "echo '==> Packages in environment:'",
                 "spack find",
+                # Verify gcc-runtime is present
+                "echo '==> Checking for gcc-runtime:'",
+                "spack find gcc-runtime || echo 'WARNING: gcc-runtime not found in environment'",
                 # Add the mirror
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 # Push ALL installed packages from the environment, including dependencies
