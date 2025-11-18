@@ -608,16 +608,17 @@ def generate_spack_config(
                 # Use slurm-factory buildcache for Slurm dependencies (binaries + sources)
                 # This mirror contains pre-built dependencies for Slurm (munge, pmix, hdf5, etc.)
                 # Spack will use binaries when available, falling back to sources from this mirror
-                # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
+                # OCI format buildcache (Spack v1.0+) - Spack automatically appends /v3/manifests/
                 "slurm-factory-slurm-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}",
+                    "url": f"oci://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}",
                     "signed": True,
                     "binary": True,
                     "source": True,
                 },
                 # Use slurm-factory buildcache for compiler binaries + sources
+                # OCI format buildcache (Spack v1.0+)
                 "slurm-factory-compiler-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}",
+                    "url": f"oci://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}",
                     "signed": True,
                     "binary": True,
                     "source": True,
