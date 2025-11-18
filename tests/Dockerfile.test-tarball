@@ -1,0 +1,120 @@
+FROM ubuntu:24.04
+
+# Install dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    lua-posix \
+    lua5.3 \
+    sudo \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Lmod for module management
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    lmod \
+    tcl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Set up environment for Lmod
+ENV BASH_ENV=/etc/profile.d/lmod.sh
+
+# Download and verify the tarball
+ARG SLURM_VERSION=25.11
+ARG COMPILER_VERSION=9.5.0
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz
+
+RUN echo "==> Downloading tarball from ${TARBALL_URL}..." && \
+    curl -fsSL "${TARBALL_URL}" -o /tmp/slurm-software.tar.gz && \
+    echo "==> Download complete. Tarball size:" && \
+    ls -lh /tmp/slurm-software.tar.gz
+
+# Extract tarball to /opt/slurm-factory
+RUN echo "==> Extracting tarball..." && \
+    mkdir -p /opt/slurm-factory && \
+    tar -xzf /tmp/slurm-software.tar.gz -C /opt/slurm-factory && \
+    rm /tmp/slurm-software.tar.gz && \
+    echo "==> Extraction complete. Contents:" && \
+    ls -la /opt/slurm-factory/
+
+# Create basic Slurm configuration using auth/slurm (no munge required)
+RUN mkdir -p /etc/slurm /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm && \
+    cat > /etc/slurm/slurm.conf <<'SLURMCONF'
+# Basic Slurm configuration for testing - using auth/slurm
+ClusterName=test-cluster
+SlurmctldHost=localhost
+AuthType=auth/slurm
+AuthInfo=/etc/slurm/slurm.key
+SlurmUser=root
+SlurmdUser=root
+SlurmctldPort=6817
+SlurmdPort=6818
+StateSaveLocation=/var/spool/slurm/ctld
+SlurmdSpoolDir=/var/spool/slurm/d
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd.log
+SlurmctldPidFile=/var/run/slurmctld.pid
+SlurmdPidFile=/var/run/slurmd.pid
+ProctrackType=proctrack/pgid
+ReturnToService=2
+PluginDir=/opt/slurm-factory/view/lib/slurm
+NodeName=localhost CPUs=4 State=UNKNOWN
+PartitionName=debug Nodes=localhost Default=YES MaxTime=INFINITE State=UP
+SLURMCONF
+
+# Create slurm authentication key
+RUN dd if=/dev/urandom bs=1 count=1024 > /etc/slurm/slurm.key 2>/dev/null && \
+    chmod 600 /etc/slurm/slurm.key
+
+# Create integration test script
+RUN cat > /test-slurm.sh <<'TESTEOF'
+#!/bin/bash
+set -ex
+
+echo "==> Sourcing Lmod initialization..."
+source /etc/profile.d/lmod.sh
+
+echo "==> Setting up module path..."
+export SLURM_INSTALL_PREFIX="/opt/slurm-factory/view"
+export MODULEPATH="/opt/slurm-factory/view/assets/modules:${MODULEPATH}"
+
+echo "==> Loading slurm module..."
+module load slurm
+module list
+
+echo "==> Verifying Slurm binaries..."
+which scontrol && which sinfo && which slurmctld && which slurmd
+
+echo "==> Starting Slurm daemons..."
+slurmctld -D -vvv &
+SLURMCTLD_PID=$!
+sleep 3
+
+slurmd -D -vvv &
+SLURMD_PID=$!
+sleep 5
+
+echo "==> Testing cluster functionality..."
+scontrol ping
+sinfo -Nel
+scontrol show node
+
+echo "==> Submitting test job..."
+srun -N1 hostname
+
+echo "==> Stopping daemons..."
+kill $SLURMD_PID $SLURMCTLD_PID 2>/dev/null || true
+sleep 2
+
+echo ""
+echo "==> SUCCESS! Slurm tarball integration test passed."
+echo "   ✓ Tarball downloaded and extracted"
+echo "   ✓ Module system configured"
+echo "   ✓ Slurm module loaded"
+echo "   ✓ Slurm daemons started successfully"
+echo "   ✓ Cluster communication working"
+echo "   ✓ Job execution tested"
+TESTEOF
+
+RUN chmod +x /test-slurm.sh
+
+CMD ["/bin/bash", "/test-slurm.sh"]
