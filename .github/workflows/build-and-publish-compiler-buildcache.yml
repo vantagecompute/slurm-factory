@@ -249,7 +249,7 @@ jobs:
             # Install GCC from buildcache only (with signature verification)
             echo ""
             echo "Installing GCC ${COMPILER_VERSION} from buildcache with GPG verification..."
-            spack install --use-buildcache only gcc@${COMPILER_VERSION} target=x86_64_v3 2>&1 | tail -50
+            spack install --use-buildcache only gcc@${COMPILER_VERSION} target=x86_64 2>&1 | tail -50
             
             # Verify installation
             echo ""
