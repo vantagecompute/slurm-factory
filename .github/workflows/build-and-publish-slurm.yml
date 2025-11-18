@@ -167,7 +167,7 @@ jobs:
             --compiler-version ${{ matrix.compiler_version }} \
             --gpu \
             --no-cache \
-            --publish=all \
+            --publish=slurm \
             --signing-key "$GPG_KEY_ID" \
             --gpg-private-key "$GPG_PRIVATE_KEY" \
             --gpg-passphrase "$GPG_PASSPHRASE"
