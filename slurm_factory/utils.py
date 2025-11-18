@@ -915,11 +915,18 @@ def publish_compiler_to_buildcache(
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 # Push ALL installed packages from the environment, including dependencies
                 # This ensures gcc-runtime and other dependencies are available in buildcache
-                # Use --force to overwrite existing packages
-                # Use --update-index to regenerate index after pushing
-                # Note: --verbose doesn't exist in Spack v1.0.0
-                # Use --fail-fast to stop on first failure
-                f"spack buildcache push {signing_flags} --force --update-index --fail-fast s3-buildcache",
+                # We need to push each package individually to ensure all dependencies are included
+                # spack buildcache push without specs only pushes root specs, not dependencies
+                "echo '==> Pushing all packages including dependencies to buildcache...'",
+                (
+                    "for pkg in $(spack find --format '{name}/{hash}'); do "
+                    f"echo \"Pushing $pkg...\"; "
+                    f"spack buildcache push {signing_flags} --force s3-buildcache \"/$pkg\" || "
+                    "echo \"Warning: Failed to push $pkg\"; "
+                    "done"
+                ),
+                # Update index after all packages are pushed
+                "spack buildcache update-index s3-buildcache",
                 # Verify upload succeeded
                 "echo '==> Buildcache contents:'",
                 "spack buildcache list --allarch",

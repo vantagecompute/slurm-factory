@@ -203,33 +203,6 @@ jobs:
             # Verify spack works
             spack --version
             
-            # Configure system compiler for bootstrapping
-            echo "Configuring system compiler for bootstrapping..."
-            GCC_VERSION=$(gcc -dumpfullversion -dumpversion)
-            echo "Detected system GCC version: ${GCC_VERSION}"
-            
-            # Create compiler configuration
-            mkdir -p "$SPACK_USER_CONFIG_PATH/linux"
-            printf "%s\n" \
-              "compilers:" \
-              "- compiler:" \
-              "    spec: gcc@${GCC_VERSION}" \
-              "    paths:" \
-              "      cc: /usr/bin/gcc" \
-              "      cxx: /usr/bin/g++" \
-              "      f77: /usr/bin/gfortran" \
-              "      fc: /usr/bin/gfortran" \
-              "    flags: {}" \
-              "    operating_system: ubuntu24.04" \
-              "    target: x86_64" \
-              "    modules: []" \
-              "    environment: {}" \
-              "    extra_rpaths: []" \
-              > "$SPACK_USER_CONFIG_PATH/linux/compilers.yaml"
-            
-            echo "✓ Configured GCC ${GCC_VERSION}"
-            spack compiler list
-            
             # Add buildcache mirror
             MIRROR_URL="${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
             spack mirror add slurm-factory-buildcache "$MIRROR_URL"
@@ -249,7 +222,7 @@ jobs:
             # Install GCC from buildcache only (with signature verification)
             echo ""
             echo "Installing GCC ${COMPILER_VERSION} from buildcache with GPG verification..."
-            spack install --use-buildcache only gcc@${COMPILER_VERSION} target=x86_64_v3 2>&1 | tail -50
+            spack install --use-buildcache only gcc@${COMPILER_VERSION} target=x86_64 2>&1 | tail -50
             
             # Verify installation
             echo ""
