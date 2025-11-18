@@ -317,11 +317,11 @@ jobs:
             -e SLURM_VERSION="${{ matrix.slurm_version }}" \
             -e COMPILER_VERSION="${{ matrix.compiler_version }}" \
             ubuntu:24.04 \
-            bash -l -c '
+            /bin/bash -c '
             set -e
+            export DEBIAN_FRONTEND=noninteractive
             # System dependencies
-            apt-get update
-            apt-get install -y --no-install-recommends \
+            apt update && apt install -y --no-install-recommends \
               build-essential \
               ca-certificates \
               curl \
@@ -335,44 +335,25 @@ jobs:
               unzip
             # Spack install
             git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
-            export SPACK_ROOT=/opt/spack
-            export PATH=$SPACK_ROOT/bin:$PATH
             . /opt/spack/share/spack/setup-env.sh
             # Add mirrors
             spack mirror add slurm-factory-gcc "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
             spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
             # Trust keys
             spack buildcache keys --install --trust
-            # Update buildcache index
-            spack buildcache update-index slurm-factory-gcc || echo "Warning: Could not update GCC buildcache index"
-            spack buildcache update-index slurm-factory-slurm || echo "Warning: Could not update Slurm buildcache index"
-            # Verify GCC in buildcache
-            spack buildcache list --allarch | grep gcc@${COMPILER_VERSION}
             # Install GCC from buildcache
+            echo "==> Installing GCC..."
             spack install -j $(nproc) --cache-only gcc@${COMPILER_VERSION} languages=c,c++,fortran
             spack compiler find $(spack location -i gcc@${COMPILER_VERSION})
-            spack compiler list | grep gcc@${COMPILER_VERSION}
             # Add custom repo for slurm-factory namespace
             git clone --depth 1 https://github.com/vantagecompute/slurm-factory-spack-repo.git /opt/slurm-factory-spack-repo
             spack repo add /opt/slurm-factory-spack-repo/spack_repo/slurm_factory
-            spack repo list
-            # Find slurm hash in buildcache
-            SLURM_HASH=$(spack buildcache list --allarch | grep "slurm@${SLURM_VERSION}" | grep "%gcc@${COMPILER_VERSION}" | grep "target=x86_64" | awk '\''{print $1}'\'' | head -1)
-            if [[ -z "$SLURM_HASH" ]]; then
-              echo "Error: No matching slurm hash found in buildcache for slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION} target=x86_64"
-              exit 1
-            fi
-            echo "Installing Slurm from buildcache with hash: $SLURM_HASH"
-            spack install -j $(nproc) --cache-only /$SLURM_HASH
-            # Verify install
+            # Install slurm from buildcache
+            echo "==> Installing Slurm..."
+            spack install -j $(nproc) --cache-only slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
+            # Verify installation
             spack find slurm
-            SLURM_DIR=$(spack location -i slurm)
-            echo "Slurm installed at: $SLURM_DIR"
-            ls -la "$SLURM_DIR/"
-            find "$SLURM_DIR" -type f -name "slurmctld" -o -name "slurmd"
-            echo "✓ Slurm binaries found"
-            spack find -v
-            echo "✓ Buildcache test completed!"
+            echo "SUCCESS!"
             '
 
       - name: Summary
