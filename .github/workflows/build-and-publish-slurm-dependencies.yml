@@ -177,7 +177,7 @@ jobs:
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   summary:
-    needs: build-slurm-deps
+    needs: build-and-publish-slurm-dependencies
     runs-on: self-hosted
     timeout-minutes: 3600
     if: always()
