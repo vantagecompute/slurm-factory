@@ -609,7 +609,7 @@ def generate_spack_config(
                 # This mirror contains pre-built dependencies for Slurm (munge, pmix, hdf5, etc.)
                 # OCI v3 format buildcache - point directly at the base path containing v3/ directory
                 "slurm-factory-deps-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/{compiler_version}",
+                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/deps/{compiler_version}",
                     "signed": True,
                     "binary": True,
                     "source": False,

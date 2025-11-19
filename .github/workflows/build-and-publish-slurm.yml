@@ -338,7 +338,7 @@ jobs:
             . /opt/spack/share/spack/setup-env.sh
             # Add mirrors
             spack mirror add slurm-factory-gcc "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
-            spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+            spack mirror add slurm-factory-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
             # Trust keys
             spack buildcache keys --install --trust
             # Install GCC from buildcache
@@ -350,7 +350,7 @@ jobs:
             spack repo add /opt/slurm-factory-spack-repo/spack_repo/slurm_factory
             # Install slurm from buildcache
             echo "==> Installing Slurm..."
-            spack install -j $(nproc) --cache-only slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
+            spack install -j $(nproc) slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
             # Verify installation
             spack find slurm
             echo "SUCCESS!"

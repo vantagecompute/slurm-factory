@@ -1047,7 +1047,6 @@ def push_to_buildcache(
         logger.debug("Using AWS credentials from ~/.aws/")
 
     try:
-        console.print(f"[dim]Pushing packages to {s3_mirror_url}...[/dim]")
 
         # Determine signing flags
         if signing_key:
@@ -1058,6 +1057,7 @@ def push_to_buildcache(
             logger.debug("Publishing unsigned packages")
 
         # Determine what to push based on publish_mode
+        s3_mirror_url = f"{s3_bucket}/slurm/{version}/{compiler_version}"
         if publish_mode == "slurm":
             # Push only slurm package
             push_cmd = f"spack buildcache push {signing_flags} --force --update-index s3-buildcache slurm"
@@ -1066,6 +1066,7 @@ def push_to_buildcache(
                 "echo 'Warning: Could not update buildcache index'"
             )
         elif publish_mode == "deps":
+            s3_mirror_url = f"{s3_bucket}/deps/{compiler_version}"
             # Push only dependencies (everything except slurm)
             push_cmd = (
                 f"spack -e . buildcache push {signing_flags} --force "
@@ -1083,6 +1084,7 @@ def push_to_buildcache(
                 "echo 'Warning: Could not update buildcache index'"
             )
 
+        console.print(f"[dim]Pushing packages to {s3_mirror_url}...[/dim]")
         # Build docker run command with AWS environment variables
         cmd = ["docker", "run", "--rm"]
 
