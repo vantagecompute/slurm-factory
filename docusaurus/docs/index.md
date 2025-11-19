@@ -57,12 +57,16 @@ All GCC toolchains are GPG-signed and include matching glibc for cross-distro co
 | 25.11 | 10.5.0 | CPU | RHEL 8 / Ubuntu 20.04 compatibility |
 | 24.11 | 7.5.0 | CPU | RHEL 7 / maximum backward compatibility |
 
-All 27 version combinations are GPG-signed and available in the buildcache:
+All 27 version combinations are GPG-signed and available in the buildcache with a three-tier mirror architecture:
 
 ```text
 https://slurm-factory-spack-binary-cache.vantagecompute.ai/
-├── compilers/<GCC_VERSION>/      # GPG-signed compiler packages
-└── slurm/<SLURM_VERSION>/<GCC_VERSION>/  # GPG-signed Slurm packages
+├── compilers/<GCC_VERSION>/         # GPG-signed compiler toolchains
+├── deps/<GCC_VERSION>/              # GPG-signed Slurm dependencies
+├── slurm/<SLURM_VERSION>/<GCC_VERSION>/  # GPG-signed Slurm packages
+└── builds/<SLURM_VERSION>/<GCC_VERSION>/ # Pre-built tarballs with signatures
+    ├── slurm-<VERSION>-gcc<VERSION>-software.tar.gz
+    └── slurm-<VERSION>-gcc<VERSION>-software.tar.gz.asc  # GPG signature
 ```
 
 ## GPG Package Signing
@@ -99,13 +103,47 @@ Choose your installation method:
 git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
 source spack/share/spack/setup-env.sh
 
-# Add buildcache and install Slurm (5-15 minutes)
-spack mirror add slurm-factory https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+# Set versions and configure three-tier mirrors
+SLURM_VERSION=25.11
+COMPILER_VERSION=15.2.0
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+
+# Import GPG keys and install Slurm (5-15 minutes)
 spack buildcache keys --install --trust
-spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
+spack install slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION} target=x86_64_v3
 ```
 
 **→ See the complete guide:** [Installing Slurm from Buildcache](installing-slurm-from-buildcache.md)
+
+### Option 1b: Download Pre-built Tarball (Alternative)
+
+Download a complete Slurm installation as a GPG-signed tarball:
+
+```bash
+# Set versions
+SLURM_VERSION=25.11
+COMPILER_VERSION=15.2.0
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Download tarball and GPG signature
+wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz"
+wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc"
+
+# Import GPG key and verify signature
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz
+
+# Extract and install (only if signature is valid!)
+sudo tar -xzf slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz -C /opt/
+cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
+```
+
+**→ See GPG verification guide:** [Verifying GPG Signatures](../VERIFY_GPG_SIGNATURE.md)
 
 ### Option 2: Build Custom Slurm with slurm-factory Tool
 

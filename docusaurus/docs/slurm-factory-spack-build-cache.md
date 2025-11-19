@@ -4,11 +4,11 @@ The Slurm Factory Spack Build Cache is a public, **GPG-signed** binary package r
 
 ## Overview
 
-The build cache is a **CloudFront-distributed S3 bucket** containing:
+The build cache is a **CloudFront-distributed S3 bucket** with a **three-tier mirror architecture**:
 
 - **GCC Compiler Toolchains** (versions 7.5.0 through 15.2.0) - **9 versions**
+- **Slurm Dependencies** - Pre-built dependencies for each compiler version
 - **Slurm Packages** (versions 23.11, 24.11, 25.11) - **3 versions**
-- **All Dependencies** (OpenMPI, PMIx, Munge, HDF5, CUDA, ROCm, etc.)
 - **Total: 27 Slurm combinations** (3 Slurm × 9 GCC versions)
 
 All packages are:
@@ -31,34 +31,59 @@ No AWS credentials are required for read access.
 
 ## Directory Structure
 
+The buildcache uses a three-tier architecture for optimal caching:
+
 ```text
 slurm-factory-spack-binary-cache.vantagecompute.ai/
 ├── compilers/
-│   ├── 15.2.0/                  # GCC 15.2.0 (latest, glibc 2.40)
-│   ├── 14.2.0/                  # GCC 14.2.0 (latest GCC 14, glibc 2.39)
-│   ├── 13.4.0/                  # GCC 13.4.0 (default, glibc 2.39)
-│   ├── 12.5.0/                  # GCC 12.5.0 (glibc 2.35)
-│   ├── 11.5.0/                  # GCC 11.5.0 (Ubuntu 22.04, glibc 2.35)
-│   ├── 10.5.0/                  # GCC 10.5.0 (RHEL 8/Ubuntu 20.04, glibc 2.31)
-│   ├── 9.5.0/                   # GCC 9.5.0 (glibc 2.28)
-│   ├── 8.5.0/                   # GCC 8.5.0 (RHEL 8, glibc 2.28)
-│   └── 7.5.0/                   # GCC 7.5.0 (RHEL 7, glibc 2.17, max compatibility)
-└── slurm/
-    ├── 25.11/                   # Slurm 25.11 (latest)
-    │   ├── 15.2.0/              # Slurm 25.11 + deps built with GCC 15.2.0
-    │   ├── 14.2.0/              # Slurm 25.11 + deps built with GCC 14.2.0
-    │   ├── 13.4.0/              # Slurm 25.11 + deps built with GCC 13.4.0
-    │   ├── 12.5.0/              # Slurm 25.11 + deps built with GCC 12.5.0
-    │   ├── 11.5.0/              # Slurm 25.11 + deps built with GCC 11.5.0
-    │   ├── 10.5.0/              # Slurm 25.11 + deps built with GCC 10.5.0
-    │   ├── 9.5.0/               # Slurm 25.11 + deps built with GCC 9.5.0
-    │   ├── 8.5.0/               # Slurm 25.11 + deps built with GCC 8.5.0
-    │   └── 7.5.0/               # Slurm 25.11 + deps built with GCC 7.5.0
-    ├── 24.11/                   # Slurm 24.11 (LTS) - 9 GCC versions
-    └── 23.11/                   # Slurm 23.11 (stable) - 9 GCC versions
+│   ├── 15.2.0/                  # GCC 15.2.0 build toolchain (GPG-signed)
+│   ├── 14.2.0/                  # GCC 14.2.0 build toolchain (GPG-signed)
+│   ├── 13.4.0/                  # GCC 13.4.0 build toolchain (default, GPG-signed)
+│   ├── 12.5.0/                  # GCC 12.5.0 build toolchain (GPG-signed)
+│   ├── 11.5.0/                  # GCC 11.5.0 build toolchain (Ubuntu 22.04, GPG-signed)
+│   ├── 10.5.0/                  # GCC 10.5.0 build toolchain (RHEL 8/Ubuntu 20.04, GPG-signed)
+│   ├── 9.5.0/                   # GCC 9.5.0 build toolchain (GPG-signed)
+│   ├── 8.5.0/                   # GCC 8.5.0 build toolchain (RHEL 8, GPG-signed)
+│   └── 7.5.0/                   # GCC 7.5.0 build toolchain (RHEL 7, max compatibility, GPG-signed)
+├── deps/
+│   ├── 15.2.0/                  # Slurm dependencies built with GCC 15.2.0 (GPG-signed)
+│   ├── 14.2.0/                  # Slurm dependencies built with GCC 14.2.0 (GPG-signed)
+│   ├── 13.4.0/                  # Slurm dependencies built with GCC 13.4.0 (GPG-signed)
+│   └── ...                      # All GCC versions (GPG-signed)
+├── slurm/
+│   ├── 25.11/                   # Slurm 25.11 (latest)
+│   │   ├── 15.2.0/              # Slurm 25.11 built with GCC 15.2.0 (GPG-signed)
+│   │   ├── 14.2.0/              # Slurm 25.11 built with GCC 14.2.0 (GPG-signed)
+│   │   ├── 13.4.0/              # Slurm 25.11 built with GCC 13.4.0 (GPG-signed)
+│   │   └── ...                  # All 9 GCC versions (GPG-signed)
+│   ├── 24.11/                   # Slurm 24.11 (LTS) - All GCC versions
+│   └── 23.11/                   # Slurm 23.11 (stable) - All GCC versions
+└── builds/
+    ├── 25.11/
+    │   ├── 15.2.0/
+    │   │   ├── slurm-25.11-gcc15.2.0-software.tar.gz      # Complete tarball
+    │   │   └── slurm-25.11-gcc15.2.0-software.tar.gz.asc  # GPG signature
+    │   ├── 14.2.0/
+    │   │   ├── slurm-25.11-gcc14.2.0-software.tar.gz
+    │   │   └── slurm-25.11-gcc14.2.0-software.tar.gz.asc
+    │   └── ...                  # All GCC versions
+    ├── 24.11/
+    │   └── ...                  # All GCC versions with tarballs + signatures
+    └── 23.11/
+        └── ...                  # All GCC versions with tarballs + signatures
 ```
 
 **All 27 combinations are GPG-signed and ready to install.**
+
+### Three-Tier Architecture Benefits
+
+The separation of compiler toolchain, dependencies, and Slurm packages provides:
+
+- ✅ **Faster builds** - Compiler toolchain cached across all Slurm versions
+- ✅ **Better caching** - Dependencies shared across Slurm versions
+- ✅ **Reduced storage** - No duplication of common packages
+- ✅ **Parallel downloads** - Spack fetches from multiple mirrors simultaneously
+- ✅ **Easier updates** - Update dependencies independently of Slurm versions
 
 ## GPG Package Signing
 
@@ -139,24 +164,55 @@ Install GPG-signed Slurm from the build cache in 5-15 minutes:
 git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
 source spack/share/spack/setup-env.sh
 
-# 2. Add compiler buildcache mirror
-spack mirror add slurm-factory-compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0
+# 2. Set versions
+SLURM_VERSION=25.11
+COMPILER_VERSION=15.2.0
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
-# 3. Add Slurm buildcache mirror
-spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+# 3. Add three-tier mirrors
+spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
 
 # 4. Import and trust GPG signing keys (enables automatic signature verification)
 spack buildcache keys --install --trust
 
 # 5. Install GPG-signed Slurm from buildcache (5-15 minutes!)
-spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
+spack install slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION} target=x86_64_v3
 
 # 6. Load and verify
-spack load slurm@25.11
+spack load slurm@${SLURM_VERSION}
 sinfo --version
 # Output: slurm 25.11.4
+```
+
+### Download Pre-built Tarball
+
+Alternatively, download a complete Slurm installation as a signed tarball:
+
+```bash
+# Set versions
+SLURM_VERSION=25.11
+COMPILER_VERSION=15.2.0
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Download tarball and GPG signature
+wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz"
+wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc"
+
+# Import GPG key
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+
+# Verify signature (REQUIRED - do not skip!)
+gpg --verify slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz
+
+# Expected output:
+# gpg: Good signature from "Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key) <info@vantagecompute.ai>"
+
+# Extract and install
+sudo tar -xzf slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz -C /opt/
+cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 ```
 
 ### Using with slurm-factory CLI
@@ -168,10 +224,11 @@ The `slurm-factory` CLI can leverage the build cache automatically:
 pip install slurm-factory
 
 # Build uses buildcache by default for dependencies
-slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+slurm-factory build --slurm-version 25.11 --compiler-version 15.2.0
 ```
 
 The CLI will:
+
 1. Pull the compiler from the buildcache (if available)
 2. Pull all Slurm dependencies from the buildcache
 3. Only compile Slurm itself from source
@@ -287,18 +344,26 @@ spack install --cache-only pmix@5.0.3
 ### Use Multiple Mirrors
 
 ```bash
-# Add multiple buildcache mirrors (Spack will try in order)
-spack mirror add compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+# Set CloudFront URL
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
-spack mirror add slurm-deps \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+# Add three-tier mirrors for multiple versions
+# Slurm 25.11 with GCC 15.2.0
+spack mirror add slurm-25-gcc15-toolchain "${CLOUDFRONT_URL}/compilers/15.2.0"
+spack mirror add slurm-25-gcc15-deps "${CLOUDFRONT_URL}/deps/15.2.0"
+spack mirror add slurm-25-gcc15 "${CLOUDFRONT_URL}/slurm/25.11/15.2.0"
+
+# Slurm 24.11 with GCC 13.4.0
+spack mirror add slurm-24-gcc13-toolchain "${CLOUDFRONT_URL}/compilers/13.4.0"
+spack mirror add slurm-24-gcc13-deps "${CLOUDFRONT_URL}/deps/13.4.0"
+spack mirror add slurm-24-gcc13 "${CLOUDFRONT_URL}/slurm/24.11/13.4.0"
 
 # Import GPG signing keys from all mirrors
 spack buildcache keys --install --trust
 
 # Install with verified signatures
-spack install slurm@25.11
+spack install slurm@25.11%gcc@15.2.0  # Uses slurm-25-gcc15 mirrors
+spack install slurm@24.11%gcc@13.4.0  # Uses slurm-24-gcc13 mirrors
 ```
 
 ### Cache-Only Installation

@@ -17,11 +17,13 @@
 import pytest
 import yaml
 
-from slurm_factory.constants import (
-    CONTAINER_SPACK_PROJECT_DIR,
-    get_dockerfile,
-    get_spack_build_script,
-)
+from slurm_factory.constants import CONTAINER_SPACK_PROJECT_DIR
+from slurm_factory.builders.slurm_builder import _get_slurm_builder_dockerfile
+from slurm_factory.builders.slurm_builder import get_slurm_build_script
+
+# Create aliases for backward compatibility in tests
+get_dockerfile = _get_slurm_builder_dockerfile
+get_spack_build_script = get_slurm_build_script
 from slurm_factory.spack_yaml import (
     generate_compiler_bootstrap_config,
     generate_compiler_bootstrap_yaml,
@@ -129,9 +131,9 @@ class TestSlurmEnvironmentConfig:
         
         # The buildcache mirror should be configured to provide gcc binaries
         mirrors = config["spack"]["mirrors"]
-        assert "slurm-factory-buildcache" in mirrors
+        assert "slurm-factory-compiler-buildcache" in mirrors
         # Note: Spack adds build_cache/ subdirectory automatically
-        assert f"compilers/{compiler_version}" in mirrors["slurm-factory-buildcache"]["url"]
+        assert f"compilers/{compiler_version}" in mirrors["slurm-factory-compiler-buildcache"]["url"]
         
     def test_slurm_env_has_empty_compilers_list(self):
         """Test that Slurm environment starts with empty compilers list."""
@@ -207,7 +209,7 @@ class TestDockerfileBuildScript:
         spack_yaml = generate_yaml_string("25.11", compiler_version="13.4.0")
         dockerfile = get_dockerfile(
             spack_yaml_content=spack_yaml,
-            version="25.11",
+            slurm_version="25.11",
             compiler_version="13.4.0",
         )
         
@@ -230,7 +232,7 @@ class TestCompilerBootstrapIntegration:
         spack_yaml = generate_yaml_string("25.11", compiler_version="13.4.0")
         dockerfile = get_dockerfile(
             spack_yaml_content=spack_yaml,
-            version="25.11",
+            slurm_version="25.11",
             compiler_version="13.4.0",
         )
         
@@ -275,10 +277,10 @@ class TestCompilerBootstrapIntegration:
         # Compiler bootstrap config should prevent system GCC from being detected
         assert compiler_config["spack"]["packages"]["gcc"]["externals"] == []
         
-        # Both configs should reference the same buildcache
-        assert "slurm-factory-buildcache" in slurm_config["spack"]["mirrors"]
+        # Both configs should reference the compiler buildcache
+        assert "slurm-factory-compiler-buildcache" in slurm_config["spack"]["mirrors"]
         # Note: Spack adds build_cache/ subdirectory automatically
-        assert f"compilers/{compiler_version}" in slurm_config["spack"]["mirrors"]["slurm-factory-buildcache"]["url"]
+        assert f"compilers/{compiler_version}" in slurm_config["spack"]["mirrors"]["slurm-factory-compiler-buildcache"]["url"]
 
 
 if __name__ == "__main__":

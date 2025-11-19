@@ -64,7 +64,7 @@ class TestLibmdRuntimeDependency:
 
     def test_libmd_dev_in_system_deps(self):
         """Verify libmd-dev is available during builds."""
-        from slurm_factory.constants import get_install_system_deps_script
+        from slurm_factory.utils import get_install_system_deps_script
 
         deps_script = get_install_system_deps_script()
 

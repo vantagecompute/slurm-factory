@@ -162,7 +162,7 @@ jobs:
             exit 1
           fi
           echo "Using GPG signing key: $GPG_KEY_ID"
-          uv run slurm-factory build \
+          uv run slurm-factory build-slurm \
             --slurm-version ${{ matrix.slurm_version }} \
             --compiler-version ${{ matrix.compiler_version }} \
             --gpu \

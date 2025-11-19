@@ -1,102 +1,258 @@
 # How to Verify GPG Signatures
 
-## What Happened in the Docker Build
+This guide explains how to verify GPG signatures for Slurm Factory packages, both for Spack buildcache packages and standalone tarballs.
 
-During the build, we:
-1. **Created** a tarball: `slurm-25.11-gcc13.4.0-software.tar.gz`
-2. **Signed** it with our GPG key, creating: `slurm-25.11-gcc13.4.0-software.tar.gz.asc`
-3. **Verified** the signature to prove authenticity
+## Overview
 
-## How Users Verify Signatures
+All Slurm Factory packages are GPG-signed with key `DFB92630BCA5AB71` for security and integrity verification:
 
-### Step 1: Get the Public Key
+- **Spack buildcache packages** - Automatically verified by Spack during installation
+- **Standalone tarballs** - Must be manually verified before extraction
 
-Users need to import the **public** GPG key (not the private key):
+**Why verify signatures?**
+
+- ✅ **Authenticity** - Confirms packages came from Vantage Compute
+- ✅ **Integrity** - Ensures no tampering or corruption during download
+- ✅ **Security** - Protects against man-in-the-middle attacks
+- ✅ **Trust** - Establishes provenance for production deployments
+
+## GPG Key Information
+
+**Signing Key Details:**
+
+- **Key ID**: `DFB92630BCA5AB71`
+- **Owner**: Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key)
+- **Email**: `info@vantagecompute.ai`
+- **Type**: RSA 4096-bit
+
+## Verifying Standalone Tarballs
+
+### Step 1: Download Tarball and Signature
 
 ```bash
-# Import the public key from a keyserver
+# Set versions
+SLURM_VERSION=25.11
+COMPILER_VERSION=15.2.0
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Download tarball
+wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz"
+
+# Download GPG signature (.asc file)
+wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc"
+```
+
+### Step 2: Import the Public GPG Key
+
+```bash
+# Import from keyserver (recommended)
 gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
 
-# Or import from a file if you publish the public key
-gpg --import vantage-compute-public.key
+# Alternative: Import from the buildcache
+curl https://slurm-factory-spack-binary-cache.vantagecompute.ai/build_cache/_pgp/DFB92630BCA5AB71.pub | gpg --import
+
+# Verify the key was imported
+gpg --list-keys DFB92630BCA5AB71
 ```
 
-### Step 2: Verify the Signature
+**Expected output:**
 
-Once the public key is imported, anyone can verify the tarball:
+```text
+pub   rsa4096 2025-XX-XX [SC]
+      XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+uid           [ unknown] Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key) <info@vantagecompute.ai>
+sub   rsa4096 2025-XX-XX [E]
+```
+
+### Step 3: Verify the Signature
 
 ```bash
-gpg --verify slurm-25.11-gcc13.4.0-software.tar.gz.asc slurm-25.11-gcc13.4.0-software.tar.gz
+# Verify tarball signature
+gpg --verify slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz
 ```
 
-This will output:
-```
+**Expected output for valid signature:**
+
+```text
 gpg: Signature made Sun Nov 17 14:48:23 2025 UTC
 gpg:                using RSA key DFB92630BCA5AB71
-gpg: Good signature from "Vantage Compute Corporation (Slurm Factory Spack Build Cache Signing Key) <info@vantagecompute.ai>"
+gpg: Good signature from "Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key) <info@vantagecompute.ai>" [unknown]
+gpg: WARNING: This key is not certified with a trusted signature!
+gpg:          There is no indication that the signature belongs to the owner.
+Primary key fingerprint: XXXX XXXX XXXX XXXX XXXX  XXXX DFB9 2630 BCA5 AB71
 ```
 
-### Step 3: Trust the Key (Optional)
+**Key indicators:**
 
-To avoid "untrusted signature" warnings, users can mark your key as trusted:
+- ✅ `Good signature from "Vantage Compute Corporation"` - **REQUIRED**
+- ⚠️ `WARNING: This key is not certified` - **EXPECTED** (see Step 4 to resolve)
+- ❌ `BAD signature` - **STOP! Do not use the tarball**
+
+### Step 4: Trust the Key (Optional)
+
+The "untrusted signature" warning appears because you haven't explicitly trusted the key. To remove this warning:
 
 ```bash
+# Start GPG key editor
 gpg --edit-key DFB92630BCA5AB71
-# Then type: trust
-# Choose: 5 (I trust ultimately)
-# Type: quit
+
+# In the GPG prompt, type:
+trust
+
+# Choose trust level:
+# 5 = I trust ultimately (recommended for production)
+# 4 = I trust fully
+# 3 = I trust marginally
+
+# Type: 5 <ENTER>
+# Type: quit <ENTER>
 ```
 
-## Publishing Best Practices
-
-### 1. Publish Your Public Key
-
-Export and publish your public key so users can import it:
+After trusting the key, re-verify:
 
 ```bash
-# Export the public key
-gpg --armor --export DFB92630BCA5AB71 > vantage-compute-public.key
-
-# Upload to keyservers
-gpg --keyserver keyserver.ubuntu.com --send-keys DFB92630BCA5AB71
-gpg --keyserver keys.openpgp.org --send-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz
 ```
 
-### 2. Include Instructions in Documentation
+Now the output should show:
 
-Add to your docs:
-
-```markdown
-## Verify Downloaded Packages
-
-All Slurm Factory packages are GPG-signed. To verify:
-
-1. Import our public key:
-   \`\`\`bash
-   gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
-   \`\`\`
-
-2. Verify the signature:
-   \`\`\`bash
-   gpg --verify slurm-VERSION-gccVERSION-software.tar.gz.asc slurm-VERSION-gccVERSION-software.tar.gz
-   \`\`\`
+```text
+gpg: Good signature from "Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key) <info@vantagecompute.ai>" [ultimate]
 ```
 
-### 3. Store Signatures Alongside Tarballs in S3
+### Step 5: Extract and Use
+
+**Only proceed if signature verification succeeded!**
 
 ```bash
-# Upload both files to S3
-aws s3 cp slurm-25.11-gcc13.4.0-software.tar.gz s3://bucket/builds/
-aws s3 cp slurm-25.11-gcc13.4.0-software.tar.gz.asc s3://bucket/builds/
+# Extract tarball
+sudo tar -xzf slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz -C /opt/
+
+# Install
+cd /opt
+sudo ./data/slurm_assets/slurm_install.sh --full-init
+
+# Verify installation
+module load slurm/${SLURM_VERSION}
+sinfo --version
 ```
 
-## What the Signature Proves
+## Verifying Spack Buildcache Packages
 
-✅ **Authenticity**: The file was created by someone with access to the private key  
-✅ **Integrity**: The file hasn't been modified since signing  
-✅ **Non-repudiation**: Can't deny signing the file
+Spack automatically verifies GPG signatures for buildcache packages.
 
-## Testing Verification Locally
+### Step 1: Import GPG Keys
+
+```bash
+# Set up Spack mirrors
+SLURM_VERSION=25.11
+COMPILER_VERSION=15.2.0
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+
+# Import and trust all GPG keys from buildcaches
+spack buildcache keys --install --trust
+```
+
+This command:
+
+1. Downloads all GPG public keys from `_pgp/` directories in the mirrors
+2. Imports them into Spack's GPG keyring
+3. Marks them as trusted for package verification
+
+### Step 2: Verify Key Import
+
+```bash
+# List imported keys in Spack
+spack gpg list
+
+# Expected output includes:
+# DFB92630BCA5AB71 Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key) <info@vantagecompute.ai>
+```
+
+### Step 3: Install with Automatic Verification
+
+```bash
+# Install Slurm (signatures verified automatically)
+spack install slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION}
+
+# Spack will:
+# 1. Download each package
+# 2. Verify GPG signature
+# 3. Abort installation if any signature is invalid
+```
+
+### Manual Package Verification
+
+To manually check a specific package signature:
+
+```bash
+# Check package in buildcache
+spack buildcache check slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION}
+
+# List all packages and their signatures
+spack buildcache list --allarch
+```
+
+## Troubleshooting
+
+### "No public key" Error
+
+If you see:
+
+```text
+gpg: Can't check signature: No public key
+```
+
+**Solution:** Import the public key (Step 2 above)
+
+### "BAD signature" Error
+
+If you see:
+
+```text
+gpg: BAD signature from "Vantage Compute Corporation"
+```
+
+**This means the file has been tampered with or is corrupted!**
+
+**DO NOT use the tarball.** Instead:
+
+1. Delete the downloaded files
+2. Re-download from the official source
+3. Verify signature again
+4. Contact info@vantagecompute.ai if the issue persists
+
+### Wrong Key ID
+
+If verification shows a different key ID:
+
+```text
+gpg: Signature made by key XXXXXXXXXXXXXXXX
+```
+
+**This is NOT a Vantage Compute package!**
+
+Only trust signatures from key `DFB92630BCA5AB71`.
+
+### Expired Key
+
+If the key has expired, you'll see:
+
+```text
+gpg: Good signature from "..." [expired]
+```
+
+**Solution:** Re-import the key to get the latest expiration date:
+
+```bash
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+```
 
 Extract the signature and tarball from the container:
 

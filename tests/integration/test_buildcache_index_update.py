@@ -52,7 +52,7 @@ class TestBuildcacheIndexUpdate:
 
     def test_compiler_workflow_updates_index(self):
         """Test that compiler buildcache workflow updates index after adding mirror."""
-        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-compiler.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
@@ -71,8 +71,8 @@ class TestBuildcacheIndexUpdate:
             "buildcache update-index should come after mirror add"
 
     def test_slurm_workflow_updates_index(self):
-        """Test that slurm buildcache workflow trusts keys and lists packages."""
-        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
+        """Test that slurm buildcache workflow trusts keys and uses cache-only installation."""
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-slurm.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
@@ -82,19 +82,19 @@ class TestBuildcacheIndexUpdate:
         assert "spack buildcache keys --install --trust" in run_script, \
             "Workflow should install and trust buildcache keys"
         
-        # Should list buildcache to verify contents
-        assert "spack buildcache list" in run_script, \
-            "Workflow should list buildcache packages"
+        # Modern approach uses --cache-only flag instead of listing
+        assert "--cache-only" in run_script, \
+            "Workflow should use --cache-only for buildcache installation"
         
-        # Ensure keys are installed before listing/installing
+        # Ensure keys are installed before installing from buildcache
         keys_pos = run_script.find("spack buildcache keys")
-        list_pos = run_script.find("spack buildcache list")
-        assert keys_pos < list_pos, \
-            "buildcache keys should be installed before listing packages"
+        install_pos = run_script.find("--cache-only")
+        assert keys_pos < install_pos, \
+            "buildcache keys should be installed before installing packages"
 
     def test_compiler_workflow_structure(self):
         """Test that compiler workflow has proper structure for buildcache testing."""
-        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-compiler-buildcache.yml"
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-compiler.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
@@ -125,7 +125,7 @@ class TestBuildcacheIndexUpdate:
 
     def test_slurm_workflow_structure(self):
         """Test that slurm workflow has proper structure for buildcache testing."""
-        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-slurm-all.yml"
+        workflow_path = Path(__file__).parent.parent.parent / ".github" / "workflows" / "build-and-publish-slurm.yml"
         
         test_step = self._find_test_step(workflow_path)
         assert test_step is not None, "Test buildcache installation step not found"
@@ -135,24 +135,20 @@ class TestBuildcacheIndexUpdate:
         # Verify the order of operations (modern Spack 1.0+ approach):
         # 1. Add mirrors
         # 2. Install and trust keys
-        # 3. List packages (implicit index update)
-        # 4. Install from buildcache
+        # 3. Install from buildcache using --cache-only
         
         first_mirror_add = run_script.find("spack mirror add")
         keys_pos = run_script.find("spack buildcache keys")
-        list_pos = run_script.find("spack buildcache list")
-        install_pos = run_script.find("spack install")
+        install_pos = run_script.find("--cache-only")
         
         # All commands should be present
         assert first_mirror_add >= 0, "mirror add should be present"
         assert keys_pos >= 0, "buildcache keys should be present"
-        assert list_pos >= 0, "buildcache list should be present"
-        assert install_pos >= 0, "install should be present"
+        assert install_pos >= 0, "--cache-only install should be present"
         
         # Check order
         assert first_mirror_add < keys_pos, "mirror add should come before keys install"
-        assert keys_pos < list_pos, "keys install should come before list"
-        assert list_pos < install_pos, "list should come before install"
+        assert keys_pos < install_pos, "keys install should come before cache-only install"
 
 
 if __name__ == "__main__":
