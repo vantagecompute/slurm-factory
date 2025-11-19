@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: "Build and Publish Slurm Dependencies for All Compilers"
+name: "Build and Publish Slurm"
 
 on:
   workflow_dispatch:
