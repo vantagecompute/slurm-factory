@@ -66,8 +66,8 @@ spack mirror add slurm-factory-compilers \
 
 # Add Slurm dependencies buildcache mirror
 echo "==> Adding Slurm dependencies buildcache mirror..."
-spack mirror add slurm-factory-slurm \
-  "${BASE_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+spack mirror add slurm-factory-slurm-deps \
+  "${BASE_URL}/deps/${COMPILER_VERSION}"
 
 # Trust GPG keys from all mirrors
 echo "==> Importing GPG signing keys..."
@@ -93,10 +93,9 @@ spack compiler find $(spack location -i gcc@${COMPILER_VERSION})
 
 # Add custom Spack repo for slurm-factory namespace
 echo "==> Adding custom Spack repository..."
-git clone --depth 1 https://github.com/vantagecompute/slurm-factory-spack-repo.git /opt/slurm-factory-spack-repo
-spack repo add /opt/slurm-factory-spack-repo/spack_repo/slurm_factory
+spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo.git /opt/slurm-factory-spack-repo
 
-# Check what's available in the Slurm buildcache
+# Check whats available in the Slurm buildcache
 echo "==> Checking Slurm buildcache contents..."
 spack buildcache list --allarch | head -30 || echo "Could not list buildcache"
 
@@ -105,11 +104,10 @@ echo "==> Installing Slurm ${SLURM_VERSION}..."
 if spack buildcache list slurm@${SLURM_VERSION} | grep -q "slurm@${SLURM_VERSION}"; then
     echo "   Found Slurm in buildcache"
     # Try cache-only first, fall back to mixed mode
-    spack install slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION} || \
     spack install slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
 else
     echo "   Slurm not in buildcache, checking dependencies..."
-    # Even if Slurm isn't in cache, dependencies might be
+    # Even if Slurm isnt in cache, dependencies might be
     spack install slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
 fi
 

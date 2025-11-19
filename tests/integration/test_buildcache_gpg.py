@@ -21,7 +21,12 @@ from unittest.mock import Mock, patch
 import pytest
 
 from slurm_factory.exceptions import SlurmFactoryError
-from slurm_factory.utils import publish_compiler_to_buildcache, push_to_buildcache
+from slurm_factory.builders.toolchain_builder import _publish_compiler_to_buildcache
+from slurm_factory.builders.slurm_builder import _push_slurm_to_buildcache
+
+# Create aliases for the tests
+publish_compiler_to_buildcache = _publish_compiler_to_buildcache
+push_to_buildcache = _push_slurm_to_buildcache
 
 
 class TestGPGKeyImport:
@@ -53,9 +58,7 @@ class TestGPGKeyImport:
             # Call the function with GPG key
             publish_compiler_to_buildcache(
                 image_tag="test:latest",
-                cache_dir="/tmp/test",
                 compiler_version="10.5.0",
-                verbose=True,
                 signing_key="0xTESTKEY",
                 gpg_private_key=mock_gpg_key,
             )
@@ -102,10 +105,9 @@ class TestGPGKeyImport:
             # Call the function with GPG key
             push_to_buildcache(
                 image_tag="test:latest",
-                version="25.11",
+                slurm_version="25.11",
                 compiler_version="10.5.0",
                 publish_mode="all",
-                verbose=True,
                 signing_key="0xTESTKEY",
                 gpg_private_key=mock_gpg_key,
             )
@@ -149,9 +151,7 @@ class TestGPGKeyImport:
             # Call the function with GPG key
             publish_compiler_to_buildcache(
                 image_tag="test:latest",
-                cache_dir="/tmp/test",
                 compiler_version="10.5.0",
-                verbose=False,
                 signing_key="0xTESTKEY",
                 gpg_private_key=mock_gpg_key,
             )
@@ -188,9 +188,7 @@ class TestGPGKeyImport:
             # Call the function without GPG key
             publish_compiler_to_buildcache(
                 image_tag="test:latest",
-                cache_dir="/tmp/test",
                 compiler_version="10.5.0",
-                verbose=False,
                 signing_key=None,
                 gpg_private_key=None,
             )
@@ -214,10 +212,9 @@ class TestGPGKeyImport:
             # Call the function without GPG key
             push_to_buildcache(
                 image_tag="test:latest",
-                version="25.11",
+                slurm_version="25.11",
                 compiler_version="10.5.0",
                 publish_mode="all",
-                verbose=False,
                 signing_key=None,
                 gpg_private_key=None,
             )
@@ -241,9 +238,7 @@ class TestGPGKeyImport:
             # Call the function with GPG key
             publish_compiler_to_buildcache(
                 image_tag="test:latest",
-                cache_dir="/tmp/test",
                 compiler_version="10.5.0",
-                verbose=False,
                 signing_key="0xTESTKEY",
                 gpg_private_key=mock_gpg_key,
             )
@@ -272,9 +267,7 @@ class TestGPGKeyImport:
             # Call the function with specific signing key
             publish_compiler_to_buildcache(
                 image_tag="test:latest",
-                cache_dir="/tmp/test",
                 compiler_version="10.5.0",
-                verbose=False,
                 signing_key=test_signing_key,
                 gpg_private_key=mock_gpg_key,
             )
@@ -296,9 +289,7 @@ class TestGPGKeyImport:
             # Call the function with GPG key
             publish_compiler_to_buildcache(
                 image_tag="test:latest",
-                cache_dir="/tmp/test",
                 compiler_version="10.5.0",
-                verbose=False,
                 signing_key="0xTESTKEY",
                 gpg_private_key=mock_gpg_key,
             )
@@ -352,9 +343,7 @@ class TestGPGErrorHandling:
             with pytest.raises(SlurmFactoryError) as exc_info:
                 publish_compiler_to_buildcache(
                     image_tag="test:latest",
-                    cache_dir="/tmp/test",
                     compiler_version="10.5.0",
-                    verbose=False,
                     signing_key="0xTESTKEY",
                     gpg_private_key=mock_gpg_key,
                 )
@@ -372,9 +361,7 @@ class TestGPGErrorHandling:
             with pytest.raises(SlurmFactoryError) as exc_info:
                 publish_compiler_to_buildcache(
                     image_tag="test:latest",
-                    cache_dir="/tmp/test",
                     compiler_version="10.5.0",
-                    verbose=False,
                     signing_key="0xTESTKEY",
                     gpg_private_key=mock_gpg_key,
                 )

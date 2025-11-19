@@ -53,7 +53,7 @@ jobs:
           echo "compiler_matrix=${COMPILER_VERSIONS}" >> $GITHUB_OUTPUT
           echo "Building with compiler versions: ${COMPILER_VERSIONS}"
 
-  build-slurm-deps:
+  build-and-publish-slurm-dependencies:
     needs: prepare-matrix
     runs-on: self-hosted
     timeout-minutes: 3600
@@ -140,7 +140,7 @@ jobs:
             exit 1
           fi
           echo "Using GPG signing key: $GPG_KEY_ID"
-          uv run slurm-factory build \
+          uv run slurm-factory build-slurm \
             --slurm-version 25.11 \
             --compiler-version ${{ matrix.compiler_version }} \
             --gpu \

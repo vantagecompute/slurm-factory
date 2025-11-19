@@ -15,7 +15,7 @@
 """Test that libfl-dev is available as a build-time dependency."""
 
 import pytest
-from slurm_factory.constants import get_install_system_deps_script
+from slurm_factory.utils import get_install_system_deps_script
 
 
 class TestLibflBuildDependency:
