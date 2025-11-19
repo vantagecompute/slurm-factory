@@ -74,7 +74,7 @@ jobs:
           echo "compiler_matrix=${COMPILER_VERSIONS}" >> $GITHUB_OUTPUT
           echo "Building with compiler versions: ${COMPILER_VERSIONS}"
 
-  build-slurm-deps:
+  build-slurm:
     needs: prepare-matrix
     runs-on: self-hosted
     timeout-minutes: 3600
@@ -337,8 +337,9 @@ jobs:
             git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
             . /opt/spack/share/spack/setup-env.sh
             # Add mirrors
-            spack mirror add slurm-factory-gcc "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
-            spack mirror add slurm-factory-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
+            spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
+            spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
+            spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
             # Trust keys
             spack buildcache keys --install --trust
             # Install GCC from buildcache
@@ -346,8 +347,7 @@ jobs:
             spack install -j $(nproc) --cache-only gcc@${COMPILER_VERSION} languages=c,c++,fortran
             spack compiler find $(spack location -i gcc@${COMPILER_VERSION})
             # Add custom repo for slurm-factory namespace
-            git clone --depth 1 https://github.com/vantagecompute/slurm-factory-spack-repo.git /opt/slurm-factory-spack-repo
-            spack repo add /opt/slurm-factory-spack-repo/spack_repo/slurm_factory
+            spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo /opt/slurm-factory-spack-repo
             # Install slurm from buildcache
             echo "==> Installing Slurm..."
             spack install -j $(nproc) slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
@@ -366,20 +366,20 @@ jobs:
           echo "**Compiler Version:** GCC ${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
-          echo "- S3: \`s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache\`" >> $GITHUB_STEP_SUMMARY
-          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Note:** This buildcache contains only Slurm dependencies (excluding Slurm itself)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/" >> $GITHUB_STEP_SUMMARY
           echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
           echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   summary:
-    needs: build-slurm-deps
+    needs: build-slurm
     runs-on: self-hosted
     timeout-minutes: 3600
     if: always()

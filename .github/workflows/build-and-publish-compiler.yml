@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: "Build and Publish Compiler Buildcache to S3"
+name: "Build and Publish Compilers to S3 Buildcache"
 
 on:
   workflow_dispatch:
@@ -52,7 +52,7 @@ jobs:
           echo "matrix=${VERSIONS}" >> $GITHUB_OUTPUT
           echo "Building compiler versions: ${VERSIONS}"
 
-  build-compiler-buildcache:
+  build-and-publish-compiler:
     needs: prepare-matrix
     runs-on: self-hosted
     timeout-minutes: 360

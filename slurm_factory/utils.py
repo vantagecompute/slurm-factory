@@ -1060,29 +1060,32 @@ def push_to_buildcache(
         s3_mirror_url = f"{s3_bucket}/slurm/{version}/{compiler_version}"
         if publish_mode == "slurm":
             # Push only slurm package
-            push_cmd = f"spack buildcache push {signing_flags} --force --update-index s3-buildcache slurm"
-            update_index_cmd = (
-                "spack buildcache update-index s3-buildcache || "
-                "echo 'Warning: Could not update buildcache index'"
+            push_cmd = (
+                f"spack buildcache push {signing_flags} --force --update-index "
+                "--only=package s3-buildcache slurm"
             )
+            #update_index_cmd = (
+            #    "spack buildcache update-index s3-buildcache || "
+            #    "echo 'Warning: Could not update buildcache index'"
+            #)
         elif publish_mode == "deps":
             s3_mirror_url = f"{s3_bucket}/deps/{compiler_version}"
             # Push only dependencies (everything except slurm)
             push_cmd = (
-                f"spack -e . buildcache push {signing_flags} --force "
-                "--update-index --only dependencies s3-buildcache"
+                f"spack -e . buildcache push {signing_flags} --force --update-index "
+                "--only=dependencies --with-build-dependencies s3-buildcache slurm"
             )
-            update_index_cmd = (
-                "spack buildcache update-index s3-buildcache || "
-                "echo 'Warning: Could not update buildcache index'"
-            )
+            #update_index_cmd = (
+            #    "spack buildcache update-index s3-buildcache || "
+            #    "echo 'Warning: Could not update buildcache index'"
+            #)
         else:  # all
             # Push everything
             push_cmd = f"spack -e . buildcache push {signing_flags} --force --update-index s3-buildcache"
-            update_index_cmd = (
-                "spack buildcache update-index s3-buildcache || "
-                "echo 'Warning: Could not update buildcache index'"
-            )
+            #update_index_cmd = (
+            #    "spack buildcache update-index s3-buildcache || "
+            #    "echo 'Warning: Could not update buildcache index'"
+            #)
 
         console.print(f"[dim]Pushing packages to {s3_mirror_url}...[/dim]")
         # Build docker run command with AWS environment variables
@@ -1148,7 +1151,7 @@ def push_to_buildcache(
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 push_cmd,
                 # Update buildcache index after pushing (Spack 1.0+ requirement)
-                update_index_cmd,
+                #update_index_cmd,
             ]
         )
 
