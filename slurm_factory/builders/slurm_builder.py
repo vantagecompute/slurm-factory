@@ -273,6 +273,9 @@ def get_slurm_build_script(compiler_version: str) -> str:
             ldd /tmp/test 2>&1 || true
             exit 1
         }}
+        echo '==> Regenerating compiler view to ensure persistence...'
+        cd /tmp/compiler-install
+        spack -e . env regenerate -v
         echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
