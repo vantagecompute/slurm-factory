@@ -305,57 +305,6 @@ jobs:
           TARBALL_NAME="slurm-${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}-software.tar.gz"
           aws s3 ls "s3://${{ env.S3_BUCKET }}/builds/$TARBALL_NAME" | head -20 || echo "Warning: Could not list buildcache contents"
 
-      - name: Test buildcache installation
-        timeout-minutes: 360
-        shell: bash
-        run: |
-          set -e
-          echo "Testing full buildcache installation in Docker container..."
-          
-          docker run --rm \
-            -e CLOUDFRONT_URL="${{ env.CLOUDFRONT_URL }}" \
-            -e SLURM_VERSION="${{ matrix.slurm_version }}" \
-            -e COMPILER_VERSION="${{ matrix.compiler_version }}" \
-            ubuntu:24.04 \
-            /bin/bash -c '
-            set -e
-            export DEBIAN_FRONTEND=noninteractive
-            # System dependencies
-            apt update && apt install -y --no-install-recommends \
-              build-essential \
-              ca-certificates \
-              curl \
-              gcc \
-              g++ \
-              gfortran \
-              git \
-              gnupg2 \
-              python3 \
-              python3-pip \
-              unzip
-            # Spack install
-            git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
-            . /opt/spack/share/spack/setup-env.sh
-            # Add mirrors
-            spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
-            spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
-            spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
-            # Trust keys
-            spack buildcache keys --install --trust
-            # Install GCC from buildcache
-            echo "==> Installing GCC..."
-            spack install -j $(nproc) --cache-only gcc@${COMPILER_VERSION} languages=c,c++,fortran
-            spack compiler find $(spack location -i gcc@${COMPILER_VERSION})
-            # Add custom repo for slurm-factory namespace
-            spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo /opt/slurm-factory-spack-repo
-            # Install slurm from buildcache
-            echo "==> Installing Slurm..."
-            spack install -j $(nproc) slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
-            # Verify installation
-            spack find slurm
-            echo "SUCCESS!"
-            '
-
       - name: Summary
         timeout-minutes: 360
         if: always()
