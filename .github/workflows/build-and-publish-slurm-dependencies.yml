@@ -17,11 +17,6 @@ name: "Build and Publish Slurm Dependencies for All Compilers"
 on:
   workflow_dispatch:
     inputs:
-      slurm_versions:
-        description: 'Slurm versions to build (comma-separated, e.g., "25.11,24.11" or "all")'
-        required: true
-        default: 'all'
-        type: string
       compiler_versions:
         description: 'Compiler versions to use (comma-separated, e.g., "11.5.0,13.4.0" or "all")'
         required: true
@@ -37,28 +32,12 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 3600
     outputs:
-      slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
       compiler_matrix: ${{ steps.set-matrix.outputs.compiler_matrix }}
     steps:
       - name: Prepare version matrices
         timeout-minutes: 360
         id: set-matrix
         run: |
-          # Prepare Slurm versions matrix
-          if [ "${{ inputs.slurm_versions }}" = "all" ]; then
-            SLURM_VERSIONS='["25.11"]'
-          else
-            IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
-            SLURM_VERSIONS="["
-            for v in "${VERS[@]}"; do
-              v=$(echo "$v" | xargs)
-              SLURM_VERSIONS="${SLURM_VERSIONS}\"${v}\","
-            done
-            SLURM_VERSIONS="${SLURM_VERSIONS%,}]"
-          fi
-          echo "slurm_matrix=${SLURM_VERSIONS}" >> $GITHUB_OUTPUT
-          echo "Building Slurm versions: ${SLURM_VERSIONS}"
-          
           # Prepare compiler versions matrix
           if [ "${{ inputs.compiler_versions }}" = "all" ]; then
             COMPILER_VERSIONS='["15.2.0", "14.2.0", "13.4.0", "12.5.0", "11.5.0", "10.5.0", "9.5.0", "8.5.0", "7.5.0"]'
@@ -86,7 +65,6 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
         compiler_version: ${{ fromJson(needs.prepare-matrix.outputs.compiler_matrix) }}
 
     steps:
@@ -110,7 +88,7 @@ jobs:
         timeout-minutes: 360
         run: |
           # Clean up any previous builds for this version/compiler combo
-          docker images | grep "slurm-factory:${{ matrix.slurm_version }}-gcc${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+          docker images | grep "slurm-factory:25.11-gcc${{ matrix.compiler_version }}" | awk '{print $3}' | xargs -r docker rmi -f || true
           
           # Clean Spack cache directories to prevent state leakage between runs
           # This ensures the buildcache test truly validates buildcache installation
@@ -148,7 +126,7 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.compiler_version }}..."
+          echo "🔨 Building Slurm 25.11 dependencies with GCC ${{ matrix.compiler_version }}..."
           if [ -z "$GPG_KEY_ID" ]; then
             echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
             exit 1
@@ -163,7 +141,7 @@ jobs:
           fi
           echo "Using GPG signing key: $GPG_KEY_ID"
           uv run slurm-factory build \
-            --slurm-version ${{ matrix.slurm_version }} \
+            --slurm-version 25.11 \
             --compiler-version ${{ matrix.compiler_version }} \
             --gpu \
             --no-cache \
@@ -182,18 +160,18 @@ jobs:
         run: |
           echo "## Slurm Dependencies Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Slurm Version:** ${{ matrix.slurm_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Version:** 25.11" >> $GITHUB_STEP_SUMMARY
           echo "**Compiler Version:** GCC ${{ matrix.compiler_version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
-          echo "- S3: \`s3://${{ env.S3_BUCKET }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache\`" >> $GITHUB_STEP_SUMMARY
-          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/${{ matrix.compiler_version }}/buildcache\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Note:** This buildcache contains only Slurm dependencies (excluding Slurm itself)" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/slurm/${{ matrix.slurm_version }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-deps-buildcache ${{ env.CLOUDFRONT_URL }}/${{ matrix.compiler_version }}/buildcache" >> $GITHUB_STEP_SUMMARY
           echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
           echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
@@ -211,7 +189,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "All Slurm dependency buildcaches have been built and published." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Slurm Versions:** ${{ inputs.slurm_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Versions:** 25.11" >> $GITHUB_STEP_SUMMARY
           echo "**Compiler Versions:** ${{ inputs.compiler_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
