@@ -43,7 +43,7 @@ yum install -y \
     lbzip2 \
     xz \
     kernel-headers && \
-    python3 -m pip install boto3 pyyaml
+    python3 -m pip install boto3
 """
 
 ROCKY_8_SETUP_SCRIPT = """
@@ -66,7 +66,7 @@ yum install -y \
     lbzip2 \
     xz \
     kernel-headers && \
-    python3 -m pip install boto3 pyyaml
+    python3 -m pip install boto3 
 """
 
 ROCKY_9_SETUP_SCRIPT = """
@@ -89,7 +89,7 @@ yum install -y \
     lbzip2 \
     xz \
     kernel-headers && \
-    python3 -m pip install boto3 pyyaml
+    python3 -m pip install boto3
 """
 
 UBUNTU_22_04_SETUP_SCRIPT = """
@@ -128,7 +128,7 @@ apt-get install -y \
     python3 \
     python3-pip \
     patch && \
-    python3 -m pip install --break-system-packages boto3 pyyaml && \
+    python3 -m pip install --break-system-packages boto3 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 """
 
@@ -148,7 +148,7 @@ apt-get install -y \
     python3 \
     python3-pip \
     patch && \
-    python3 -m pip install --break-system-packages boto3 pyyaml && \
+    python3 -m pip install --break-system-packages boto3 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 """
 

@@ -63,11 +63,9 @@ class TestSpackConfigGeneration:
         for version in SLURM_VERSIONS.keys():
             config = generate_spack_config(slurm_version=version)
             assert "spack" in config
-            
             # Check that the slurm package version is correct
             slurm_specs = [spec for spec in config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
             assert len(slurm_specs) > 0, f"No slurm spec found for version {version}"
-            
             expected_package_version = SLURM_VERSIONS[version]
             slurm_spec = slurm_specs[0]
             assert expected_package_version in slurm_spec, f"Incorrect package version in {slurm_spec}"
@@ -80,14 +78,12 @@ class TestSpackConfigGeneration:
         slurm_spec = slurm_specs[0]
         assert "~nvml" in slurm_spec
         assert "~rsmi" in slurm_spec
-        
         # GPU-enabled config
         gpu_config = generate_spack_config(gpu_support=True)
         slurm_specs = [spec for spec in gpu_config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
         slurm_spec = slurm_specs[0]
         assert "+nvml" in slurm_spec
         assert "+rsmi" in slurm_spec
-        
         # Check view configuration uses hardlinks
         assert gpu_config["spack"]["view"]["default"]["link_type"] == "hardlink"
 
@@ -95,7 +91,6 @@ class TestSpackConfigGeneration:
         """Test compiler configuration."""
         config = generate_spack_config()
         compilers = config["spack"]["compilers"]
-        
         # Compilers start empty - GCC is installed from buildcache and detected via spack compiler find
         assert len(compilers) == 0
 
@@ -105,14 +100,11 @@ class TestSpackConfigGeneration:
         compiler_version = "13.4.0"
         config = generate_spack_config(compiler_version=compiler_version)
         packages = config["spack"]["packages"]
-        
         # Test that GCC is configured to be installed from buildcache
         assert "gcc" in packages
         gcc_config = packages["gcc"]
-        
         # GCC should be buildable (from buildcache)
         assert gcc_config["buildable"] is True
-        
         # GCC should have correct version and variants to match buildcache
         assert gcc_config["version"] == [compiler_version]
         assert "+binutils" in gcc_config["variants"]
@@ -122,25 +114,21 @@ class TestSpackConfigGeneration:
         """Test package-specific configurations."""
         config = generate_spack_config()
         packages = config["spack"]["packages"]
-        
         # Test build tools are buildable (no longer using externals)
         build_tools = ["cmake", "python", "gmake", "m4", "pkgconf", "diffutils", "findutils", "tar", "gettext"]
         for tool in build_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is True
-        
         # Test autotools are buildable (built from source for libjwt compatibility)
         buildable_tools = ["autoconf", "automake", "libtool"]
         for tool in buildable_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is True
-        
         # Test runtime libraries are buildable
         runtime_libs = ["munge", "json-c", "curl", "openssl", "readline", "ncurses"]
         for lib in runtime_libs:
             assert lib in packages
             assert packages[lib]["buildable"] is True
-        
         # Test libjwt configuration
         assert "libjwt" in packages
         libjwt_config = packages["libjwt"]
@@ -157,19 +145,16 @@ class TestModuleConfiguration:
     def test_generate_module_config_default(self):
         """Test default module configuration."""
         module_config = generate_module_config()
-        
         # Test structure
         assert "default" in module_config
         default_config = module_config["default"]
         assert "enable" in default_config
         assert "lmod" in default_config
-        
         # Test Lmod configuration (using default 13.4.0)
         lmod_config = default_config["lmod"]
         assert "core_compilers" in lmod_config
         assert "gcc@13.4.0" in lmod_config["core_compilers"]
         assert lmod_config["hierarchy"] == []
-        
         # Test included modules
         assert "slurm" in lmod_config["include"]
         assert "openmpi" in lmod_config["include"]
@@ -178,7 +163,6 @@ class TestModuleConfiguration:
         """Test Slurm-specific module configuration."""
         module_config = generate_module_config()
         slurm_config = module_config["default"]["lmod"]["slurm"]
-        
         # Test environment variables
         env_vars = slurm_config["environment"]["set"]
         assert "SLURM_CONF" in env_vars
@@ -190,7 +174,6 @@ class TestModuleConfiguration:
         assert "SLURM_COMPILER" in env_vars
         assert "SLURM_TARGET_ARCH" in env_vars
         assert "SLURM_GCC_RUNTIME_PREFIX" in env_vars
-        
         # Test path modifications
         paths = slurm_config["environment"]["prepend_path"]
         assert "PATH" in paths
@@ -207,7 +190,6 @@ class TestConvenienceFunctions:
         """Test CPU-only convenience function."""
         config = cpu_only_config()
         assert "spack" in config
-        
         # Should be equivalent to generate_spack_config with defaults
         default_config = generate_spack_config()
         assert config == default_config
@@ -216,7 +198,6 @@ class TestConvenienceFunctions:
         """Test GPU-enabled convenience function."""
         config = gpu_enabled_config()
         assert "spack" in config
-        
         # Should have GPU support enabled
         slurm_specs = [spec for spec in config["spack"]["specs"] if "slurm_factory.slurm@" in spec]
         slurm_spec = slurm_specs[0]
@@ -227,7 +208,6 @@ class TestConvenienceFunctions:
         """Test verification convenience function."""
         config = verification_config()
         assert "spack" in config
-        
         # Should have verification enabled
         assert "verify" in config["spack"]["config"]
         verify_config = config["spack"]["config"]["verify"]
@@ -242,15 +222,12 @@ class TestYAMLGeneration:
     def test_generate_yaml_string(self):
         """Test YAML string generation."""
         yaml_string = generate_yaml_string()
-        
         # Test that it's a valid YAML string
         assert isinstance(yaml_string, str)
         assert len(yaml_string) > 0
-        
         # Test that it can be parsed as YAML
         parsed = yaml.safe_load(yaml_string)
         assert "spack" in parsed
-        
         # Test that it has a comment header
         lines = yaml_string.split('\n')
         assert lines[0].startswith("#")
@@ -259,11 +236,9 @@ class TestYAMLGeneration:
         """Test YAML generation for different versions."""
         for version in SLURM_VERSIONS.keys():
             yaml_string = generate_yaml_string(slurm_version=version)
-            
             # Should be valid YAML
             parsed = yaml.safe_load(yaml_string)
             assert "spack" in parsed
-            
             # Should contain the correct version in comment
             assert version in yaml_string
 
@@ -286,10 +261,8 @@ class TestConfigurationValidation:
         # Standard build
         config = generate_spack_config()
         view_config = config["spack"]["view"]["default"]
-        
         # Should use hardlink for easier copying
         assert view_config["link_type"] == "hardlink"
-        
         # Should exclude build tools (not autoconf - it's buildable but not excluded)
         assert "cmake" in view_config["exclude"]
         assert "tar" in view_config["exclude"]
@@ -298,10 +271,8 @@ class TestConfigurationValidation:
         """Test view configuration for GPU build."""
         config = generate_spack_config(gpu_support=True)
         view_config = config["spack"]["view"]["default"]
-        
         # Should use hardlink for easier copying
         assert view_config["link_type"] == "hardlink"
-        
         # GPU packages should be excluded from view (they'll be copied separately)
         assert "cuda" in view_config["exclude"]
         assert "rocm-core" in view_config["exclude"]
@@ -310,7 +281,6 @@ class TestConfigurationValidation:
         """Test concretizer configuration."""
         config = generate_spack_config()
         concretizer = config["spack"]["concretizer"]
-        
         # unify is set to "when_possible" for better dependency resolution
         assert concretizer["unify"] == "when_possible"
         assert concretizer["reuse"]["roots"] is True  # Reuse from buildcache
@@ -319,10 +289,8 @@ class TestConfigurationValidation:
         """Test mirror configuration."""
         config = generate_spack_config()
         mirrors = config["spack"]["mirrors"]
-        
         # Should have spack-public mirror for source downloads
         assert "spack-public" in mirrors
-        
         # Test mirror properties
         assert mirrors["spack-public"]["url"] == "https://mirror.spack.io"
         assert mirrors["spack-public"]["signed"] is False
