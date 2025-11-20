@@ -60,7 +60,7 @@ def generate_module_config(
             f"Unsupported toolchain: {toolchain}. "
             f"Supported toolchains: {list(COMPILER_TOOLCHAINS.keys())}"
         )
-    
+
     _, gcc_version, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
 
     slurm_package_version = SLURM_VERSIONS[slurm_version]
@@ -224,9 +224,9 @@ def generate_spack_config(
     specs.append(f"slurm_factory.freeipmi@1.6.16 {compiler_spec}")
     specs.append(f"openmpi@5.0.8 schedulers=slurm fabrics=auto {compiler_spec}")
     specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
-    # mysql-connector-c 6.1.11 has signal handler incompatibility with modern glibc
-    # Safe workaround: downgrade incompatible-pointer-types from error to warning
-    specs.append(f"mysql-connector-c cflags='-Wno-error=incompatible-pointer-types' {compiler_spec}")
+    # Use mysql client libraries instead of deprecated mysql-connector-c
+    # mysql-connector-c 6.1.11 has kernel header incompatibilities on Rocky Linux 9+
+    specs.append(f"mysql@8.0.35 +client_only {compiler_spec}")
     specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
     specs.append(
         f"slurm_factory.slurm@{slurm_package_version} {gpu_flags} sysconfdir=/etc/slurm {compiler_spec}"
