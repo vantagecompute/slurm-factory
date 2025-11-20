@@ -24,7 +24,7 @@ slug: /
 
 ## Support Matrix
 
-Slurm Factory supports **27 combinations** of Slurm and GCC compiler versions. All combinations are pre-built, **GPG-signed**, and available in the public buildcache:
+Slurm Factory supports Slurm builds for **multiple OS distributions**. All builds use the **system compiler** and are available as **GPG-signed** packages in the public buildcache:
 
 ### Slurm Versions
 
@@ -32,41 +32,37 @@ Slurm Factory supports **27 combinations** of Slurm and GCC compiler versions. A
 - **24.11** (LTS)
 - **23.11** (Stable)
 
-### GCC Compiler Versions
+### OS Toolchains
 
-All GCC toolchains are GPG-signed and include matching glibc for cross-distro compatibility:
+All toolchains use the system GCC and glibc from the base OS:
 
-- **15.2.0** (Latest GCC 15, glibc 2.40)
-- **14.2.0** (Latest GCC 14, glibc 2.39)
-- **13.4.0** (Recommended default, glibc 2.39, Ubuntu 24.04)
-- **12.5.0** (glibc 2.35)
-- **11.5.0** (glibc 2.35, Ubuntu 22.04)
-- **10.5.0** (glibc 2.31, RHEL 8/Ubuntu 20.04)
-- **9.5.0** (glibc 2.28)
-- **8.5.0** (glibc 2.28, RHEL 8)
-- **7.5.0** (glibc 2.17, RHEL 7 - maximum compatibility)
+- **noble** (Ubuntu 24.04 - Recommended, GCC 13.2, glibc 2.39)
+- **jammy** (Ubuntu 22.04 - LTS, GCC 11.4, glibc 2.35)
+- **focal** (Ubuntu 20.04 - Legacy, GCC 9.4, glibc 2.31)
+- **rockylinux9** (Rocky Linux 9 / RHEL 9, GCC 11.4, glibc 2.34)
+- **rockylinux8** (Rocky Linux 8 / RHEL 8, GCC 8.5, glibc 2.28)
+- **centos7** (CentOS 7 / RHEL 7, GCC 4.8, glibc 2.17 - maximum compatibility)
 
 ### Recommended Combinations
 
-| Slurm Version | GCC Version | Build Type | Use Case |
-|---------------|-------------|------------|----------|
-| 25.11 | 13.4.0 | CPU/GPU | **Recommended** - Latest features, best compatibility |
-| 24.11 | 13.4.0 | CPU/GPU | Long-term support production |
-| 25.11 | 15.2.0 | CPU/GPU | Bleeding edge, latest compiler features |
-| 23.11 | 11.5.0 | CPU | Conservative production environments |
-| 25.11 | 10.5.0 | CPU | RHEL 8 / Ubuntu 20.04 compatibility |
-| 24.11 | 7.5.0 | CPU | RHEL 7 / maximum backward compatibility |
+| Slurm Version | Toolchain | Build Type | Use Case |
+|---------------|-----------|------------|----------|
+| 25.11 | noble | CPU/GPU | **Recommended** - Latest Ubuntu LTS |
+| 24.11 | jammy | CPU/GPU | Long-term support production |
+| 25.11 | rockylinux9 | CPU/GPU | RHEL 9 compatible |
+| 23.11 | rockylinux8 | CPU | RHEL 8 compatibility |
+| 24.11 | centos7 | CPU | RHEL 7 / maximum backward compatibility |
 
-All 27 version combinations are GPG-signed and available in the buildcache with a three-tier mirror architecture:
+All builds are available in the buildcache:
 
 ```text
 https://slurm-factory-spack-binary-cache.vantagecompute.ai/
-├── compilers/<GCC_VERSION>/         # GPG-signed compiler toolchains
-├── deps/<GCC_VERSION>/              # GPG-signed Slurm dependencies
-├── slurm/<SLURM_VERSION>/<GCC_VERSION>/  # GPG-signed Slurm packages
-└── builds/<SLURM_VERSION>/<GCC_VERSION>/ # Pre-built tarballs with signatures
-    ├── slurm-<VERSION>-gcc<VERSION>-software.tar.gz
-    └── slurm-<VERSION>-gcc<VERSION>-software.tar.gz.asc  # GPG signature
+├── compilers/<TOOLCHAIN>/         # GPG-signed system compiler packages
+├── deps/<TOOLCHAIN>/              # GPG-signed Slurm dependencies
+├── slurm/<SLURM_VERSION>/<TOOLCHAIN>/  # GPG-signed Slurm packages
+└── builds/<SLURM_VERSION>/<TOOLCHAIN>/ # Pre-built tarballs with signatures
+    ├── slurm-<VERSION>-<TOOLCHAIN>-software.tar.gz
+    └── slurm-<VERSION>-<TOOLCHAIN>-software.tar.gz.asc  # GPG signature
 ```
 
 ## GPG Package Signing

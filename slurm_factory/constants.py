@@ -23,19 +23,147 @@ SLURM_VERSIONS = {
     "23.11": "23-11-11-1",
 }
 
-# Supported compiler versions for building
-# Key: user-facing version, Value: (gcc_version, glibc_version, description)
-# Latest stable minor versions for each major GCC version from Spack v1.0.0
+CENTOS_7_SETUP_SCRIPT = """
+# CentOS 7 setup script for Slurm Factory
+# Install EPEL repository
+yum install -y epel-release
+yum install -y \
+    gcc \
+    gcc-c++ \
+    gcc-gfortran \
+    make \
+    wget \
+    tar \
+    git \
+    Lmod \
+    python3 \
+    python3-pip \
+    which \
+    patch \
+    lbzip2 \
+    xz \
+    kernel-headers && \
+    python3 -m pip install boto3 pyyaml
+"""
+
+ROCKY_8_SETUP_SCRIPT = """
+# Rocky 8 setup script for Slurm Factory
+# Install EPEL repository
+yum install -y epel-release
+yum install -y \
+    gcc \
+    gcc-c++ \
+    gcc-gfortran \
+    make \
+    wget \
+    tar \
+    git \
+    Lmod \
+    python3 \
+    python3-pip \
+    which \
+    patch \
+    lbzip2 \
+    xz \
+    kernel-headers && \
+    python3 -m pip install boto3 pyyaml
+"""
+
+ROCKY_9_SETUP_SCRIPT = """
+# Rocky 9 setup script for Slurm Factory
+# Install EPEL repository
+yum install -y epel-release
+yum install -y \
+    gcc \
+    gcc-c++ \
+    gcc-gfortran \
+    make \
+    wget \
+    tar \
+    git \
+    Lmod \
+    python3 \
+    python3-pip \
+    which \
+    patch \
+    lbzip2 \
+    xz \
+    kernel-headers && \
+    python3 -m pip install boto3 pyyaml
+"""
+
+UBUNTU_22_04_SETUP_SCRIPT = """
+# Ubuntu 22.04 setup script for Slurm Factory
+apt-get update
+apt-get install -y \
+    build-essential \
+    wget \
+    tar \
+    git \
+    gcc \
+    g++ \
+    gfortran \
+    lmod \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    patch && \
+    python3 -m pip install --break-system-packages boto3 && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+"""
+
+UBUNTU_24_04_SETUP_SCRIPT = """
+# Ubuntu 24.04 setup script for Slurm Factory
+apt-get update
+apt-get install -y \
+    build-essential \
+    wget \
+    tar \
+    git \
+    gcc \
+    g++ \
+    gfortran \
+    lmod \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    patch && \
+    python3 -m pip install --break-system-packages boto3 pyyaml && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+"""
+
+UBUNTU_26_04_SETUP_SCRIPT = """
+# Ubuntu 26.04 setup script for Slurm Factory
+apt-get update
+apt-get install -y \
+    build-essential \
+    wget \
+    tar \
+    git \
+    gcc \
+    g++ \
+    gfortran \
+    lmod \
+    ca-certificates \
+    python3 \
+    python3-pip \
+    patch && \
+    python3 -m pip install --break-system-packages boto3 pyyaml && \
+    apt-get clean && rm -rf /var/lib/apt/lists/*
+"""
+
+
+# Supported OS-based compiler toolchains for building
+# Key: toolchain identifier, Value: (os_name, gcc_version, glibc_version, docker_image, setup_script)
+# We use OS-provided compilers instead of building custom GCC toolchains
+# This ensures compatibility with target deployment environments
 COMPILER_TOOLCHAINS = {
-    "15.2.0": ("15.2.0", "2.40", "GCC 15.2 (latest in Spack v1.0.0) - glibc 2.40"),
-    "14.2.0": ("14.2.0", "2.39", "GCC 14.2 (latest stable) - glibc 2.39"),
-    "13.4.0": ("13.4.0", "2.39", "GCC 13.4 / Ubuntu 24.04 (default) - glibc 2.39"),
-    "12.5.0": ("12.5.0", "2.35", "GCC 12.5 (latest stable) - glibc 2.35"),
-    "11.5.0": ("11.5.0", "2.35", "GCC 11.5 / Ubuntu 22.04 - glibc 2.35"),
-    "10.5.0": ("10.5.0", "2.31", "GCC 10.5 / RHEL 8 / Ubuntu 20.04 - glibc 2.31"),
-    "9.5.0": ("9.5.0", "2.28", "GCC 9.5 (latest stable) - glibc 2.28"),
-    "8.5.0": ("8.5.0", "2.28", "GCC 8.5 / RHEL 8 minimum - glibc 2.28"),
-    "7.5.0": ("7.5.0", "2.17", "GCC 7.5 / RHEL 7 compatible - glibc 2.17"),
+    "centos7": ("CentOS 7", "4.8.5", "2.17", "centos:7", CENTOS_7_SETUP_SCRIPT),
+    "rockylinux8": ("Rocky Linux 8", "8.5.0", "2.28", "rockylinux:8", ROCKY_8_SETUP_SCRIPT),
+    "rockylinux9": ("Rocky Linux 9", "11.5.0", "2.34", "rockylinux:9", ROCKY_9_SETUP_SCRIPT),
+    "jammy": ("Ubuntu 22.04 (Jammy)", "11.2.0", "2.35", "ubuntu:jammy", UBUNTU_22_04_SETUP_SCRIPT),
+    "noble": ("Ubuntu 24.04 (Noble)", "13.3.0", "2.39", "ubuntu:noble", UBUNTU_24_04_SETUP_SCRIPT),
+    "resolute": ("Ubuntu 26.04 (Resolute)", "15.2.0", "2.42", "ubuntu:resolute", UBUNTU_26_04_SETUP_SCRIPT),
 }
 
 
@@ -58,7 +186,7 @@ class BuildType(str, Enum):
 INSTANCE_NAME_PREFIX = "slurm-factory"
 
 # Timeouts (in seconds)
-BUILD_TIMEOUT = 3600  # 1 hour for full build
+BUILD_TIMEOUT = 14400  # 4 hours for full source build
 DOCKER_BUILD_TIMEOUT = 600  # 10 minutes for image build
 
 # Spack buildcache configuration

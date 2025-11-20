@@ -24,7 +24,6 @@ from rich.markup import escape
 from typing_extensions import Annotated
 
 from slurm_factory.commands.build_slurm import build_slurm_app
-from slurm_factory.commands.build_toolchain import build_toolchain_app
 from slurm_factory.config import Settings
 
 # Configure logging following craft-providers pattern
@@ -197,7 +196,6 @@ def clean(
 
 
 # Register command groups
-app.add_typer(build_toolchain_app, name="build-toolchain")
 app.add_typer(build_slurm_app, name="build-slurm")
 
 

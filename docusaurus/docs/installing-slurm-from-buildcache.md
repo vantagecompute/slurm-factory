@@ -52,13 +52,13 @@ The buildcache uses three separate mirrors for optimal caching:
 ```bash
 # Set versions
 SLURM_VERSION=25.11
-COMPILER_VERSION=15.2.0
+TOOLCHAIN=noble
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
 # Add three-tier mirror structure
-spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
-spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
-spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${TOOLCHAIN}"
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${TOOLCHAIN}"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${TOOLCHAIN}"
 ```
 
 ### 3. Import GPG Signing Keys
@@ -75,7 +75,7 @@ gpg --list-keys DFB92630BCA5AB71
 
 ```bash
 # Install Slurm with automatic signature verification (5-15 minutes)
-spack install slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION} target=x86_64_v3
+spack install slurm@${SLURM_VERSION} target=x86_64_v3
 
 # Load Slurm into your environment
 spack load slurm@${SLURM_VERSION}
@@ -97,19 +97,16 @@ All 27 combinations of Slurm × GCC are available in the buildcache:
 | **24.11** | LTS | Long-term support, production recommended |
 | **23.11** | Stable | Previous stable release |
 
-### GCC Versions
+### Toolchains
 
-| GCC Version | Glibc | Compatible OS |
-|-------------|-------|---------------|
-| **15.2.0** | 2.40 | Ubuntu 24.04+ |
-| **14.2.0** | 2.39 | Ubuntu 24.04+ |
-| **13.4.0** | 2.39 | Ubuntu 24.04+ (default) |
-| **12.5.0** | 2.35 | Ubuntu 22.04+ |
-| **11.5.0** | 2.31 | Ubuntu 20.04+ |
-| **10.5.0** | 2.31 | Ubuntu 20.04+, RHEL 8+ |
-| **9.5.0** | 2.31 | Ubuntu 20.04+, RHEL 8+ |
-| **8.5.0** | 2.28 | Ubuntu 18.04+, RHEL 7+ |
-| **7.5.0** | 2.28 | Ubuntu 18.04+, RHEL 7+ |
+| Toolchain | OS/Distribution | System GCC | Glibc |
+|-----------|-----------------|------------|-------|
+| **noble** | Ubuntu 24.04 (Noble) | 13.2.0 | 2.39 |
+| **jammy** | Ubuntu 22.04 (Jammy) | 11.4.0 | 2.35 |
+| **focal** | Ubuntu 20.04 (Focal) | 9.4.0 | 2.31 |
+| **rockylinux9** | Rocky Linux 9 / RHEL 9 | 11.4.0 | 2.34 |
+| **rockylinux8** | Rocky Linux 8 / RHEL 8 | 8.5.0 | 2.28 |
+| **centos7** | CentOS 7 / RHEL 7 | 4.8.5 | 2.17 |
 
 ## Installation Examples
 
@@ -118,19 +115,19 @@ All 27 combinations of Slurm × GCC are available in the buildcache:
 ```bash
 # Set versions
 SLURM_VERSION=25.11
-COMPILER_VERSION=15.2.0
+TOOLCHAIN=noble
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
 # Add three-tier mirrors
-spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
-spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
-spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${TOOLCHAIN}"
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${TOOLCHAIN}"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${TOOLCHAIN}"
 
 # Import GPG keys
 spack buildcache keys --install --trust
 
-# Install latest Slurm with default compiler
-spack install slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION} target=x86_64_v3
+# Install latest Slurm with system compiler
+spack install slurm@${SLURM_VERSION} target=x86_64_v3
 
 # Load and verify
 spack load slurm@${SLURM_VERSION}
@@ -142,12 +139,12 @@ sinfo --version
 ```bash
 # Set versions for LTS
 SLURM_VERSION=24.11
-COMPILER_VERSION=13.4.0
+TOOLCHAIN=jammy
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
 # Add mirrors
-spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
-spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
+spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${TOOLCHAIN}"
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${TOOLCHAIN}"
 spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
 
 # Import GPG keys

@@ -21,6 +21,7 @@ from rich.console import Console
 from rich.markup import escape
 
 from slurm_factory.constants import (
+    COMPILER_TOOLCHAINS,
     CONTAINER_BUILD_OUTPUT_DIR,
     CONTAINER_CACHE_DIR,
     CONTAINER_SLURM_DIR,
@@ -36,7 +37,6 @@ from slurm_factory.utils import (
     get_create_spack_profile_script,
     get_data_dir,
     get_install_spack_script,
-    get_install_system_deps_script,
     remove_old_docker_image,
 )
 
@@ -155,128 +155,25 @@ def get_modulerc_creation_script(module_dir: str, modulerc_path: str) -> str:
     )
 
 
-def get_slurm_build_script(compiler_version: str) -> str:
+def get_slurm_build_script(toolchain: str) -> str:
     """
-    Generate script to build Slurm with Spack using a bootstrap compiler.
+    Generate script to build Slurm with Spack using the OS-provided system compiler.
 
-    This implements a two-stage build process:
-
-    Stage 1: Compiler Bootstrap
-    - Create temporary environment at /tmp/compiler-install
-    - Install GCC from buildcache with view at /opt/spack-compiler-view
-    - Register compiler globally with `spack compiler find --scope site`
-    - This makes the compiler available to ALL Spack environments
-
-    Stage 2: Slurm Build
-    - Switch to Slurm project environment at {CONTAINER_SPACK_PROJECT_DIR}
-    - Activate the Slurm environment (which has spack.yaml with Slurm specs)
-    - Concretize and install Slurm using the registered compiler
-
-    Key insight from Spack docs: Compilers registered at 'site' scope are global.
-    See: https://spack.readthedocs.io/en/latest/configuring_compilers.html
+    Since we're using OS-based toolchains (noble, jammy, etc.), we use the GCC compiler
+    that's already installed in the Docker base image instead of downloading a custom-built
+    GCC from buildcache.
 
     Args:
-        compiler_version: GCC version to install and use (e.g., "13.4.0")
+        toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
 
     Returns:
-        Complete bash script for compiler bootstrap and Slurm build
+        Complete bash script for Slurm build using system compiler
 
     """
-    # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
-    compiler_buildcache_url = (
-        f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{compiler_version}"
-    )
+    # Get GCC version for this toolchain
+    _, gcc_version, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
+    
     return textwrap.dedent(f"""        source {SPACK_SETUP_SCRIPT}
-        echo '==> Configuring buildcache mirror globally for compiler installation...'
-        spack mirror add --scope site slurm-factory-compiler-buildcache {compiler_buildcache_url} || true
-        echo '==> Trusting Slurm Factory GPG public key for signed compiler packages...'
-        spack buildcache keys --install --trust
-        echo '==> Creating temporary environment to install GCC compiler from buildcache...'
-        mkdir -p /tmp/compiler-install
-        cd /tmp/compiler-install
-        printf '%s\\n' \\
-          'spack:' \\
-          '  specs:' \\
-          '  - gcc@{compiler_version} languages=c,c++,fortran' \\
-          '  view:' \\
-          '    default:' \\
-          '      root: /opt/spack-compiler-view' \\
-          '      link_type: symlink' \\
-          '  concretizer:' \\
-          '    unify: false' \\
-          '    reuse:' \\
-          '      roots: true' \\
-          '      from:' \\
-          '      - type: buildcache' \\
-          '        path: {compiler_buildcache_url}' \\
-          > spack.yaml
-        echo '==> Checking if GCC is available in buildcache...'
-        if ! spack buildcache list --allarch | grep -q "gcc@{compiler_version}"; then
-            echo 'ERROR: gcc@{compiler_version} not found in buildcache!'
-            echo 'Available packages in buildcache:'
-            spack buildcache list --allarch | head -50
-            exit 1
-        fi
-        echo '✓ gcc@{compiler_version} found in buildcache'
-        echo '==> Concretizing GCC environment...'
-        spack -e . concretize -f
-        echo '==> Installing GCC compiler from buildcache...'
-        # The concretizer is configured to prefer buildcache (via reuse:roots + from:buildcache)
-        # This will use gcc from buildcache while allowing dependencies to build from source if needed
-        # GPG signature verification is automatic since we've trusted the key
-        spack -e . install
-        echo '==> Verifying GCC was installed from buildcache (not built from source)...'
-        if spack find -v gcc@{compiler_version} | grep -q 'installed from binary cache'; then
-            echo '✓ GCC was installed from buildcache'
-        else
-            # Check the build stage to confirm it came from cache
-            echo 'Checking installation method...'
-            spack find -vl gcc@{compiler_version} || true
-        fi
-        echo '==> Hiding system gcc binaries to prevent auto-detection...'
-        for f in gcc g++ c++ gfortran gcc-13 g++-13 gfortran-13 gcc-14 g++-14 gfortran-14; do
-            [ -f /usr/bin/$f ] && mv /usr/bin/$f /usr/bin/$f.hidden || true
-        done
-        echo '==> Verifying GCC installation in compiler view...'
-        ls -la /opt/spack-compiler-view/bin/gcc* || echo 'WARNING: GCC binaries not found'
-        /opt/spack-compiler-view/bin/gcc --version || echo 'ERROR: GCC not executable'
-        echo '==> Setting up compiler runtime library path...'
-        export \
-            LD_LIBRARY_PATH=/opt/spack-compiler-view/lib64:/opt/spack-compiler-view/lib:${{LD_LIBRARY_PATH:-}}
-        echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
-        echo '==> Detecting newly installed GCC compiler...'
-        spack compiler find --scope site /opt/spack-compiler-view
-        echo '==> Removing any auto-detected system compilers...'
-        for compiler in $(spack compiler list | grep -v gcc@{compiler_version} | \
-                grep gcc@ | awk '{{print $1}}'); do
-            echo "Removing $compiler"
-            spack compiler rm --scope site $compiler 2>/dev/null || true
-        done
-        echo '==> Verifying gcc@{compiler_version} is available...'
-        if ! spack compiler list | grep -q "gcc@{compiler_version}"; then
-            echo 'ERROR: gcc@{compiler_version} compiler not found:'
-            spack compiler list
-            exit 1
-        fi
-        echo '==> Configured compilers:'
-        spack compiler list
-        echo '==> Compiler info for gcc@{compiler_version}:'
-        spack compiler info gcc@{compiler_version}
-        echo '==> Testing compiler with simple program...'
-        printf '%s\\n' \\
-          '#include <stdio.h>' \\
-          'int main() {{ printf("Compiler test OK\\\\n"); return 0; }}' \\
-          > /tmp/test.c
-        /opt/spack-compiler-view/bin/gcc /tmp/test.c -o /tmp/test && /tmp/test || {{
-            echo 'ERROR: Compiler test failed'
-            /opt/spack-compiler-view/bin/gcc -v /tmp/test.c -o /tmp/test 2>&1 || true
-            ldd /tmp/test 2>&1 || true
-            exit 1
-        }}
-        echo '==> Regenerating compiler view to ensure persistence...'
-        cd /tmp/compiler-install
-        spack -e . env regenerate -v
-        echo '==> Switching to Slurm project environment...'
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
         echo '==> Checking custom Spack repositories...'
@@ -289,23 +186,24 @@ def get_slurm_build_script(compiler_version: str) -> str:
             spack repo list
             exit 1
         }}
-        # Check for compiler in site scope (where it was registered)
-        if ! spack compiler list --scope site | grep -q "gcc@{compiler_version}"; then
-            echo 'ERROR: gcc@{compiler_version} not found in site scope'
-            echo 'Site compilers:'
-            spack compiler list --scope site
-            echo 'All compilers:'
-            spack compiler list
-            exit 1
-        fi
-        echo '✓ gcc@{compiler_version} available in site scope'
-        spack compiler info gcc@{compiler_version} || {{
-            echo 'WARNING: Could not get compiler info, but compiler is registered'
+        echo '==> Detecting system compilers...'
+        spack compiler find --scope site
+        echo '==> Available compilers:'
+        spack compiler list
+        echo '==> Verifying gcc@{gcc_version} is available...'
+        if ! spack compiler list | grep -q "gcc@{gcc_version}"; then
+            echo 'ERROR: gcc@{gcc_version} compiler not found'
             echo 'Available compilers:'
             spack compiler list
-        }}
+            echo 'Trying to find GCC in standard locations...'
+            which gcc g++ gfortran || true
+            gcc --version || true
+            exit 1
+        fi
+        echo '✓ gcc@{gcc_version} available'
+        spack compiler info gcc@{gcc_version}
         rm -f spack.lock
-        echo '==> Concretizing Slurm packages with gcc@{compiler_version}...'
+        echo '==> Concretizing Slurm packages with gcc@{gcc_version}...'
         spack -e . concretize -j $(nproc) -f --fresh
         echo '==> Installing Slurm and dependencies...'
         spack -e . install -j $(nproc) -f slurm || {{
@@ -335,10 +233,11 @@ def get_slurm_build_script(compiler_version: str) -> str:
     """).strip()
 
 
+
 def get_create_slurm_tarball_script(
     modulerc_script: str,
     version: str,
-    compiler_version: str = "13.4.0",
+    toolchain: str = "noble",
     gpu_support: bool = False,
 ) -> str:
     """
@@ -347,11 +246,11 @@ def get_create_slurm_tarball_script(
     Args:
         modulerc_script: The script to create .modulerc.lua file
         version: Slurm version (e.g., "25.11") for the tarball filename
-        compiler_version: GCC compiler version used for the build (e.g., "7.5.0")
+        toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         gpu_support: Whether GPU support is enabled (affects CUDA/ROCm handling)
 
     """
-    tarball_base = f"slurm-{version}-gcc{compiler_version}-software"
+    tarball_base = f"slurm-{version}-{toolchain}-software"
 
     # When GPU support is enabled, we need to copy specific GPU .so files from install tree
     # since CUDA and ROCm packages are excluded from the view
@@ -414,8 +313,8 @@ def get_create_slurm_tarball_script(
 
 def _get_slurm_builder_dockerfile(
     spack_yaml_content: str,
-    slurm_version: str = "25.11",
-    compiler_version: str = "13.4.0",
+    slurm_version: str,
+    operating_system: str,
     gpu_support: bool = False,
 ) -> str:
     """
@@ -439,11 +338,14 @@ def _get_slurm_builder_dockerfile(
 
     """
     # Generate all script components
-    install_deps_script = get_install_system_deps_script()
+    install_deps_script = COMPILER_TOOLCHAINS[operating_system][4]
+    container_image = COMPILER_TOOLCHAINS[operating_system][3]
+    compiler_version = COMPILER_TOOLCHAINS[operating_system][1]
+
     install_spack_script = get_install_spack_script()
     create_spack_profile_script = get_create_spack_profile_script()
     module_template_content = get_module_template_content()
-    slurm_build_script = get_slurm_build_script(compiler_version)
+    slurm_build_script = get_slurm_build_script(operating_system)
 
     # Generate the modulerc creation script
     modulerc_script = get_modulerc_creation_script(
@@ -471,12 +373,14 @@ def _get_slurm_builder_dockerfile(
 # ========================================================================
 # Stage 0 Init - Install build deps and init base system with Spack
 # ========================================================================
-FROM ubuntu:24.04 AS init
+FROM {container_image} AS init
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
-RUN {install_deps_script}
+RUN bash << 'SETUP_EOF'
+{install_deps_script}
+SETUP_EOF
 
 # Install Spack v1.0.0
 RUN {install_spack_script}
@@ -538,31 +442,32 @@ def _extract_slurm_tarball_from_image(
     image_tag: str,
     output_dir: str,
     slurm_version: str,
-    compiler_version: str,
+    toolchain: str,
 ) -> None:
     """
     Extract the Slurm package tarball from a packager Docker image.
 
     Args:
         image_tag: Tag of the packager Docker image
-        output_dir: Directory to extract the tarball to (will be appended with version/compiler_version)
+        output_dir: Directory to extract the tarball to (will be appended with version/toolchain)
         slurm_version: Slurm version (for finding the correct tarball)
-        compiler_version: GCC compiler version used for the build
+        toolchain: OS toolchain identifier used for the build
 
     """
     console.print(f"[bold blue]Extracting Slurm package from image {image_tag}...[/bold blue]")
 
-    # Create slurm_version-specific output directory: ~/.slurm-factory/slurm_version/compiler_version/
+    # Create slurm_version-specific output directory: ~/.slurm-factory/slurm_version/toolchain/
     base_path = Path(output_dir)
-    output_path = base_path / slurm_version / compiler_version
+    output_path = base_path / slurm_version / toolchain
     output_path.mkdir(parents=True, exist_ok=True)
 
     logger.debug(f"Extracting package from image {image_tag} to {output_path}")
 
     container_name = f"slurm-factory-extract-{slurm_version.replace('.', '-')}"
 
-    # Tarball name always includes compiler version for consistency
-    tarball_name = f"slurm-{slurm_version}-gcc{compiler_version}-software.tar.gz"
+    # Get GCC version from toolchain for tarball naming
+    _, gcc_ver, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
+    tarball_name = f"slurm-{slurm_version}-gcc{gcc_ver}-software.tar.gz"
 
     container_tarball_path = f"/opt/slurm/build_output/{tarball_name}"
 
@@ -629,7 +534,7 @@ def _extract_slurm_tarball_from_image(
 def _push_slurm_to_buildcache(
     image_tag: str,
     slurm_version: str,
-    compiler_version: str,
+    toolchain: str,
     publish_mode: str = "all",
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
@@ -644,7 +549,7 @@ def _push_slurm_to_buildcache(
     Args:
         image_tag: Tag of the build Docker image
         slurm_version: Slurm version
-        compiler_version: GCC compiler version
+        toolchain: OS toolchain identifier
         publish_mode: What to publish - "slurm", "deps", or "all"
         signing_key: GPG key ID for signing packages (e.g., "0xKEYID")
         gpg_private_key: GPG private key (base64 encoded) to import into container
@@ -654,7 +559,7 @@ def _push_slurm_to_buildcache(
     console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
 
     # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
-    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/slurm/{slurm_version}/{compiler_version}"
+    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/slurm/{slurm_version}/{toolchain}"
 
     logger.debug(f"Publishing Slurm {slurm_version} to {S3_BUILDCACHE_BUCKET} (mode: {publish_mode})")
 
@@ -703,7 +608,7 @@ def _push_slurm_to_buildcache(
             )
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
-            s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/deps/{compiler_version}"
+            s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/deps/{toolchain}"
             push_cmd = (
                 f"spack -e . buildcache push {signing_flags} --force --update-index "
                 "--only=dependencies --with-build-dependencies s3-buildcache slurm"
@@ -829,7 +734,7 @@ def _push_slurm_to_buildcache(
 def create_slurm_package(
     image_tag: str,
     slurm_version: str = "25.11",
-    compiler_version: str = "13.4.0",
+    toolchain: str = "noble",
     gpu_support: bool = False,
     cache_dir: str = "",
     no_cache: bool = False,
@@ -844,7 +749,7 @@ def create_slurm_package(
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
 
     logger.debug(
-        f"Building Slurm package: slurm_version={slurm_version}, compiler_version={compiler_version}, "
+        f"Building Slurm package: slurm_version={slurm_version}, toolchain={toolchain}, "
         f"gpu={gpu_support}, no_cache={no_cache}, use_local_buildcache={use_local_buildcache}, "
         f"publish={publish}, enable_hierarchy={enable_hierarchy}"
     )
@@ -858,7 +763,7 @@ def create_slurm_package(
         # Always use Spack-built compiler for consistency and relocatability
         spack_yaml = generate_yaml_string(
             slurm_version=slurm_version,
-            compiler_version=compiler_version,
+            toolchain=toolchain,
             gpu_support=gpu_support,
             enable_hierarchy=enable_hierarchy,
         )
@@ -874,7 +779,7 @@ def create_slurm_package(
         slurm_builder_dockerfile_content = _get_slurm_builder_dockerfile(
             spack_yaml,
             slurm_version,
-            compiler_version=compiler_version,
+            operating_system=toolchain,
             gpu_support=gpu_support,
         )
         logger.debug(f"Generated Dockerfile ({len(slurm_builder_dockerfile_content)} chars)")
@@ -895,7 +800,7 @@ def create_slurm_package(
             image_tag=image_tag,
             output_dir=cache_dir,
             slurm_version=slurm_version,
-            compiler_version=compiler_version,
+            toolchain=toolchain,
         )
 
         # If publish is enabled, push to buildcache
@@ -904,7 +809,7 @@ def create_slurm_package(
             _push_slurm_to_buildcache(
                 image_tag=image_tag,
                 slurm_version=slurm_version,
-                compiler_version=compiler_version,
+                toolchain=toolchain,
                 publish_mode=publish,
                 signing_key=signing_key,
                 gpg_private_key=gpg_private_key,

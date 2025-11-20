@@ -6,8 +6,7 @@ Slurm Factory uses GitHub Actions for continuous integration, testing, and autom
 
 The CI/CD system consists of:
 
-- **Compiler Builds** - Build and publish GCC toolchains to buildcache
-- **Slurm Builds** - Build and publish Slurm packages with all dependencies
+- **Slurm Builds** - Build and publish Slurm packages with dependencies for each OS toolchain
 - **Tarball Publishing** - Create relocatable tarballs and upload to S3
 - **Continuous Integration** - Run tests, linters, and type checking
 - **Documentation** - Auto-deploy documentation to GitHub Pages
@@ -416,9 +415,9 @@ on:
 ```
 
 **Outputs**:
-- Tarball: `slurm-{version}-gcc{compiler}-software.tar.gz`
-- Location: `s3://vantage-public-assets/slurm-factory/{version}/{compiler}/`
-- Public URL: `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/{version}/{compiler}/slurm-{version}-gcc{compiler}-software.tar.gz`
+- Tarball: `slurm-{version}-{toolchain}-software.tar.gz`
+- Location: `s3://vantage-public-assets/slurm-factory/{version}/{toolchain}/`
+- Public URL: `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/{version}/{toolchain}/slurm-{version}-{toolchain}-software.tar.gz`
 
 ### 4. CI Tests (`ci.yml`)
 

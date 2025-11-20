@@ -34,7 +34,7 @@ def build_slurm(
     slurm_version: Annotated[
         SlurmVersion, typer.Option("--slurm-version", help="Slurm version to build")
     ] = SlurmVersion.v25_11,
-    compiler_version: str = "13.4.0",
+    toolchain: str = "noble",
     gpu: bool = False,
     verify: bool = False,
     no_cache: bool = False,
@@ -54,7 +54,7 @@ def build_slurm(
 
     logger.debug(
         f"Starting build with parameters: slurm_version={slurm_version.value}, "
-        f"compiler_version={compiler_version}, gpu={gpu}, verify={verify}, "
+        f"toolchain={toolchain}, gpu={gpu}, verify={verify}, "
         f"publish={publish}, enable_hierarchy={enable_hierarchy}"
     )
 
@@ -101,7 +101,7 @@ def build_slurm(
         create_slurm_package(
             image_tag=image_tag,
             slurm_version=version,
-            compiler_version=compiler_version,
+            toolchain=toolchain,
             gpu_support=gpu,
             cache_dir=f"{settings.home_cache_dir}",
             no_cache=no_cache,
@@ -129,13 +129,13 @@ def build_slurm_command(
     slurm_version: Annotated[
         SlurmVersion, typer.Option("--slurm-version", help="Slurm version to build")
     ] = SlurmVersion.v25_11,
-    compiler_version: Annotated[
+    toolchain: Annotated[
         str,
         typer.Option(
-            "--compiler-version",
-            help=f"GCC compiler version to use ({', '.join(COMPILER_TOOLCHAINS.keys())})",
+            "--toolchain",
+            help=f"OS toolchain to use for building ({', '.join(COMPILER_TOOLCHAINS.keys())})",
         ),
-    ] = "13.4.0",
+    ] = "noble",
     gpu: Annotated[
         bool, typer.Option("--gpu", help="Enable GPU support (CUDA/ROCm) - creates larger packages")
     ] = False,
@@ -193,11 +193,13 @@ def build_slurm_command(
 
     Available versions: 25.11 (default), 25.11, 24.11, 23.11
 
-    Compiler toolchains (--compiler-version) - all built with Spack for relocatability:
-    - 14.2.0: GCC 14.2, glibc 2.39, latest stable
-    - 13.4.0 (default): GCC 13.4, glibc 2.39, Ubuntu 24.04 compatible
-    - 12.5.0: GCC 12.5, glibc 2.35, Ubuntu 22.04 compatible
-    - 11.5.0: GCC 11.5, glibc 2.35, good compatibility
+    OS Toolchains (--toolchain) - using system compilers:
+    - noble (default): Ubuntu 24.04, GCC 13.2, glibc 2.39
+    - jammy: Ubuntu 22.04, GCC 11.2, glibc 2.35
+    - focal: Ubuntu 20.04, GCC 9.4, glibc 2.31
+    - rockylinux9: Rocky Linux 9, GCC 11.4, glibc 2.34
+    - rockylinux8: Rocky Linux 8, GCC 8.5, glibc 2.28
+    - centos7: CentOS 7, GCC 4.8, glibc 2.17 (maximum compatibility)
     - 10.5.0: GCC 10.5, glibc 2.31, RHEL 8/Ubuntu 20.04 compatible
     - 9.5.0: GCC 9.5, glibc 2.28, wide compatibility
     - 8.5.0: GCC 8.5, glibc 2.28, RHEL 8 minimum
@@ -234,12 +236,11 @@ def build_slurm_command(
     - Professional Lmod modules with hierarchy support
 
     Examples:
-        slurm-factory build-slurm                                    # Build default (25.11, gcc 13.4.0)
+        slurm-factory build-slurm                                    # Build default (25.11, noble)
         slurm-factory build-slurm --slurm-version 24.11             # Build specific version
-        slurm-factory build-slurm --compiler-version 14.2.0         # Build with gcc 14.2
-        slurm-factory build-slurm --compiler-version 12.5.0         # gcc 12 - Ubuntu 22.04 compat
-        slurm-factory build-slurm --compiler-version 10.5.0         # gcc 10.5 - RHEL 8 compat
-        slurm-factory build-slurm --compiler-version 7.5.0          # gcc 7.5 - RHEL 7 compat
+        slurm-factory build-slurm --toolchain jammy                 # Build for Ubuntu 22.04
+        slurm-factory build-slurm --toolchain rockylinux9           # Build for Rocky Linux 9
+        slurm-factory build-slurm --toolchain centos7               # Build for RHEL 7
         slurm-factory build-slurm --gpu                             # Build with GPU support
         slurm-factory build-slurm --verify                          # Build with verification (CI)
         slurm-factory build-slurm --no-cache                        # Build without Docker cache
@@ -259,18 +260,18 @@ def build_slurm_command(
         console.print(f"[bold yellow]Valid options: {', '.join(valid_publish_options)}[/bold yellow]")
         raise typer.Exit(1)
 
-    if compiler_version not in COMPILER_TOOLCHAINS:
-        console.print(f"[bold red]Error: Invalid compiler version '{compiler_version}'[/bold red]")
+    if toolchain not in COMPILER_TOOLCHAINS:
+        console.print(f"[bold red]Error: Invalid toolchain '{toolchain}'[/bold red]")
         console.print(
-            f"[bold yellow]Available versions: {', '.join(sorted(COMPILER_TOOLCHAINS.keys()))}[/bold yellow]"
+            f"[bold yellow]Available toolchains: {', '.join(sorted(COMPILER_TOOLCHAINS.keys()))}[/bold yellow]"
         )
         raise typer.Exit(1)
 
-    # Show compiler info
-    gcc_ver, glibc_ver, description = COMPILER_TOOLCHAINS[compiler_version]
+    # Show toolchain info
+    os_name, gcc_ver, glibc_ver, base_image, _ = COMPILER_TOOLCHAINS[toolchain]
     console.print(
-        f"[bold blue]Building with compiler toolchain:[/bold blue] "
-        f"GCC {gcc_ver}, glibc {glibc_ver} ({description})"
+        f"[bold blue]Building with toolchain:[/bold blue] "
+        f"{os_name} (GCC {gcc_ver}, glibc {glibc_ver}, {base_image})"
     )
 
     console.print(f"[bold green]Starting build for Slurm {slurm_version}[/bold green]")
@@ -296,7 +297,7 @@ def build_slurm_command(
     build_slurm(
         ctx,
         slurm_version,
-        compiler_version,
+        toolchain,
         gpu,
         verify,
         no_cache,

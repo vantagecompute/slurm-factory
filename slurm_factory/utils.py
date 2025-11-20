@@ -238,40 +238,6 @@ def remove_old_docker_image(image_tag: str) -> None:
 
 
 
-def get_install_system_deps_script() -> str:
-    """Generate script to install system dependencies for Spack."""
-    return textwrap.dedent("""\
-        apt-get update && apt-get upgrade -y && \\
-        apt-get install -y \\
-        git \\
-        python3 \\
-        python3-pip \\
-        unzip \\
-        bison \\
-        flex \\
-        libfl-dev \\
-        cmake \\
-        make \\
-        m4 \\
-        pkg-config \\
-        ccache \\
-        findutils \\
-        diffutils \\
-        tar \\
-        gawk \\
-        gettext \\
-        libmd-dev \\
-        libbsd-dev \\
-        libsigsegv-dev \\
-        file \\
-        lmod \\
-        ca-certificates \\
-        wget && \\
-        python3 -m pip install --break-system-packages boto3 pyyaml && \\
-        apt-get clean && rm -rf /var/lib/apt/lists/*
-    """).strip()
-
-
 def get_install_spack_script() -> str:
     """Generate script to install Spack."""
     return textwrap.dedent(

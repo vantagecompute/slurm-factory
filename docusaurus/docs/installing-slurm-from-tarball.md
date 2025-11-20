@@ -17,20 +17,20 @@ Stick with the [buildcache workflow](./installing-slurm-from-buildcache.md) when
 Tarballs are published under the CloudFront distribution:
 
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/{slurm_version}/{compiler_version}/
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/{slurm_version}/{toolchain}/
 ```
 
 Each directory contains:
 
 ```
-slurm-{slurm_version}-gcc{compiler_version}-software.tar.gz      # Tarball
-slurm-{slurm_version}-gcc{compiler_version}-software.tar.gz.asc  # Detached GPG signature
-manifest.yml                                                      # Component manifest
-modules/                                                          # Lmod modulefiles
-view/                                                             # Relocated Slurm prefix
+slurm-{slurm_version}-{toolchain}-software.tar.gz      # Tarball
+slurm-{slurm_version}-{toolchain}-software.tar.gz.asc  # Detached GPG signature
+manifest.yml                                           # Component manifest
+modules/                                               # Lmod modulefiles
+view/                                                  # Relocated Slurm prefix
 ```
 
-Pick a tarball that matches both your host distribution and the GCC toolchain you expect to use (see [Build Artifacts](./build-artifacts.md) for the compatibility matrix).
+Pick a tarball that matches your host distribution (see [Build Artifacts](./build-artifacts.md) for the compatibility matrix).
 
 ## Prerequisites
 
@@ -44,20 +44,20 @@ Pick a tarball that matches both your host distribution and the GCC toolchain yo
 ```bash
 export CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 export SLURM_VERSION=25.11
-export GCC_VERSION=13.4.0
+export TOOLCHAIN=noble  # or: jammy, focal, rockylinux9, rockylinux8, centos7, etc.
 
 # Fetch tarball and signature
 mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball
-curl -O "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz"
-curl -O "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc"
+curl -O "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz"
+curl -O "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc"
 ```
 
 ### Verify the Tarball
 
 ```bash
 gpg --keyserver keyserver.ubuntu.com --auto-key-retrieve \
-        --verify slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-                         slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+        --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+                         slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 ```
 
 Verification succeeds when the output includes `gpg: Good signature from "slurm-factory"`.
@@ -66,7 +66,7 @@ Verification succeeds when the output includes `gpg: Good signature from "slurm-
 
 ```bash
 sudo mkdir -p /opt/slurm-factory
-sudo tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory
+sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory
 sudo chown -R root:root /opt/slurm-factory
 ```
 
@@ -113,7 +113,7 @@ sudo /opt/slurm-factory/view/sbin/slurmd
 
 ## Dockerfile Examples
 
-Each Dockerfile below downloads, verifies, and extracts the tarball, then bootstraps a simple single-node configuration using `auth/slurm`. Adjust `SLURM_VERSION`, `GCC_VERSION`, and `TARBALL_URL` to match the artifact you need.
+Each Dockerfile below downloads, verifies, and extracts the tarball, then bootstraps a simple single-node configuration using `auth/slurm`. Adjust `SLURM_VERSION`, `TOOLCHAIN`, and `TARBALL_URL` to match the artifact you need.
 
 ### Rocky Linux 7 (RHEL 7 Compatible)
 
@@ -123,8 +123,8 @@ Each Dockerfile below downloads, verifies, and extracts the tarball, then bootst
 FROM centos:7
 
 ARG SLURM_VERSION=23.11
-ARG GCC_VERSION=7.5.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=centos7
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN yum -y install epel-release && \
     yum -y install curl gnupg lmod lua lua-posix which && \
@@ -134,10 +134,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
         curl -fsSLO "${TARBALL_URL}.asc" && \
         curl -fsSLO "${TARBALL_URL}" && \
     gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
@@ -174,8 +174,8 @@ CMD ["/opt/slurm-factory/view/bin/sinfo"]
 FROM rockylinux:8
 
 ARG SLURM_VERSION=25.11
-ARG GCC_VERSION=11.5.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=rockylinux8
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN dnf -y install epel-release && \
     dnf -y install curl gnupg2 lmod lua-posix && \
@@ -185,10 +185,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
         curl -fsSLO "${TARBALL_URL}.asc" && \
         curl -fsSLO "${TARBALL_URL}" && \
     gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
@@ -225,8 +225,8 @@ CMD ["/opt/slurm-factory/view/bin/sinfo"]
 FROM rockylinux:9
 
 ARG SLURM_VERSION=25.11
-ARG GCC_VERSION=13.4.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=rockylinux9
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN dnf -y install epel-release && \
     dnf -y install curl gnupg2 lmod lua-posix && \
@@ -236,10 +236,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
         curl -fsSLO "${TARBALL_URL}.asc" && \
         curl -fsSLO "${TARBALL_URL}" && \
     gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
@@ -276,8 +276,8 @@ CMD ["/opt/slurm-factory/view/bin/sinfo"]
 FROM ubuntu:18.04
 
 ARG SLURM_VERSION=25.11
-ARG GCC_VERSION=11.5.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=bionic
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends ca-certificates curl gnupg lmod lua5.3 lua-posix && \
@@ -287,10 +287,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
         curl -fsSLO "${TARBALL_URL}.asc" && \
         curl -fsSLO "${TARBALL_URL}" && \
     gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
@@ -327,8 +327,8 @@ CMD ["/opt/slurm-factory/view/bin/sinfo"]
 FROM ubuntu:20.04
 
 ARG SLURM_VERSION=25.11
-ARG GCC_VERSION=12.5.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=focal
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -339,10 +339,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
         curl -fsSLO "${TARBALL_URL}.asc" && \
         curl -fsSLO "${TARBALL_URL}" && \
     gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
@@ -379,8 +379,8 @@ CMD ["/opt/slurm-factory/view/bin/sinfo"]
 FROM ubuntu:22.04
 
 ARG SLURM_VERSION=25.11
-ARG GCC_VERSION=13.4.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=jammy
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -391,10 +391,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
         curl -fsSLO "${TARBALL_URL}.asc" && \
         curl -fsSLO "${TARBALL_URL}" && \
         gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-            slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-            slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+            slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+            slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
@@ -431,8 +431,8 @@ CMD ["/opt/slurm-factory/view/bin/sinfo"]
 FROM ubuntu:24.04
 
 ARG SLURM_VERSION=25.11
-ARG GCC_VERSION=13.4.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=noble
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -443,10 +443,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
     curl -fsSLO "${TARBALL_URL}" && \
     curl -fsSLO "${TARBALL_URL}.asc" && \
     gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
@@ -485,8 +485,8 @@ CMD ["/opt/slurm-factory/view/bin/sinfo"]
 FROM ubuntu:devel
 
 ARG SLURM_VERSION=25.11
-ARG GCC_VERSION=15.2.0
-ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${GCC_VERSION}/slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz
+ARG TOOLCHAIN=oracular
+ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
 
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
@@ -497,10 +497,10 @@ RUN mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
     curl -fsSLO "${TARBALL_URL}" && \
     curl -fsSLO "${TARBALL_URL}.asc" && \
     gpg --batch --keyserver keyserver.ubuntu.com --auto-key-retrieve --verify \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-gcc${GCC_VERSION}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:$MODULEPATH \
