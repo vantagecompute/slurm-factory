@@ -131,7 +131,7 @@ class TestDockerConfiguration:
         """Test build timeout."""
         assert isinstance(BUILD_TIMEOUT, int)
         assert BUILD_TIMEOUT > 0
-        assert BUILD_TIMEOUT == 3600
+        assert BUILD_TIMEOUT == 14400
 
 
 class TestSpackPaths:

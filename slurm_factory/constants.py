@@ -66,7 +66,7 @@ yum install -y \
     lbzip2 \
     xz \
     kernel-headers && \
-    python3 -m pip install boto3 
+    python3 -m pip install boto3
 """
 
 ROCKY_9_SETUP_SCRIPT = """

@@ -19,7 +19,7 @@ This module generates Spack environment configurations as Python dictionaries,
 allowing for easy parameterization of Slurm versions and GPU support options.
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from slurm_factory.constants import COMPILER_TOOLCHAINS, SLURM_VERSIONS
 
@@ -200,7 +200,7 @@ def generate_spack_config(
     # Using slurm_factory.curl with exact variants to match slurm dependency requirements
     curl_spec = (
         f"slurm_factory.curl@8.15.0 libs=shared,static +nghttp2+libssh2+ldap+gssapi+libidn2 "
-        f"tls=openssl ^openssl@3.6.0 ^openldap@2.6.8 {compiler_spec}"
+        f"tls=openssl ^slurm_factory.openssl@3.6.0 ^openldap@2.6.8 {compiler_spec}"
     )
     specs = [
         # System compiler from toolchain - no custom build needed
@@ -213,8 +213,8 @@ def generate_spack_config(
         # Build OpenSSL with explicit zlib dependency
         f"slurm_factory.openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",
         f"jansson@2.14 {compiler_spec}",  # JSON library for libjwt
-        # JWT library with all dependencies - let Spack choose available version
-        f"libjwt ^openssl@3.6.0 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
+        # JWT library with all dependencies - use slurm_factory.openssl
+        f"libjwt ^slurm_factory.openssl@3.6.0 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
         openldap_spec,  # Build openldap before curl since curl+ldap needs it
         curl_spec,
         f"patchelf@0.18.0 {compiler_spec}",  # For RPATH fixing during relocatability
@@ -366,7 +366,7 @@ def generate_spack_config(
                 "libjwt": {
                     "buildable": True,
                     "require": [
-                        "^openssl@3:",
+                        "^slurm_factory.openssl@3:",
                         "^jansson",
                         "^automake@:1.16.3",  # libjwt@1.15.3 incompatible with automake 1.16.5
                     ],  # Ensure it uses Spack-built OpenSSL 3.x and jansson

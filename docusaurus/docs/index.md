@@ -139,7 +139,7 @@ sudo tar -xzf slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz -C /
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 ```
 
-**→ See GPG verification guide:** [Verifying GPG Signatures](../VERIFY_GPG_SIGNATURE.md)
+**→ See GPG verification guide:** [Verifying GPG Signatures](verify-gpg-signature.md)
 **→ Full workflow and Dockerfiles:** [Installing Slurm from Tarball](installing-slurm-from-tarball.md)
 
 ### Option 2: Build Custom Slurm with slurm-factory Tool
@@ -251,9 +251,12 @@ spack install slurm@25.11
 ```
 
 #### Install Slurm 25.11 Tarball from Buildcache
+
 ```bash
-
-
+# Download and install tarball (placeholder - see installation guide for details)
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/25.11/15.2.0/slurm-25.11-gcc15.2.0-software.tar.gz
+tar -xzf slurm-25.11-gcc15.2.0-software.tar.gz -C /opt/
+```
 
 ## GPG Package Verification
 

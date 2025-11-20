@@ -16,7 +16,7 @@
 
 import pytest
 
-from slurm_factory.builders import slurm_builder, toolchain_builder
+from slurm_factory.builders import slurm_builder
 from slurm_factory.constants import SlurmVersion
 
 
@@ -47,12 +47,3 @@ class TestSlurmBuilderModule:
         """Test that get_move_slurm_assets_to_container_str function exists."""
         assert hasattr(slurm_builder, 'get_move_slurm_assets_to_container_str')
         assert callable(slurm_builder.get_move_slurm_assets_to_container_str)
-
-
-class TestToolchainBuilderModule:
-    """Test the toolchain_builder module structure and exports."""
-
-    def test_build_compiler_function_exists(self):
-        """Test that the build_compiler function exists and is callable."""
-        assert hasattr(toolchain_builder, 'build_compiler')
-        assert callable(toolchain_builder.build_compiler)

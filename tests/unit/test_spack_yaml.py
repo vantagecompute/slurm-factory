@@ -49,11 +49,11 @@ class TestSpackConfigGeneration:
         assert isinstance(spack_config["specs"], list)
         assert len(spack_config["specs"]) > 0
         
-        # Test that all specs have compiler constraints (using default 13.4.0)
+        # Test that all specs have compiler constraints (using default noble toolchain: gcc@13.3.0)
         # EXCEPT gcc itself which should not have a compiler spec (it's built with system compiler)
         for spec in spack_config["specs"]:
             if not spec.startswith("gcc@"):
-                assert "%gcc@13.4.0" in spec, f"Spec missing compiler constraint: {spec}"
+                assert "%gcc@13.3.0" in spec, f"Spec missing compiler constraint: {spec}"
             else:
                 # GCC should not have a compiler spec - it's built with system compiler from Ubuntu
                 assert "%" not in spec, f"GCC spec should not have compiler constraint: {spec}"
@@ -95,27 +95,25 @@ class TestSpackConfigGeneration:
         assert len(compilers) == 0
 
     def test_gcc_buildcache_configuration(self):
-        """Test that GCC is properly configured to use buildcache."""
-        # Use default compiler version
-        compiler_version = "13.4.0"
-        config = generate_spack_config(compiler_version=compiler_version)
-        packages = config["spack"]["packages"]
-        # Test that GCC is configured to be installed from buildcache
-        assert "gcc" in packages
-        gcc_config = packages["gcc"]
-        # GCC should be buildable (from buildcache)
-        assert gcc_config["buildable"] is True
-        # GCC should have correct version and variants to match buildcache
-        assert gcc_config["version"] == [compiler_version]
-        assert "+binutils" in gcc_config["variants"]
-        assert "+piclibs" in gcc_config["variants"]
+        """Test that GCC compiler is properly configured from system."""
+        # Use noble toolchain (Ubuntu 24.04 with GCC 13.3.0)
+        toolchain = "noble"
+        config = generate_spack_config(toolchain=toolchain)
+        compilers = config["spack"]["compilers"]
+        # System compiler should be detected and configured
+        assert isinstance(compilers, list)
+        # No pre-built compilers are needed with system toolchain approach
+        # The compiler is found via 'spack compiler find --scope site'
 
     def test_package_configurations(self):
         """Test package-specific configurations."""
         config = generate_spack_config()
         packages = config["spack"]["packages"]
         # Test build tools are buildable (no longer using externals)
-        build_tools = ["cmake", "python", "gmake", "m4", "pkgconf", "diffutils", "findutils", "tar", "gettext"]
+        build_tools = [
+            "cmake", "python", "gmake", "m4", "pkgconf",
+            "diffutils", "findutils", "tar", "gettext"
+        ]
         for tool in build_tools:
             assert tool in packages
             assert packages[tool]["buildable"] is True
@@ -135,7 +133,7 @@ class TestSpackConfigGeneration:
         assert libjwt_config["buildable"] is True
         assert "require" in libjwt_config
         requirements = libjwt_config["require"]
-        assert "^openssl@3:" in requirements
+        assert "^slurm_factory.openssl@3:" in requirements
         assert "^jansson" in requirements
 
 
@@ -150,10 +148,10 @@ class TestModuleConfiguration:
         default_config = module_config["default"]
         assert "enable" in default_config
         assert "lmod" in default_config
-        # Test Lmod configuration (using default 13.4.0)
+        # Test Lmod configuration (using default noble toolchain: gcc@13.3.0)
         lmod_config = default_config["lmod"]
         assert "core_compilers" in lmod_config
-        assert "gcc@13.4.0" in lmod_config["core_compilers"]
+        assert "gcc@13.3.0" in lmod_config["core_compilers"]
         assert lmod_config["hierarchy"] == []
         # Test included modules
         assert "slurm" in lmod_config["include"]

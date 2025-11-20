@@ -172,7 +172,7 @@ def get_slurm_build_script(toolchain: str) -> str:
     """
     # Get GCC version for this toolchain
     _, gcc_version, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
-    
+
     return textwrap.dedent(f"""        source {SPACK_SETUP_SCRIPT}
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
@@ -330,7 +330,7 @@ def _get_slurm_builder_dockerfile(
     Args:
         spack_yaml_content: The complete spack.yaml content as a string
         slurm_version: Slurm version (e.g., "25.11") for the tarball filename
-        compiler_version: GCC compiler version to use (downloaded from buildcache)
+        operating_system: Operating system identifier for setup script
         gpu_support: Whether GPU support is enabled
 
     Returns:

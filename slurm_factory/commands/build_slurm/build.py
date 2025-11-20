@@ -262,9 +262,8 @@ def build_slurm_command(
 
     if toolchain not in COMPILER_TOOLCHAINS:
         console.print(f"[bold red]Error: Invalid toolchain '{toolchain}'[/bold red]")
-        console.print(
-            f"[bold yellow]Available toolchains: {', '.join(sorted(COMPILER_TOOLCHAINS.keys()))}[/bold yellow]"
-        )
+        available = ', '.join(sorted(COMPILER_TOOLCHAINS.keys()))
+        console.print(f"[bold yellow]Available toolchains: {available}[/bold yellow]")
         raise typer.Exit(1)
 
     # Show toolchain info

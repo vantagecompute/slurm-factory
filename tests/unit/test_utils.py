@@ -61,7 +61,6 @@ class TestModuleStructure:
             'get_data_dir',
             'build_docker_image',
             'remove_old_docker_image',
-            'get_install_system_deps_script',
             'get_install_spack_script',
             'get_create_spack_profile_script',
         ]
