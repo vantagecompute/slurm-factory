@@ -27,7 +27,7 @@ flowchart TD
     Start([Workflow Dispatch]) --> PrepareMatrix[Prepare Compiler Matrix]
     PrepareMatrix --> Matrix{Matrix Build}
     
-    Matrix -->|GCC 15.1.0| Build1[Build Compiler 15.1.0]
+    Matrix -->|GCC 15.2.0| Build1[Build Compiler 15.2.0]
     Matrix -->|GCC 14.2.0| Build2[Build Compiler 14.2.0]
     Matrix -->|GCC 13.4.0| Build3[Build Compiler 13.4.0]
     Matrix -->|GCC 12.5.0| Build4[Build Compiler 12.5.0]
@@ -177,7 +177,7 @@ env:
 
 **Outputs**:
 - Compiler buildcache at: `s3://slurm-factory-spack-buildcache-4b670/compilers/{version}/buildcache`
-- Accessible via: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache`
+- Accessible via: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/`
 
 ### 2. Slurm Dependencies Buildcache (`build-and-publish-slurm-all.yml`)
 
@@ -213,10 +213,10 @@ flowchart TD
     Checkout3 --> OIDC3[AWS OIDC Auth]
     CheckoutN --> OIDCN[AWS OIDC Auth]
     
-    OIDC1 --> BuildSlurm1[slurm-factory build<br/>--publish=all --gpu]
-    OIDC2 --> BuildSlurm2[slurm-factory build<br/>--publish=all --gpu]
-    OIDC3 --> BuildSlurm3[slurm-factory build<br/>--publish=all --gpu]
-    OIDCN --> BuildSlurmN[slurm-factory build<br/>--publish=all --gpu]
+    OIDC1 --> BuildSlurm1[slurm-factory build-slurm<br/>--publish=all --gpu]
+    OIDC2 --> BuildSlurm2[slurm-factory build-slurm<br/>--publish=all --gpu]
+    OIDC3 --> BuildSlurm3[slurm-factory build-slurm<br/>--publish=all --gpu]
+    OIDCN --> BuildSlurmN[slurm-factory build-slurm<br/>--publish=all --gpu]
     
     BuildSlurm1 --> Docker1[Docker Build<br/>Spack Container]
     BuildSlurm2 --> Docker2[Docker Build<br/>Spack Container]
@@ -332,14 +332,14 @@ flowchart TD
     Steps7 --> Clean7[Clean Previous Builds]
     Steps8 --> Clean8[Clean Previous Builds]
     
-    Clean1 --> BuildTar1[slurm-factory build --gpu]
-    Clean2 --> BuildTar2[slurm-factory build --gpu]
-    Clean3 --> BuildTar3[slurm-factory build --gpu]
-    Clean4 --> BuildTar4[slurm-factory build --gpu]
-    Clean5 --> BuildTar5[slurm-factory build --gpu]
-    Clean6 --> BuildTar6[slurm-factory build --gpu]
-    Clean7 --> BuildTar7[slurm-factory build --gpu]
-    Clean8 --> BuildTar8[slurm-factory build --gpu]
+    Clean1 --> BuildTar1[slurm-factory build-slurm --gpu]
+    Clean2 --> BuildTar2[slurm-factory build-slurm --gpu]
+    Clean3 --> BuildTar3[slurm-factory build-slurm --gpu]
+    Clean4 --> BuildTar4[slurm-factory build-slurm --gpu]
+    Clean5 --> BuildTar5[slurm-factory build-slurm --gpu]
+    Clean6 --> BuildTar6[slurm-factory build-slurm --gpu]
+    Clean7 --> BuildTar7[slurm-factory build-slurm --gpu]
+    Clean8 --> BuildTar8[slurm-factory build-slurm --gpu]
     
     BuildTar1 --> Docker1[Docker: Spack Build]
     BuildTar2 --> Docker2[Docker: Spack Build]
@@ -494,7 +494,7 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    Start([slurm-factory build]) --> Docker[Create Docker<br/>Container]
+    Start([slurm-factory build-slurm]) --> Docker[Create Docker<br/>Container]
     Docker --> Base[Ubuntu 24.04<br/>Base Image]
     Base --> Spack[Install Spack<br/>v1.0.0]
     Spack --> CustomRepo[Add Custom<br/>Spack Repo]

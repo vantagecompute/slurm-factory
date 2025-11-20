@@ -450,7 +450,7 @@ curl -I https://slurm-factory-spack-binary-cache.vantagecompute.ai/
 # Remove and re-add mirror
 spack mirror remove slurm-factory
 spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
 ```
 
 ### GPG Key Issues

@@ -48,9 +48,6 @@ wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${COMPILER_VERSION}/slurm-${SLUR
 # Import from keyserver (recommended)
 gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
 
-# Alternative: Import from the buildcache
-curl https://slurm-factory-spack-binary-cache.vantagecompute.ai/build_cache/_pgp/DFB92630BCA5AB71.pub | gpg --import
-
 # Verify the key was imported
 gpg --list-keys DFB92630BCA5AB71
 ```

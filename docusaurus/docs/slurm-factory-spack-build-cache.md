@@ -105,7 +105,7 @@ The easiest way to import the signing keys is to let Spack fetch them automatica
 ```bash
 # Add a mirror first
 spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
 
 # Import and trust all GPG keys from the buildcache
 spack buildcache keys --install --trust
@@ -224,7 +224,7 @@ The `slurm-factory` CLI can leverage the build cache automatically:
 pip install slurm-factory
 
 # Build uses buildcache by default for dependencies
-slurm-factory build --slurm-version 25.11 --compiler-version 15.2.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 15.2.0
 ```
 
 The CLI will:
@@ -242,15 +242,15 @@ All GCC versions are available with full dependency chains:
 
 | GCC Version | glibc | Target Distro | Buildcache URL |
 |-------------|-------|---------------|----------------|
-| 15.1.0 | 2.40 | Latest (experimental) | `compilers/15.1.0/buildcache` |
-| 14.2.0 | 2.39 | Latest stable | `compilers/14.2.0/buildcache` |
-| 13.4.0 | 2.39 | Ubuntu 24.04 **(default)** | `compilers/13.4.0/buildcache` |
-| 12.5.0 | 2.35 | Ubuntu 22.04 | `compilers/12.5.0/buildcache` |
-| 11.5.0 | 2.35 | Ubuntu 22.04 | `compilers/11.5.0/buildcache` |
-| 10.5.0 | 2.31 | RHEL 8 / Ubuntu 20.04 | `compilers/10.5.0/buildcache` |
-| 9.5.0 | 2.28 | RHEL 8 | `compilers/9.5.0/buildcache` |
-| 8.5.0 | 2.28 | RHEL 8 | `compilers/8.5.0/buildcache` |
-| 7.5.0 | 2.17 | RHEL 7 | `compilers/7.5.0/buildcache` |
+| 15.2.0 | 2.40 | Latest (experimental) | `compilers/15.2.0/` |
+| 14.2.0 | 2.39 | Latest stable | `compilers/14.2.0/` |
+| 13.4.0 | 2.39 | Ubuntu 24.04 **(default)** | `compilers/13.4.0/` |
+| 12.5.0 | 2.35 | Ubuntu 22.04 | `compilers/12.5.0/` |
+| 11.5.0 | 2.35 | Ubuntu 22.04 | `compilers/11.5.0/` |
+| 10.5.0 | 2.31 | RHEL 8 / Ubuntu 20.04 | `compilers/10.5.0/` |
+| 9.5.0 | 2.28 | RHEL 8 | `compilers/9.5.0/` |
+| 8.5.0 | 2.28 | RHEL 8 | `compilers/8.5.0/` |
+| 7.5.0 | 2.17 | RHEL 7 | `compilers/7.5.0/` |
 
 Each compiler buildcache includes:
 - `gcc` - Full GCC compiler suite (C, C++, Fortran)
@@ -265,9 +265,9 @@ All combinations of Slurm version × GCC compiler version are available:
 
 | Slurm Version | Status | Available Compilers | Buildcache URL Pattern |
 |---------------|--------|---------------------|------------------------|
-| 25.11 | Latest | All (7.5.0-15.1.0) | `slurm/25.11/{compiler}/buildcache` |
-| 24.11 | LTS | All (7.5.0-14.2.0) | `slurm/24.11/{compiler}/buildcache` |
-| 23.11 | Stable | All (7.5.0-14.2.0) | `slurm/23.11/{compiler}/buildcache` |
+| 25.11 | Latest | All (7.5.0-15.2.0) | `slurm/25.11/{compiler}/` |
+| 24.11 | LTS | All (7.5.0-14.2.0) | `slurm/24.11/{compiler}/` |
+| 23.11 | Stable | All (7.5.0-14.2.0) | `slurm/23.11/{compiler}/` |
 
 Each Slurm buildcache includes:
 - **Slurm** - Complete workload manager with all plugins
@@ -319,7 +319,7 @@ GPU builds additionally include:
 ```bash
 # Add mirror
 spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
 
 # Import GPG signing keys
 spack buildcache keys --install --trust

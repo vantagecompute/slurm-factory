@@ -52,7 +52,7 @@ Install the slurm-factory tool to build custom packages:
 pip install slurm-factory
 
 # Build Slurm with default compiler (GCC 13.4.0)
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 ```
 
 **→ Full guide:** [Installing slurm-factory Tool](https://vantagecompute.github.io/slurm-factory/installation)
@@ -133,16 +133,16 @@ spack install slurm@25.11%gcc@13.4.0
 
 ```bash
 # Default build (CPU-only, GCC 13.4.0)
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 
 # GPU support (CUDA/ROCm)
-slurm-factory build --slurm-version 25.11 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --gpu
 
 # Different compiler version
-slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 14.2.0
 
 # Build and publish to buildcache with GPG signing
-slurm-factory build --slurm-version 25.11 --publish \
+slurm-factory build-slurm --slurm-version 25.11 --publish \
   --signing-key $GPG_KEY_ID \
   --gpg-private-key "$GPG_PRIVATE_KEY" \
   --gpg-passphrase "$GPG_PASSPHRASE"

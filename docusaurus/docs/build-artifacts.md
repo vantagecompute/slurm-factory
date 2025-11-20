@@ -191,7 +191,7 @@ All Slurm × Compiler combinations are pre-built and available:
 
 | Compiler | Target OS | Public URL |
 |----------|-----------|------------|
-| GCC 15.1.0 | Latest (experimental) | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/15.1.0/slurm-25.11-gcc15.1.0-software.tar.gz` |
+| GCC 15.2.0 | Latest (experimental) | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/15.2.0/slurm-25.11-gcc15.2.0-software.tar.gz` |
 | GCC 14.2.0 | Latest | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/14.2.0/slurm-25.11-gcc14.2.0-software.tar.gz` |
 | GCC 13.4.0 | Ubuntu 24.04 **(recommended)** | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/13.4.0/slurm-25.11-gcc13.4.0-software.tar.gz` |
 | GCC 12.5.0 | Ubuntu 22.04 | `https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/12.5.0/slurm-25.11-gcc12.5.0-software.tar.gz` |
@@ -215,12 +215,12 @@ All buildcache packages are available via CloudFront:
 
 **Compiler Buildcache URLs**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/
 ```
 
 **Slurm Buildcache URLs**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/
 ```
 
 See [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) for complete buildcache documentation.
@@ -267,10 +267,10 @@ source spack/share/spack/setup-env.sh
 
 # 2. Add buildcache mirrors
 spack mirror add slurm-factory-compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/
 
 spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
 
 # 3. Import and trust GPG signing keys
 spack buildcache keys --install --trust
@@ -290,7 +290,7 @@ sinfo --version
 pip install slurm-factory
 
 # Build will use buildcache for dependencies
-slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
 ```
 
 ## Artifact Verification
@@ -341,10 +341,10 @@ Install Slurm directly with Spack:
 ```bash
 # 1. Add buildcache mirrors
 spack mirror add slurm-factory-compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/
 
 spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
 
 # 2. Import and trust GPG signing keys
 spack buildcache keys --install --trust

@@ -144,6 +144,7 @@ cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 ```
 
 **→ See GPG verification guide:** [Verifying GPG Signatures](../VERIFY_GPG_SIGNATURE.md)
+**→ Full workflow and Dockerfiles:** [Installing Slurm from Tarball](installing-slurm-from-tarball.md)
 
 ### Option 2: Build Custom Slurm with slurm-factory Tool
 
@@ -158,7 +159,7 @@ sudo usermod -aG docker $USER && newgrp docker
 pip install slurm-factory
 
 # Build Slurm (~45 minutes)
-slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
 ```
 
 **→ See the complete guide:** [Installing slurm-factory Tool](installation.md)
@@ -184,22 +185,22 @@ slurm-factory build-compiler --compiler-version 13.4.0 --publish
 
 **Output**: Docker image and optional buildcache upload to S3
 
-### `build`
+### `build-slurm`
 
 Build complete Slurm packages with all dependencies:
 
 ```bash
 # Standard build (CPU-optimized, ~2-5GB)
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 
 # GPU support (includes CUDA/ROCm, ~15-25GB)
-slurm-factory build --slurm-version 25.11 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --gpu
 
 # Use specific compiler version
-slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 14.2.0
 
 # Publish to buildcache (requires AWS credentials)
-slurm-factory build --slurm-version 25.11 --publish=all
+slurm-factory build-slurm --slurm-version 25.11 --publish=all
 ```
 
 **Supported Versions**: 25.11, 24.11, 23.11
@@ -214,13 +215,13 @@ Pre-built packages are available at `slurm-factory-spack-binary-cache.vantagecom
 
 #### Compilers
 
-- **URL**: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache`
+- **URL**: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/`
 - **Versions**: GCC 7.5.0 through 15.2.0
 - **Includes**: gcc, gcc-runtime, binutils, gmp, mpfr, mpc, zlib-ng, zstd
 
 #### Slurm Packages
 
-- **URL**: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache`
+- **URL**: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/`
 - **Slurm Versions**: 25.11, 24.11, 23.11
 - **Compiler Combinations**: Each Slurm version × each GCC version
 - **Includes**: All dependencies (OpenMPI, OpenSSL, Munge, PMIx, HDF5, etc.)
@@ -233,27 +234,30 @@ Pre-built packages are available at `slurm-factory-spack-binary-cache.vantagecom
 - 🔄 **Always Current**: Automated workflows keep packages up-to-date
 - 💾 **Storage Efficient**: Download only what you need (2-25GB vs 50GB build requirements)
 
-### Usage Examples
+### Usage Example
+
+#### Install Slurm 25.11 from Buildcache with gcc 13.4.0
 
 ```bash
-# Install latest Slurm with recommended compiler
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+# Install the Slurm-Factory Spack Repo
+spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo ~/slurm-factory-spack-repo
+
+# Install latest Slurm mirrors for slurm built with gcc@13.4.0
+spack mirror add slurm-factory-compiler \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compiler/13.4.0/
+spack mirror add slurm-factory-deps \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/deps/13.4.0/
+spack mirror add slurm-factory-slurm \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
+
 spack buildcache keys --install --trust
 spack install slurm@25.11
-
-# Install legacy Slurm with older compiler
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/23.11/11.5.0/buildcache
-spack buildcache keys --install --trust
-spack install slurm@23.11
-
-# Install just the compiler
-spack mirror add gcc-buildcache \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
-spack buildcache keys --install --trust
-spack install gcc@13.4.0
 ```
+
+#### Install Slurm 25.11 Tarball from Buildcache
+```bash
+
+
 
 ## GPG Package Verification
 
