@@ -27,10 +27,13 @@ CENTOS_7_SETUP_SCRIPT = """
 # CentOS 7 setup script for Slurm Factory
 # Install EPEL repository
 yum install -y epel-release
-yum install -y \
+# Update system packages AND install build tools in one transaction
+# This ensures glibc and gcc versions are compatible
+yum update -y && yum install -y \
     gcc \
     gcc-c++ \
     gcc-gfortran \
+    glibc-devel \
     make \
     wget \
     tar \
@@ -42,6 +45,8 @@ yum install -y \
     patch \
     lbzip2 \
     xz \
+    unzip \
+    diffutils \
     kernel-headers && \
     python3 -m pip install boto3
 """
@@ -50,10 +55,13 @@ ROCKY_8_SETUP_SCRIPT = """
 # Rocky 8 setup script for Slurm Factory
 # Install EPEL repository
 yum install -y epel-release
-yum install -y \
+# Update system packages AND install build tools in one transaction
+# This ensures glibc and gcc versions are compatible
+yum update -y && yum install -y \
     gcc \
     gcc-c++ \
     gcc-gfortran \
+    glibc-devel \
     make \
     wget \
     tar \
@@ -65,18 +73,23 @@ yum install -y \
     patch \
     lbzip2 \
     xz \
+    unzip \
+    diffutils \
     kernel-headers && \
     python3 -m pip install boto3
 """
 
 ROCKY_9_SETUP_SCRIPT = """
 # Rocky 9 setup script for Slurm Factory
-# Install EPEL repository
+# Install EPEL repository first
 yum install -y epel-release
-yum install -y \
+# Update system packages AND install build tools in one transaction
+# This ensures glibc and gcc versions are compatible
+yum update -y && yum install -y \
     gcc \
     gcc-c++ \
     gcc-gfortran \
+    glibc-devel \
     make \
     wget \
     tar \
@@ -88,6 +101,8 @@ yum install -y \
     patch \
     lbzip2 \
     xz \
+    unzip \
+    diffutils \
     kernel-headers && \
     python3 -m pip install boto3
 """
@@ -107,7 +122,9 @@ apt-get install -y \
     ca-certificates \
     python3 \
     python3-pip \
-    patch && \
+    patch \
+    unzip \
+    diffutils && \
     python3 -m pip install --break-system-packages boto3 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 """
@@ -127,7 +144,9 @@ apt-get install -y \
     ca-certificates \
     python3 \
     python3-pip \
-    patch && \
+    patch \
+    unzip && \
+    diffutils && \
     python3 -m pip install --break-system-packages boto3 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 """
@@ -147,7 +166,9 @@ apt-get install -y \
     ca-certificates \
     python3 \
     python3-pip \
-    patch && \
+    patch \
+    unzip && \
+    diffutils && \
     python3 -m pip install --break-system-packages boto3 && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 """
@@ -191,7 +212,6 @@ DOCKER_BUILD_TIMEOUT = 600  # 10 minutes for image build
 
 # Spack buildcache configuration
 SLURM_FACTORY_SPACK_CACHE_BASE_URL = "https://slurm-factory-spack-binary-cache.vantagecompute.ai"
-SLURM_FACTORY_GPG_PUBLIC_KEY_URL = f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/keys/vantage-slurm-factory.pub"
 
 # S3 bucket for Spack buildcache
 S3_BUILDCACHE_BUCKET = "s3://slurm-factory-spack-buildcache-4b670"

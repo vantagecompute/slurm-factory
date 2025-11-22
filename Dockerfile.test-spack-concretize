@@ -1,0 +1,79 @@
+# Test Dockerfile to verify Spack configuration concretizes successfully
+FROM rockylinux:9
+
+# Install dependencies in single transaction with update to avoid glibc version mismatch
+RUN yum install -y epel-release && \
+    yum install -y \
+        gcc \
+        gcc-c++ \
+        gcc-gfortran \
+        make \
+        wget \
+        tar \
+        git \
+        python3 \
+        python3-pip \
+        which \
+        patch \
+        lbzip2 \
+        xz \
+        unzip \
+        kernel-headers && \
+    python3 -m pip install boto3
+
+# Install Spack
+RUN git clone --depth=1 --branch=v1.0.0 https://github.com/spack/spack.git /opt/spack
+
+# Set up Spack environment
+ENV SPACK_ROOT=/opt/spack
+ENV PATH="${SPACK_ROOT}/bin:${PATH}"
+
+# Initialize Spack
+RUN . /opt/spack/share/spack/setup-env.sh
+
+# Create working directory
+WORKDIR /root/spack-project
+
+# Copy spack.yaml
+COPY spack.yaml /root/spack-project/spack.yaml
+
+# Add slurm-factory spack repo (remove if exists, then add)
+RUN bash -c "source /opt/spack/share/spack/setup-env.sh && \
+    cd /root/spack-project && \
+    spack env activate . && \
+    (spack repo rm slurm_factory 2>/dev/null || true) && \
+    spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo"
+
+
+# Test: Detect compilers
+RUN bash -c "source /opt/spack/share/spack/setup-env.sh && \
+    spack compiler find --scope site && \
+    spack compiler list"
+
+# Test: Activate environment
+RUN bash -c "source /opt/spack/share/spack/setup-env.sh && \
+    cd /root/spack-project && \
+    spack env activate . && \
+    spack env status"
+
+# Test: Debug openssl configuration
+RUN bash -c "source /opt/spack/share/spack/setup-env.sh && \
+    cd /root/spack-project && \
+    spack env activate . && \
+    echo '==> Checking specs with openssl...' && \
+    grep -n 'openssl' spack.yaml && \
+    echo '==> Checking slurm_factory repo...' && \
+    spack repo list && \
+    echo '==> Checking if openssl package exists in slurm_factory repo...' && \
+    spack info slurm_factory.openssl"
+
+# Test: Concretize (this is where the error happens)
+RUN bash -c "source /opt/spack/share/spack/setup-env.sh && \
+    cd /root/spack-project && \
+    spack env activate . && \
+    echo '==> Starting concretization test...' && \
+    spack -e . concretize -f --fresh 2>&1 | tee /tmp/concretize.log && \
+    echo '==> Concretization successful!' && \
+    spack find -v"
+
+CMD ["/bin/bash"]

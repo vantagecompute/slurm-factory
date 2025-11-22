@@ -1,0 +1,101 @@
+FROM rockylinux:9
+
+# Install system dependencies
+RUN dnf install -y epel-release && \
+    dnf update -y && \
+    dnf install -y --allowerasing \
+        gcc \
+        gcc-c++ \
+        gcc-gfortran \
+        glibc-devel \
+        make \
+        patch \
+        unzip \
+        bzip2 \
+        file \
+        git \
+        gnupg2 \
+        hostname \
+        iproute \
+        python3 \
+        python3-pip \
+        findutils \
+        tar \
+        xz \
+        wget \
+        gzip \
+        curl \
+        vim \
+        less \
+        diffutils && \
+    dnf clean all
+
+# Install Spack v1.0.0
+WORKDIR /opt
+RUN git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+
+# Initialize Spack environment
+ENV SPACK_ROOT=/opt/spack
+ENV PATH="${SPACK_ROOT}/bin:${PATH}"
+RUN echo '. /opt/spack/share/spack/setup-env.sh' >> /root/.bashrc
+
+# Add slurm-factory Spack repository
+RUN . /opt/spack/share/spack/setup-env.sh && \
+    spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo
+
+# Create test environment directory
+WORKDIR /root/spack-project
+
+# Copy the generated spack.yaml for inspection and testing
+COPY tmp/spack.yaml /root/spack-project/spack.yaml
+
+# Activate environment and detect compilers
+RUN /bin/bash <<'EOFBASH'
+source /opt/spack/share/spack/setup-env.sh
+cd /root/spack-project
+spack -e . compiler find --scope site
+spack -e . compiler list
+EOFBASH
+
+# Debug: Show the MySQL spec and concretize
+RUN /bin/bash <<'EOFBASH'
+source /opt/spack/share/spack/setup-env.sh
+cd /root/spack-project
+echo "==> Full spack.yaml content:"
+cat spack.yaml
+
+echo "==> Concretizing environment..."
+spack -e . concretize -f -j $(nproc) --fresh 2>&1 | tee /tmp/concretize.log
+
+echo "==> MySQL spec details:"
+spack -e . spec mysql@8.0.35 2>&1 | tee /tmp/mysql-spec.log
+
+echo "==> Checking MySQL package info from slurm_factory repo:"
+spack -e . info mysql 2>&1 | tee /tmp/mysql-info.log
+EOFBASH
+
+# Try to install just MySQL with verbose output to see the actual error
+RUN /bin/bash <<'EOFBASH'
+source /opt/spack/share/spack/setup-env.sh
+cd /root/spack-project
+
+echo "==> Installing MySQL with maximum verbosity..."
+spack -e . install -j $(nproc) --verbose --show-log-on-error mysql 2>&1 | tee /tmp/mysql-install.log || {
+    echo "==> MySQL install failed, showing last 200 lines of build log:"
+    tail -n 200 /tmp/mysql-install.log
+    
+    echo "==> Searching for build directory..."
+    find /tmp -type d -name "*mysql*" 2>/dev/null | head -20
+    
+    echo "==> Checking for CMake error logs..."
+    find /tmp -type f -name "CMakeError.log" -o -name "CMakeOutput.log" 2>/dev/null | while read f; do
+        echo "==> Found: $f"
+        echo "Last 50 lines:"
+        tail -n 50 "$f"
+    done
+    
+    exit 1
+}
+EOFBASH
+
+CMD ["/bin/bash"]

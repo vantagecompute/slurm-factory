@@ -1,0 +1,43 @@
+FROM rockylinux:9
+
+# Install system dependencies
+RUN dnf install -y epel-release && \
+    dnf update -y && \
+    dnf install -y --allowerasing \
+        gcc gcc-c++ gcc-gfortran make patch unzip bzip2 file \
+        git gnupg2 curl && \
+    dnf clean all
+
+# Install Spack v1.0.0
+WORKDIR /opt
+RUN git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+
+ENV SPACK_ROOT=/opt/spack
+ENV PATH="${SPACK_ROOT}/bin:${PATH}"
+
+# Add slurm-factory Spack repository
+RUN . /opt/spack/share/spack/setup-env.sh && \
+    spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo
+
+# Create test environment directory
+WORKDIR /root/spack-project
+COPY tmp/spack-mysql-fixed.yaml /root/spack-project/spack.yaml
+
+# Test MySQL spec with ABI check disabled
+RUN /bin/bash <<'EOFBASH'
+source /opt/spack/share/spack/setup-env.sh
+cd /root/spack-project
+spack env activate .
+spack compiler find --scope site
+
+echo "==> Checking MySQL spec..."
+spack spec mysql 2>&1 | grep -i "abi_check\|mysql@" | head -10
+
+echo "==> Concretizing environment..."
+spack -e . concretize -f --fresh 2>&1 | tail -50
+
+echo "==> Installing MySQL with verbose logging..."
+spack install -j2 --verbose --keep-stage mysql 2>&1 | tee /tmp/mysql-install.log
+EOFBASH
+
+CMD ["/bin/bash"]

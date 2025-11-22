@@ -91,7 +91,7 @@ def generate_module_config(
             "lmod": {
                 "core_compilers": [f"gcc@{gcc_version}"],  # Mark gcc as core for relocatable binaries
                 "hierarchy": hierarchy,
-                "include": (["slurm", "openmpi", "mysql-connector-c"]),
+                "include": (["slurm", "openmpi", "mysql"]),
                 "slurm": {
                     "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
                     "autoload": "direct",
@@ -189,18 +189,18 @@ def generate_spack_config(
     # Spec definitions for packages
     # cyrus-sasl 2.1.28 has old-style function definitions incompatible with GCC 15+
     cyrus_sasl_spec = (
-        f"cyrus-sasl cflags='-Wno-error=implicit-function-declaration "
-        f"-Wno-error=incompatible-pointer-types -std=gnu89' {compiler_spec}"
+        "cyrus-sasl cflags='-Wno-error=implicit-function-declaration "
+        "-Wno-error=incompatible-pointer-types -std=gnu89'"
     )
     openldap_spec = (
         f"openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl "
-        f"^{cyrus_sasl_spec} {compiler_spec}"
+        f"^openssl@3.6.0 ^{cyrus_sasl_spec} {compiler_spec}"
     )
     # Match curl spec from slurm package.py: libs=shared,static +nghttp2 +libssh2 +ldap +gssapi +libidn2
     # Using slurm_factory.curl with exact variants to match slurm dependency requirements
     curl_spec = (
         f"slurm_factory.curl@8.15.0 libs=shared,static +nghttp2+libssh2+ldap+gssapi+libidn2 "
-        f"tls=openssl ^slurm_factory.openssl@3.6.0 ^openldap@2.6.8 {compiler_spec}"
+        f"tls=openssl ^openssl@3.6.0 ^openldap@2.6.8 {compiler_spec}"
     )
     specs = [
         # System compiler from toolchain - no custom build needed
@@ -211,10 +211,10 @@ def generate_spack_config(
         # All packages below will use %gcc@{compiler_version}
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         # Build OpenSSL with explicit zlib dependency
-        f"slurm_factory.openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",
+        f"openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",
         f"jansson@2.14 {compiler_spec}",  # JSON library for libjwt
-        # JWT library with all dependencies - use slurm_factory.openssl
-        f"libjwt ^slurm_factory.openssl@3.6.0 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
+        # JWT library with all dependencies - let Spack choose available version
+        f"libjwt ^openssl@3.6.0 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
         openldap_spec,  # Build openldap before curl since curl+ldap needs it
         curl_spec,
         f"patchelf@0.18.0 {compiler_spec}",  # For RPATH fixing during relocatability
@@ -224,9 +224,8 @@ def generate_spack_config(
     specs.append(f"slurm_factory.freeipmi@1.6.16 {compiler_spec}")
     specs.append(f"openmpi@5.0.8 schedulers=slurm fabrics=auto {compiler_spec}")
     specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
-    # Use mysql client libraries instead of deprecated mysql-connector-c
-    # mysql-connector-c 6.1.11 has kernel header incompatibilities on Rocky Linux 9+
-    specs.append(f"mysql@8.0.35 +client_only {compiler_spec}")
+    # Use custom MySQL from slurm_factory repo with ABI check disabled
+    specs.append(f"slurm_factory.mysql@8.0.35 +client_only {compiler_spec}")
     specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
     specs.append(
         f"slurm_factory.slurm@{slurm_package_version} {gpu_flags} sysconfdir=/etc/slurm {compiler_spec}"
@@ -243,10 +242,7 @@ def generate_spack_config(
             },
             "concretizer": {
                 "unify": "when_possible",
-                "reuse": {
-                    "roots": True,
-                    "from": [{"type": "buildcache"}],
-                },
+                "reuse": False,  # Disable buildcache reuse - build everything from source
             },
             "config": {
                 "verify": {
@@ -309,7 +305,10 @@ def generate_spack_config(
                 "tar": {"buildable": True},
                 # Build autotools from source for libjwt compatibility
                 "autoconf": {"buildable": True},
-                "automake": {"buildable": True},
+                "automake": {
+                    "buildable": True,
+                    "version": [":1.16.3"],  # libjwt@1.15.3 incompatible with automake 1.16.5
+                },
                 "libtool": {"buildable": True},
                 # Build runtime libraries (these ARE Slurm dependencies)
                 "libmd": {"buildable": True},
@@ -321,7 +320,15 @@ def generate_spack_config(
                 "munge": {"buildable": True},  # Authentication - let Spack pick latest available
                 "json-c": {"buildable": True},  # JSON parsing - linked at runtime
                 "libpciaccess": {"buildable": True},  # PCI access library
-                "cyrus-sasl": {"buildable": True},  # SASL authentication (cflags set in spec)
+                "cyrus-sasl": {
+                    "buildable": True,
+                    "require": [
+                        (
+                            "cflags='-Wno-error=implicit-function-declaration "
+                            "-Wno-error=incompatible-pointer-types -std=gnu89'"
+                        )
+                    ],
+                },  # SASL authentication (cflags set in spec)
                 "rapidjson": {"buildable": True},
                 "openldap": {
                     "buildable": True,
@@ -330,12 +337,6 @@ def generate_spack_config(
                 "curl": {
                     "buildable": True,
                     "version": ["8.15.0"],
-                },
-                "openssl": {
-                    "buildable": True,
-                    "version": ["3:"],
-                    "variants": "~docs +shared ~static",  # Remove system cert dependencies
-                    "require": ["^ca-certificates-mozilla"],  # Force use of Spack certs
                 },
                 "ca-certificates-mozilla": {"buildable": True},  # Self-contained SSL certificates
                 "readline": {"buildable": True},  # Interactive command line
@@ -365,14 +366,12 @@ def generate_spack_config(
                 "http-parser": {"buildable": True},  # HTTP parsing for REST API
                 "libjwt": {
                     "buildable": True,
-                    "require": [
-                        "^slurm_factory.openssl@3:",
-                        "^jansson",
-                        "^automake@:1.16.3",  # libjwt@1.15.3 incompatible with automake 1.16.5
-                    ],  # Ensure it uses Spack-built OpenSSL 3.x and jansson
                 },  # JWT token support - essential for Slurm REST API
-                # MySQL client library for Slurm accounting storage
-                "mysql-connector-c": {"buildable": True},
+                # MySQL client library for Slurm accounting (from slurm_factory repo)
+                "mysql": {
+                    "buildable": True,
+                    "version": ["8.0.35"],
+                },
                 "librdkafka": {"buildable": True},
                 # PMIx configuration for consistent version
                 "pmix": {
@@ -422,6 +421,7 @@ def generate_spack_config(
                 "default": {
                     "root": view_root,
                     "link_type": "hardlink",  # Use hardlinks instead of symlinks for easier copying
+                    "link": "all",  # Explicitly link all installed specs (except excluded ones)
                     "projections": {"all": "."},  # Merge all packages into unified FHS structure
                     # No 'select' - include all installed packages automatically
                     # Exclude build tools (external, not runtime deps) and compiler
@@ -452,14 +452,6 @@ def generate_spack_config(
                 # OCI v3 format buildcache - point directly at the base path containing v3/ directory
                 "slurm-factory-deps-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/deps/{toolchain}",
-                    "signed": True,
-                    "binary": True,
-                    "source": False,
-                },
-                # Use slurm-factory buildcache for compiler binaries
-                # OCI v3 format buildcache
-                "slurm-factory-compiler-buildcache": {
-                    "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{toolchain}",
                     "signed": True,
                     "binary": True,
                     "source": False,

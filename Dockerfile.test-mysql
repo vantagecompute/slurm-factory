@@ -1,0 +1,50 @@
+FROM rockylinux:9
+
+# Install basic build tools and Spack dependencies
+# Install gcc packages first before any updates to avoid glibc version conflicts
+RUN dnf install -y \
+    gcc \
+    gcc-c++ \
+    glibc-devel \
+    make \
+    cmake \
+    git \
+    patch \
+    bzip2 \
+    xz \
+    file \
+    unzip \
+    python3 \
+    python3-pip \
+    && dnf clean all
+
+# Install Spack
+RUN git clone --depth=1 --branch=v1.0.0 https://github.com/spack/spack.git /opt/spack
+
+# Setup Spack environment
+ENV SPACK_ROOT=/opt/spack
+ENV PATH=${SPACK_ROOT}/bin:${PATH}
+
+# Initialize Spack
+RUN . ${SPACK_ROOT}/share/spack/setup-env.sh && \
+    spack compiler find
+
+# Test: Try to install MySQL with client_only (using builtin, not custom slurm_factory version)
+RUN . ${SPACK_ROOT}/share/spack/setup-env.sh && \
+    echo "==> Testing MySQL installation..." && \
+    spack spec mysql@8.0.35 +client_only && \
+    spack install -j $(nproc) --verbose mysql@8.0.35 +client_only || { \
+        echo "ERROR: MySQL installation failed"; \
+        echo "Checking build logs:"; \
+        find /tmp -name "*mysql*out.txt" -exec tail -100 {} \; || true; \
+        exit 1; \
+    }
+
+# Verify the installation
+RUN . ${SPACK_ROOT}/share/spack/setup-env.sh && \
+    echo "==> Verifying MySQL installation..." && \
+    spack find mysql && \
+    spack location -i mysql && \
+    echo "==> MySQL installation SUCCEEDED!"
+
+CMD ["/bin/bash"]

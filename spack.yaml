@@ -1,0 +1,270 @@
+spack:
+  compilers: []
+  concretizer:
+    reuse: false
+    unify: when_possible
+  config:
+    build_jobs: 4
+    ccache: false
+    checksum: true
+    connect_timeout: 30
+    db_lock_timeout: 120
+    deprecated: false
+    install_tree:
+      padded_length: 128
+      projections:
+        all: '{name}-{version}-{hash:7}'
+      root: /opt/slurm/software
+    shared_linking:
+      bind: false
+      missing_library_policy: warn
+      type: rpath
+    suppress_gpg_warnings: false
+    verify:
+      dependencies: true
+      relocatable: true
+      shared_libraries: true
+    verify_ssl: true
+  develop: {}
+  mirrors:
+    slurm-factory-deps-buildcache:
+      binary: true
+      signed: true
+      source: false
+      url: https://slurm-factory-spack-binary-cache.vantagecompute.ai/deps/rockylinux9
+    spack-public:
+      binary: false
+      signed: false
+      source: true
+      url: https://mirror.spack.io
+  modules:
+    default:
+      enable:
+      - lmod
+      lmod:
+        core_compilers:
+        - gcc@11.5.0
+        hierarchy: []
+        include:
+        - slurm
+        - openmpi
+        - mysql
+        slurm:
+          autoload: direct
+          conflict:
+          - '{name}'
+          environment:
+            prepend_path:
+              CMAKE_PREFIX_PATH: '{prefix}'
+              CPATH: '{prefix}/include'
+              MANPATH: '{prefix}/share/man'
+              PATH: '{prefix}/bin:{prefix}/sbin'
+              PKG_CONFIG_PATH: '{prefix}/lib/pkgconfig'
+            set:
+              SLURM_BUILD_TYPE: standard build
+              SLURM_COMPILER: '{compiler.name}@{compiler.version}'
+              SLURM_CONF: /etc/slurm/slurm.conf
+              SLURM_GCC_RUNTIME_PREFIX: '{^gcc-runtime.prefix}'
+              SLURM_MODULE_HELP: Set SLURM_INSTALL_PREFIX before loading to override
+                installation path
+              SLURM_PREFIX: '{prefix}'
+              SLURM_ROOT: '{prefix}'
+              SLURM_TARGET_ARCH: '{architecture}'
+              SLURM_VERSION: 24-11-6-1
+          template: modules/relocatable_modulefile.lua
+  packages:
+    all:
+      buildable: true
+      providers:
+        mpi:
+        - openmpi
+      target:
+      - x86_64
+    autoconf:
+      buildable: true
+    automake:
+      buildable: true
+      version:
+      - :1.16.3
+    berkeley-db:
+      buildable: true
+    bzip2:
+      buildable: true
+    ca-certificates-mozilla:
+      buildable: true
+    cmake:
+      buildable: true
+    curl:
+      buildable: true
+      version:
+      - 8.15.0
+    cyrus-sasl:
+      buildable: true
+      require:
+      - cflags='-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types
+        -std=gnu89'
+    dbus:
+      buildable: true
+      variants: system-socket=/var/run/dbus/system_bus_socket
+    diffutils:
+      buildable: true
+    findutils:
+      buildable: true
+    gcc:
+      buildable: true
+      externals: []
+      variants: +binutils +piclibs languages=c,c++,fortran
+      version:
+      - 11.5.0
+    gcc-runtime:
+      buildable: true
+      version:
+      - 11.5.0
+    gdbm:
+      buildable: true
+    gettext:
+      buildable: true
+    glib:
+      buildable: true
+    gmake:
+      buildable: true
+    hdf5:
+      buildable: true
+    http-parser:
+      buildable: true
+    hwloc:
+      buildable: true
+      version:
+      - '2:'
+    jansson:
+      buildable: true
+    json-c:
+      buildable: true
+    libbsd:
+      buildable: true
+    libevent:
+      buildable: true
+    libgcrypt:
+      buildable: true
+    libgpg-error:
+      buildable: true
+    libjwt:
+      buildable: true
+    libmd:
+      buildable: true
+    libpciaccess:
+      buildable: true
+    librdkafka:
+      buildable: true
+    libsigsegv:
+      buildable: true
+    libtool:
+      buildable: true
+    libxml2:
+      buildable: true
+    libyaml:
+      buildable: true
+    linux-pam:
+      buildable: true
+    lz4:
+      buildable: true
+    m4:
+      buildable: true
+    munge:
+      buildable: true
+    mysql:
+      buildable: true
+    ncurses:
+      buildable: true
+    numactl:
+      buildable: true
+    openldap:
+      buildable: true
+      version:
+      - 2.6.8
+    openmpi:
+      buildable: true
+      variants: schedulers=slurm fabrics=auto
+      version:
+      - 5.0.8
+    perl:
+      require:
+      - ^bzip2
+      - ^gdbm
+      - ^berkeley-db
+    pkgconf:
+      buildable: true
+    pmix:
+      buildable: true
+      variants: ~munge ~python
+      version:
+      - 5.0.5
+    python:
+      buildable: true
+    rapidjson:
+      buildable: true
+    readline:
+      buildable: true
+    slurm:
+      buildable: true
+      prefer:
+      - slurm_factory.slurm
+      variants: +shared ~static +pic
+      version:
+      - 24-11-6-1
+    tar:
+      buildable: true
+    xz:
+      buildable: true
+    zlib-ng:
+      buildable: true
+      variants: +compat
+    zstd:
+      buildable: true
+  repos:
+    slurm_factory:
+      branch: main
+      git: https://github.com/vantagecompute/slurm-factory-spack-repo.git
+  specs:
+  - gcc@11.5.0 +binutils +piclibs languages=c,c++,fortran
+  - zlib@1.3.1 %gcc@11.5.0
+  - openssl@3.6.0 ^zlib@1.3.1 %gcc@11.5.0
+  - jansson@2.14 %gcc@11.5.0
+  - libjwt ^openssl@3.6.0 ^zlib@1.3.1 ^jansson@2.14 %gcc@11.5.0
+  - openldap@2.6.8+client_only~perl+sasl+dynamic+shared~static tls=openssl ^openssl@3.6.0
+    ^cyrus-sasl cflags='-Wno-error=implicit-function-declaration -Wno-error=incompatible-pointer-types
+    -std=gnu89' %gcc@11.5.0
+  - slurm_factory.curl@8.15.0 libs=shared,static +nghttp2+libssh2+ldap+gssapi+libidn2
+    tls=openssl ^openssl@3.6.0 ^openldap@2.6.8 %gcc@11.5.0
+  - patchelf@0.18.0 %gcc@11.5.0
+  - slurm_factory.freeipmi@1.6.16 %gcc@11.5.0
+  - openmpi@5.0.8 schedulers=slurm fabrics=auto %gcc@11.5.0
+  - pmix@5.0.5 ~munge ~python %gcc@11.5.0
+  - mysql@8.0.35 +client_only %gcc@11.5.0
+  - hdf5@1.14.6 +hl +cxx %gcc@11.5.0
+  - slurm_factory.slurm@24-11-6-1 ~nvml ~rsmi sysconfdir=/etc/slurm %gcc@11.5.0
+  view:
+    default:
+      exclude:
+      - cmake
+      - python
+      - gmake
+      - m4
+      - pkgconf
+      - diffutils
+      - findutils
+      - gettext
+      - libbsd
+      - libsigsegv
+      - tar
+      - flex
+      - bison
+      - autoconf
+      - automake
+      - gcc
+      link: all
+      link_type: hardlink
+      projections:
+        all: .
+      root: /opt/slurm/view
+

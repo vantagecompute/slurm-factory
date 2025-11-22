@@ -205,13 +205,23 @@ def get_slurm_build_script(toolchain: str) -> str:
         rm -f spack.lock
         echo '==> Concretizing Slurm packages with gcc@{gcc_version}...'
         spack -e . concretize -j $(nproc) -f --fresh
-        echo '==> Installing Slurm and dependencies...'
-        spack -e . install -j $(nproc) -f slurm || {{
+        echo '==> Installing Slurm and all dependencies...'
+        spack -e . install -j $(nproc) --verbose || {{
             echo 'ERROR: spack install failed'
             echo 'Checking view status:'
             ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'
             echo 'Installed specs:'
             spack find -v 2>&1 || true
+            exit 1
+        }}
+        echo '==> Regenerating view to ensure all packages are properly linked...'
+        spack -e . env view regenerate 2>&1 || {{
+            echo 'ERROR: Failed to regenerate environment view'
+            echo 'Last error output should be above'
+            echo 'Checking view status:'
+            ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'
+            echo 'Checking for conflicting files:'
+            spack -e . env status -v
             exit 1
         }}
         echo 'Verifying view was created...'
@@ -340,7 +350,6 @@ def _get_slurm_builder_dockerfile(
     # Generate all script components
     install_deps_script = COMPILER_TOOLCHAINS[operating_system][4]
     container_image = COMPILER_TOOLCHAINS[operating_system][3]
-    compiler_version = COMPILER_TOOLCHAINS[operating_system][1]
 
     install_spack_script = get_install_spack_script()
     create_spack_profile_script = get_create_spack_profile_script()
@@ -355,7 +364,7 @@ def _get_slurm_builder_dockerfile(
 
     # Generate the packaging script
     create_slurm_tarball_script = get_create_slurm_tarball_script(
-        modulerc_script, slurm_version, compiler_version, gpu_support
+        modulerc_script, slurm_version, operating_system, gpu_support
     )
 
 
@@ -466,8 +475,7 @@ def _extract_slurm_tarball_from_image(
     container_name = f"slurm-factory-extract-{slurm_version.replace('.', '-')}"
 
     # Get GCC version from toolchain for tarball naming
-    _, gcc_ver, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
-    tarball_name = f"slurm-{slurm_version}-gcc{gcc_ver}-software.tar.gz"
+    tarball_name = f"slurm-{slurm_version}-{toolchain}-software.tar.gz"
 
     container_tarball_path = f"/opt/slurm/build_output/{tarball_name}"
 
@@ -559,7 +567,7 @@ def _push_slurm_to_buildcache(
     console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
 
     # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
-    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/slurm/{slurm_version}/{toolchain}"
+    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/{slurm_version}"
 
     logger.debug(f"Publishing Slurm {slurm_version} to {S3_BUILDCACHE_BUCKET} (mode: {publish_mode})")
 
@@ -608,7 +616,7 @@ def _push_slurm_to_buildcache(
             )
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
-            s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/deps/{toolchain}"
+            s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/deps"
             push_cmd = (
                 f"spack -e . buildcache push {signing_flags} --force --update-index "
                 "--only=dependencies --with-build-dependencies s3-buildcache slurm"
