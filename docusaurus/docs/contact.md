@@ -81,7 +81,7 @@ env | grep -E "(SLURM_FACTORY|DOCKER)"
 Build fails for Slurm 25.11 with GPU support on Ubuntu 22.04
 
 ## Steps to Reproduce
-1. `slurm-factory build --slurm-version 25.11 --gpu`
+1. `slurm-factory build-slurm --slurm-version 25.11 --gpu`
 2. Build fails after ~30 minutes with CUDA errors
 
 ## Environment
@@ -131,7 +131,7 @@ Build Slurm packages for ARM64 clusters from x86_64 build machines
 
 ### Proposed Solution
 Add `--target-arch` option to specify target architecture:
-`slurm-factory build --slurm-version 25.11 --target-arch arm64`
+`slurm-factory build-slurm --slurm-version 25.11 --target-arch arm64`
 
 ### Alternatives Considered
 - Building directly on ARM64 (slow, expensive)

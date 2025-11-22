@@ -28,12 +28,12 @@ slurm-factory [OPTIONS] COMMAND [ARGS]...
 
 ---
 
-### build
+### build-slurm
 
 Build a specific Slurm version with relocatable packages.
 
 ```bash
-slurm-factory build [OPTIONS]
+slurm-factory build-slurm [OPTIONS]
 ```
 
 **Description:**
@@ -81,49 +81,49 @@ All compilers are built with Spack for relocatability:
 
 ```bash
 # Build default CPU version (25.11, gcc 13.4.0)
-slurm-factory build
+slurm-factory build-slurm
 
 # Build specific version
-slurm-factory build --slurm-version 24.11
+slurm-factory build-slurm --slurm-version 24.11 24.11
 
 # Build with specific compiler
-slurm-factory build --compiler-version 14.2.0
+slurm-factory build-slurm --compiler-version 14.2.0
 
 # Build with gcc 12 - Ubuntu 22.04 compatibility
-slurm-factory build --compiler-version 12.5.0
+slurm-factory build-slurm --compiler-version 12.5.0
 
 # Build with gcc 10.5 - RHEL 8 compatibility
-slurm-factory build --compiler-version 10.5.0
+slurm-factory build-slurm --compiler-version 10.5.0
 
 # Build with gcc 7.5 - RHEL 7 compatibility
-slurm-factory build --compiler-version 7.5.0
+slurm-factory build-slurm --compiler-version 7.5.0
 
 # Build with GPU support
-slurm-factory build --gpu
+slurm-factory build-slurm --gpu
 
 # Build with verification (CI)
-slurm-factory build --verify
+slurm-factory build-slurm --verify
 
 # Build without Docker cache
-slurm-factory build --no-cache
+slurm-factory build-slurm --no-cache
 
 # Build with module hierarchy
-slurm-factory build --enable-hierarchy
+slurm-factory build-slurm --enable-hierarchy
 
 # Build and publish all to buildcache
-slurm-factory build --publish=all
+slurm-factory build-slurm --publish=all
 
 # Build and publish only Slurm
-slurm-factory build --publish=slurm
+slurm-factory build-slurm --publish=slurm
 
 # Build and publish only dependencies
-slurm-factory build --publish=deps
+slurm-factory build-slurm --publish=deps
 
 # Build and publish with GPG signing
-slurm-factory build --publish=all --signing-key 0xDFB92630BCA5AB71
+slurm-factory build-slurm --publish=all --signing-key 0xDFB92630BCA5AB71
 
 # Use local compiler tarball (advanced)
-slurm-factory build --use-local-buildcache
+slurm-factory build-slurm --use-local-buildcache
 ```
 
 ---
@@ -304,7 +304,7 @@ When using `--publish`, you can sign packages with:
 
 ```bash
 # Build and publish with GPG signing
-slurm-factory build \
+slurm-factory build-slurm \
   --slurm-version 25.11 \
   --publish=all \
   --signing-key 0xDFB92630BCA5AB71 \

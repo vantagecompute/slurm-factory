@@ -15,7 +15,7 @@
 """Test that libfl-dev is available as a build-time dependency."""
 
 import pytest
-from slurm_factory.constants import get_install_system_deps_script
+from slurm_factory.constants import COMPILER_TOOLCHAINS
 
 
 class TestLibflBuildDependency:
@@ -23,22 +23,24 @@ class TestLibflBuildDependency:
 
     def test_libfl_dev_in_system_deps(self):
         """Verify libfl-dev is installed in the build container."""
-        deps_script = get_install_system_deps_script()
-
-        # libfl-dev should be in the apt install list
-        assert "libfl-dev" in deps_script, (
-            "libfl-dev must be available during builds. "
-            "Some packages may use flex-generated code that links with -lfl. "
-            "Having libfl-dev provides libfl.a (static library) for build-time linking."
-        )
+        # Check Ubuntu-based toolchains
+        for toolchain_name, (_, _, _, _, install_script) in COMPILER_TOOLCHAINS.items():
+            if "ubuntu" in toolchain_name or "Ubuntu" in toolchain_name:
+                # libfl-dev should be in the apt install list for Ubuntu
+                assert "libfl-dev" in install_script, (
+                    f"libfl-dev must be available during builds on {toolchain_name}. "
+                    "Some packages may use flex-generated code that links with -lfl. "
+                    "Having libfl-dev provides libfl.a (static library) for build-time linking."
+                )
 
     def test_flex_also_installed(self):
         """Verify flex tool is available alongside libfl-dev."""
-        deps_script = get_install_system_deps_script()
-
-        # Both flex and libfl-dev should be present
-        assert "flex" in deps_script, "flex tool must be available"
-        assert "libfl-dev" in deps_script, "libfl-dev must be available"
+        # Check Ubuntu-based toolchains
+        for toolchain_name, (_, _, _, _, install_script) in COMPILER_TOOLCHAINS.items():
+            if "ubuntu" in toolchain_name or "Ubuntu" in toolchain_name:
+                # Both flex and libfl-dev should be present
+                assert "flex" in install_script, f"flex tool must be available on {toolchain_name}"
+                assert "libfl-dev" in install_script, f"libfl-dev must be available on {toolchain_name}"
 
     def test_flex_not_in_runtime_view(self):
         """Verify flex is excluded from the final runtime package."""
@@ -46,7 +48,7 @@ class TestLibflBuildDependency:
         
         config = generate_spack_config(
             slurm_version="25.11",
-            compiler_version="13.4.0",
+            toolchain="noble",
             gpu_support=False,
         )
         
@@ -69,7 +71,7 @@ class TestLibflBuildDependency:
         
         config = generate_spack_config(
             slurm_version="25.11",
-            compiler_version="13.4.0",
+            toolchain="noble",
             gpu_support=False,
         )
         

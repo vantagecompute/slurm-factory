@@ -30,7 +30,7 @@ The custom Spack repository provides:
 
 ```mermaid
 flowchart LR
-    Start([slurm-factory build]) --> Docker[Create Docker Container]
+    Start([slurm-factory build-slurm]) --> Docker[Create Docker Container]
     Docker --> Spack[Install Spack v1.0.0]
     Spack --> Clone[Clone Custom Repo<br/>vantagecompute/slurm-factory-spack-repo]
     Clone --> Register[Register Repo with Spack<br/>spack repo add]
@@ -109,7 +109,7 @@ The custom repository enhances standard Spack packages:
 | **GPU Support** | Optional | Tested with CUDA 11.8+ and ROCm 5.7+ |
 | **OpenMPI** | Basic PMIx support | Enhanced with UCX and hwloc integration |
 | **REST API** | Basic curl | Full LDAP/SSH/TLS support via enhanced curl |
-| **Compiler Support** | Standard | Tested with GCC 7.5.0 through 15.1.0 |
+| **Compiler Support** | Standard | Tested with GCC 7.5.0 through 15.2.0 |
 | **Module Generation** | Basic | Enhanced Lmod modules with autoloading |
 | **Build Optimizations** | Generic | CPU-specific (x86_64_v3) by default |
 
@@ -237,7 +237,7 @@ cd slurm-factory-spack-repo
 
 # 3. Test locally
 cd /path/to/slurm-factory
-slurm-factory build --slurm-version NEW_VERSION
+slurm-factory build-slurm --slurm-version NEW_VERSION
 
 # 4. Submit PR with test results
 ```

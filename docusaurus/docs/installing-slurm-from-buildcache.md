@@ -6,6 +6,10 @@ This guide shows how to install pre-built, GPG-signed Slurm binaries directly fr
 
 The slurm-factory buildcache provides pre-compiled, GPG-signed Slurm packages that install in **5-15 minutes** instead of 45-90 minutes from source. All packages are signed with GPG key `DFB92630BCA5AB71` for security verification.
 
+The buildcache uses a **two-tier mirror architecture** organized by OS toolchain:
+- **`{toolchain}/slurm/deps/`** - Slurm runtime dependencies (OpenMPI, PMIx, Munge, etc.) for each OS
+- **`{toolchain}/slurm/{version}/`** - Slurm packages for each OS and version
+
 **Use this method when:**
 - ✅ You want the fastest installation (5-15 minutes)
 - ✅ You don't need custom build configurations
@@ -40,12 +44,19 @@ source ~/spack/share/spack/setup-env.sh
 echo 'source ~/spack/share/spack/setup-env.sh' >> ~/.bashrc
 ```
 
-### 2. Configure Buildcache Mirror
+### 2. Configure Buildcache Mirrors
+
+The buildcache uses three separate mirrors for optimal caching:
 
 ```bash
-# Add the buildcache mirror for Slurm 25.11 with GCC 13.4.0
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+# Set versions
+SLURM_VERSION=25.11
+TOOLCHAIN=noble
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Add two-tier mirror structure (organized by OS toolchain)
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/deps"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/${SLURM_VERSION}"
 ```
 
 ### 3. Import GPG Signing Keys
@@ -62,10 +73,10 @@ gpg --list-keys DFB92630BCA5AB71
 
 ```bash
 # Install Slurm with automatic signature verification (5-15 minutes)
-spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
+spack install slurm@${SLURM_VERSION} target=x86_64_v3
 
 # Load Slurm into your environment
-spack load slurm@25.11
+spack load slurm@${SLURM_VERSION}
 
 # Verify installation
 sinfo --version
@@ -84,125 +95,239 @@ All 27 combinations of Slurm × GCC are available in the buildcache:
 | **24.11** | LTS | Long-term support, production recommended |
 | **23.11** | Stable | Previous stable release |
 
-### GCC Versions
+### Toolchains
 
-| GCC Version | Glibc | Compatible OS |
-|-------------|-------|---------------|
-| **15.2.0** | 2.40 | Ubuntu 24.04+ |
-| **14.2.0** | 2.39 | Ubuntu 24.04+ |
-| **13.4.0** | 2.39 | Ubuntu 24.04+ (default) |
-| **12.5.0** | 2.35 | Ubuntu 22.04+ |
-| **11.5.0** | 2.31 | Ubuntu 20.04+ |
-| **10.5.0** | 2.31 | Ubuntu 20.04+, RHEL 8+ |
-| **9.5.0** | 2.31 | Ubuntu 20.04+, RHEL 8+ |
-| **8.5.0** | 2.28 | Ubuntu 18.04+, RHEL 7+ |
-| **7.5.0** | 2.28 | Ubuntu 18.04+, RHEL 7+ |
+| Toolchain | OS/Distribution | System GCC | Glibc |
+|-----------|-----------------|------------|-------|
+| **noble** | Ubuntu 24.04 (Noble) | 13.2.0 | 2.39 |
+| **jammy** | Ubuntu 22.04 (Jammy) | 11.4.0 | 2.35 |
+| **focal** | Ubuntu 20.04 (Focal) | 9.4.0 | 2.31 |
+| **rockylinux10** | Rocky Linux 10 / RHEL 10 | 14.2.1 | 2.40 |
+| **rockylinux9** | Rocky Linux 9 / RHEL 9 | 11.4.0 | 2.34 |
+| **rockylinux8** | Rocky Linux 8 / RHEL 8 | 8.5.0 | 2.28 |
 
 ## Installation Examples
 
 ### Example 1: Latest Slurm (Recommended)
 
 ```bash
-# Add mirror
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+# Set versions
+SLURM_VERSION=25.11
+TOOLCHAIN=noble
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Add two-tier mirrors (organized by OS toolchain)
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/deps"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/${SLURM_VERSION}"
 
 # Import GPG keys
 spack buildcache keys --install --trust
 
-# Install latest Slurm with default compiler
-spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
+# Install latest Slurm with system compiler
+spack install slurm@${SLURM_VERSION} target=x86_64_v3
 
 # Load and verify
-spack load slurm@25.11
+spack load slurm@${SLURM_VERSION}
 sinfo --version
 ```
 
 ### Example 2: LTS Version for Production
 
 ```bash
-# Add mirror for LTS version
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/24.11/13.4.0
+# Set versions for LTS
+SLURM_VERSION=24.11
+TOOLCHAIN=jammy
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Add mirrors (organized by OS toolchain)
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/deps"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/${SLURM_VERSION}"
 
 # Import GPG keys
 spack buildcache keys --install --trust
 
 # Install LTS Slurm
-spack install slurm@24.11%gcc@13.4.0 target=x86_64_v3
+spack install slurm@${SLURM_VERSION} target=x86_64_v3
 
 # Load and verify
-spack load slurm@24.11
+spack load slurm@${SLURM_VERSION}
 sinfo --version
 ```
 
-### Example 3: RHEL 8 / Ubuntu 20.04 Compatible
+### Example 3: Rocky Linux 8 Compatible
 
 ```bash
-# Use GCC 10.5.0 for RHEL 8 / Ubuntu 20.04 compatibility
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/10.5.0
+# Use Rocky Linux 8 toolchain for RHEL 8 compatibility
+SLURM_VERSION=25.11
+TOOLCHAIN=rockylinux8
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Add mirrors (organized by OS toolchain)
+spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/deps"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/${SLURM_VERSION}"
 
 # Import GPG keys
 spack buildcache keys --install --trust
 
-# Install with compatible compiler
-spack install slurm@25.11%gcc@10.5.0 target=x86_64_v3
+# Install with Rocky Linux 8 toolchain
+spack install slurm@${SLURM_VERSION} target=x86_64_v3
 
 # Load and verify
-spack load slurm@25.11
-sinfo --version
-```
-
-### Example 4: RHEL 7 Legacy Systems
-
-```bash
-# Use GCC 7.5.0 for RHEL 7 / older systems
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/23.11/7.5.0
-
-# Import GPG keys
-spack buildcache keys --install --trust
-
-# Install with legacy compiler
-spack install slurm@23.11%gcc@7.5.0 target=x86_64_v3
-
-# Load and verify
-spack load slurm@23.11
+spack load slurm@${SLURM_VERSION}
 sinfo --version
 ```
 
 ## Buildcache Structure
 
-The buildcache is organized by Slurm version and compiler:
+The buildcache is organized by OS toolchain for optimal performance:
 
-```
+```text
 https://slurm-factory-spack-binary-cache.vantagecompute.ai/
-├── compilers/
-│   ├── 15.2.0/buildcache/     # GCC 15.2.0 compiler binaries
-│   ├── 14.2.0/buildcache/     # GCC 14.2.0 compiler binaries
-│   ├── 13.4.0/buildcache/     # GCC 13.4.0 compiler binaries (default)
-│   ├── 12.5.0/buildcache/     # GCC 12.5.0 compiler binaries
-│   ├── 11.5.0/buildcache/     # GCC 11.5.0 compiler binaries
-│   ├── 10.5.0/buildcache/     # GCC 10.5.0 compiler binaries
-│   ├── 9.5.0/buildcache/      # GCC 9.5.0 compiler binaries
-│   ├── 8.5.0/buildcache/      # GCC 8.5.0 compiler binaries
-│   └── 7.5.0/buildcache/      # GCC 7.5.0 compiler binaries
-└── slurm/
-    ├── 25.11/                 # Slurm 25.11 (latest)
-    │   ├── 15.2.0/buildcache/ # Built with GCC 15.2.0
-    │   ├── 14.2.0/buildcache/ # Built with GCC 14.2.0
-    │   ├── 13.4.0/buildcache/ # Built with GCC 13.4.0 (default)
-    │   ├── 12.5.0/buildcache/ # Built with GCC 12.5.0
-    │   ├── 11.5.0/buildcache/ # Built with GCC 11.5.0
-    │   ├── 10.5.0/buildcache/ # Built with GCC 10.5.0
-    │   ├── 9.5.0/buildcache/  # Built with GCC 9.5.0
-    │   ├── 8.5.0/buildcache/  # Built with GCC 8.5.0
-    │   └── 7.5.0/buildcache/  # Built with GCC 7.5.0
-    ├── 24.11/                 # Slurm 24.11 (LTS)
-    │   └── [same structure]
-    └── 23.11/                 # Slurm 23.11 (stable)
-        └── [same structure]
+├── noble/                          # Ubuntu 24.04 toolchain
+│   └── slurm/
+│       ├── deps/buildcache/        # Dependencies for Ubuntu 24.04
+│       ├── 25.11/buildcache/       # Slurm 25.11 for Ubuntu 24.04
+│       ├── 24.11/buildcache/       # Slurm 24.11 for Ubuntu 24.04
+│       └── 23.11/buildcache/       # Slurm 23.11 for Ubuntu 24.04
+├── jammy/                          # Ubuntu 22.04 toolchain
+│   └── slurm/
+│       ├── deps/buildcache/
+│       └── {version}/buildcache/
+├── rockylinux10/                   # Rocky Linux 10 toolchain
+│   └── slurm/
+│       ├── deps/buildcache/
+│       └── {version}/buildcache/
+├── rockylinux9/                    # Rocky Linux 9 toolchain
+│   └── slurm/
+│       ├── deps/buildcache/
+│       └── {version}/buildcache/
+├── rockylinux8/                    # Rocky Linux 8 toolchain
+│   └── slurm/
+│       ├── deps/buildcache/
+│       └── {version}/buildcache/
+├── resolute/                       # Ubuntu 25.04 toolchain
+│   └── slurm/
+│       ├── deps/buildcache/
+│       └── {version}/buildcache/
+└── focal/                          # Ubuntu 20.04 toolchain (legacy)
+    └── slurm/
+        ├── deps/buildcache/
+        └── {version}/buildcache/
+```
+
+### Tarball Downloads
+
+Pre-packaged tarballs for offline installation:
+
+```text
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/
+├── noble/
+│   ├── 25.11/
+│   │   ├── slurm-25.11-noble-software.tar.gz      # Complete tarball
+│   │   └── slurm-25.11-noble-software.tar.gz.asc  # GPG signature
+│   ├── 24.11/
+│   └── 23.11/
+├── jammy/
+│   ├── 25.11/
+│   │   ├── slurm-25.11-jammy-software.tar.gz
+│   │   └── slurm-25.11-jammy-software.tar.gz.asc
+│   └── ...
+└── {other toolchains}/
+    └── {versions}/
+```
+
+### Mirror Architecture Benefits
+
+The two-tier OS-based structure provides:
+
+- ✅ **OS-native compatibility** - Uses system compilers for maximum compatibility
+- ✅ **Better caching** - Dependencies shared across Slurm versions per OS
+- ✅ **Reduced storage** - No duplication of common packages
+- ✅ **Parallel downloads** - Spack fetches from multiple mirrors simultaneously
+- ✅ **Simplified maintenance** - No custom GCC builds required
+
+## Alternative: Download Pre-built Tarball
+
+Instead of using Spack buildcache, you can download a complete Slurm installation as a tarball. This is ideal for air-gapped environments or simple deployments.
+
+### 1. Download Tarball and Signature
+
+```bash
+# Set versions
+SLURM_VERSION=25.11
+TOOLCHAIN=noble
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+# Download tarball
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz"
+
+# Download signature
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc"
+```
+
+### 2. Verify GPG Signature
+
+```bash
+# Import the public GPG key
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+
+# Verify the tarball signature
+gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
+```
+
+**Expected output:**
+
+```text
+gpg: Signature made [DATE]
+gpg:                using RSA key DFB92630BCA5AB71
+gpg: Good signature from "Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key) <info@vantagecompute.ai>"
+```
+
+If you see `BAD signature` or the signature doesn't match, **do not use the tarball** - it may have been tampered with.
+
+### 3. Trust the GPG Key (Optional)
+
+To avoid "untrusted signature" warnings in the future:
+
+```bash
+# Start GPG key editor
+gpg --edit-key DFB92630BCA5AB71
+
+# In the GPG prompt, type:
+trust
+# Choose: 5 (I trust ultimately)
+quit
+```
+
+### 4. Extract and Install
+
+```bash
+# Extract to /opt (or your preferred location)
+sudo tar -xzf slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz -C /opt/
+
+# Run the installation script
+cd /opt
+sudo ./data/slurm_assets/slurm_install.sh --full-init
+
+# Verify installation
+module load slurm/${SLURM_VERSION}
+sinfo --version
+```
+
+### Tarball Contents
+
+Each tarball contains:
+
+```text
+slurm-25.11-gcc15.2.0-software.tar.gz
+├── view/                      # Slurm binaries & libraries
+├── modules/slurm/25.11.lua    # Lmod module (relocatable)
+└── data/slurm_assets/         # Config templates & install script
+    ├── slurm_install.sh       # Installation script
+    ├── defaults/              # Default configuration files
+    ├── systemd/               # Systemd service units
+    └── ...
 ```
 
 ## GPG Signature Verification
@@ -245,19 +370,23 @@ spack install slurm@25.11%gcc@13.4.0
 You can configure multiple buildcache mirrors for different versions:
 
 ```bash
-# Add multiple mirrors
-spack mirror add slurm-25.11-gcc13 \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+# Set CloudFront URL
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
-spack mirror add slurm-24.11-gcc10 \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/24.11/10.5.0
+# Add mirrors for Slurm 25.11 on Ubuntu 24.04 (noble)
+spack mirror add slurm-25-noble-deps "${CLOUDFRONT_URL}/noble/slurm/deps"
+spack mirror add slurm-25-noble "${CLOUDFRONT_URL}/noble/slurm/25.11"
+
+# Add mirrors for Slurm 24.11 on Ubuntu 22.04 (jammy)
+spack mirror add slurm-24-jammy-deps "${CLOUDFRONT_URL}/jammy/slurm/deps"
+spack mirror add slurm-24-jammy "${CLOUDFRONT_URL}/jammy/slurm/24.11"
 
 # List configured mirrors
 spack mirror list
 
 # Install from specific versions
-spack install slurm@25.11%gcc@13.4.0  # Uses slurm-25.11-gcc13
-spack install slurm@24.11%gcc@10.5.0  # Uses slurm-24.11-gcc10
+spack install slurm@25.11  # Uses slurm-25-noble mirrors
+spack install slurm@24.11  # Uses slurm-24-jammy mirrors
 ```
 
 ### Specific Target Architecture
@@ -313,7 +442,7 @@ curl -I https://slurm-factory-spack-binary-cache.vantagecompute.ai/
 # Remove and re-add mirror
 spack mirror remove slurm-factory
 spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
 ```
 
 ### GPG Key Issues

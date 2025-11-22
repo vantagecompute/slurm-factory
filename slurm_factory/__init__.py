@@ -30,7 +30,6 @@ Main modules:
 """
 import importlib.metadata
 
-from slurm_factory.builder import build
 from slurm_factory.config import Settings
 from slurm_factory.constants import SlurmVersion
 from slurm_factory.exceptions import (
@@ -51,7 +50,6 @@ __email__ = "info@vantagecompute.ai"
 __all__ = [
     # Main API
     "app",
-    "build",
     "Settings",
     "SlurmVersion",
     "generate_spack_config",

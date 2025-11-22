@@ -58,14 +58,11 @@ class TestModuleStructure:
         
         # Test for existence of key functions
         expected_functions = [
-            'create_slurm_package',
-            'create_compiler_package',
-            'extract_slurm_package_from_image',
-            'extract_compiler_package_from_image',
-            'publish_compiler_to_buildcache',
-            '_build_docker_image',
-            '_remove_old_docker_image',
-            '_clear_cache_directory',
+            'get_data_dir',
+            'build_docker_image',
+            'remove_old_docker_image',
+            'get_install_spack_script',
+            'get_create_spack_profile_script',
         ]
         
         for func_name in expected_functions:

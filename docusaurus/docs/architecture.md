@@ -263,12 +263,12 @@ In addition to local caching, Slurm Factory can use the **public buildcache**:
 
 **Compiler Buildcache**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/
 ```
 
 **Slurm Buildcache**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/
 ```
 
 Benefits:
@@ -367,7 +367,6 @@ Builds support 8 different GCC versions for cross-distribution compatibility:
 | GCC 10.5.0 | RHEL 8+, Ubuntu 20.04+ | 2.31 | +50 min |
 | GCC 9.5.0 | RHEL 8+, CentOS 8+ | 2.28 | +50 min |
 | GCC 8.5.0 | RHEL 8+, CentOS 8+ | 2.28 | +55 min |
-| GCC 7.5.0 | RHEL 7+, CentOS 7+ | 2.17 | +60 min |
 
 Older compilers add build time for initial toolchain bootstrap, but use cached binaries on subsequent builds.
 
@@ -375,16 +374,16 @@ Older compilers add build time for initial toolchain bootstrap, but use cached b
 
 ```bash
 # CPU-optimized with default compiler (recommended)
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 
 # Specific compiler for RHEL 8 compatibility
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 10.5.0
 
 # With GPU support (CUDA/ROCm)
-slurm-factory build --slurm-version 25.11 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --gpu
 
 # Combined: RHEL 8 with GPU support
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 10.5.0 --gpu
 ```
 
 ## Docker Integration

@@ -41,7 +41,7 @@ Our GitHub Actions workflows create a **dependency pyramid** that maximizes cach
 ```mermaid
 graph LR
     subgraph "Stage 1: Compiler Buildcache"
-        A1[GCC 15.1.0] --> BC1[(S3 Buildcache)]
+        A1[GCC 15.2.0] --> BC1[(S3 Buildcache)]
         A2[GCC 14.2.0] --> BC1
         A3[GCC 13.4.0] --> BC1
         A4[GCC 12.5.0] --> BC1
@@ -82,7 +82,7 @@ graph LR
 
 **Workflow:** `build-and-publish-compiler-buildcache.yml`
 
-- **Builds:** 9 GCC compiler versions (7.5.0 → 15.1.0)
+- **Builds:** 9 GCC compiler versions (7.5.0 → 15.2.0)
 - **Runtime:** ~45 minutes per compiler (parallel execution)
 - **Frequency:** Once per compiler version (rarely updated)
 - **Output:** Relocatable GCC compilers with gcc-runtime libraries
@@ -92,7 +92,7 @@ graph LR
 # Each compiler is self-contained and relocatable
 gcc-7.5.0-compiler.tar.gz   # RHEL 7 compatible (glibc 2.17)
 gcc-13.4.0-compiler.tar.gz  # Ubuntu 24.04 (glibc 2.39) - default
-gcc-15.1.0-compiler.tar.gz  # Latest (glibc 2.40)
+gcc-15.2.0-compiler.tar.gz  # Latest (glibc 2.40)
 ```
 
 **Key Optimization:** Compilers are built once and reused across **all** Slurm versions and dependency combinations.
@@ -170,9 +170,9 @@ Total Time:             84 minutes for 3 combinations (94% reduction)
 
 | Slurm Version | GCC Versions | Total Configs |
 |---------------|-------------|---------------|
-| **25.11** (latest) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.1.0 | 9 |
-| **24.11** (stable) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.1.0 | 9 |
-| **23.11** (LTS) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.1.0 | 9 |
+| **25.11** (latest) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
+| **24.11** (stable) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
+| **23.11** (LTS) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.2.0 | 9 |
 
 **Every combination produces:**
 - ✅ Identical module structure (Lmod-based)
@@ -240,7 +240,7 @@ sequenceDiagram
     participant CloudFront
     participant S3
     
-    User->>Spack: slurm-factory build
+    User->>Spack: slurm-factory build-slurm
     Spack->>CloudFront: GET /build_cache/linux-ubuntu24.04-x86_64/gcc-13.4.0/index.json
     CloudFront->>S3: Cache miss?
     S3-->>CloudFront: index.json
@@ -304,19 +304,19 @@ Even when building locally (not using public buildcache), Slurm Factory caches i
 
 ```bash
 # First build: Downloads from S3 buildcache
-$ time slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+$ time slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
 real    2m15s  # Download + extract
 
 # Different Slurm version, same compiler: Reuses compiler, downloads Slurm deps
-$ time slurm-factory build --slurm-version 24.11 --compiler-version 13.4.0
+$ time slurm-factory build-slurm --slurm-version 24.11 --compiler-version 13.4.0
 real    1m45s  # Compiler cached locally
 
 # Same Slurm, different compiler: Downloads new compiler + deps
-$ time slurm-factory build --slurm-version 25.11 --compiler-version 11.5.0
+$ time slurm-factory build-slurm --slurm-version 25.11 --compiler-version 11.5.0
 real    2m30s  # New compiler from buildcache
 
 # Rebuild same config: Everything cached
-$ time slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+$ time slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
 real    0m45s  # All local caches hit
 ```
 
@@ -356,7 +356,7 @@ rsync -av --delete slurm-25.11-gcc-13.4.0/ /opt/slurm/
 | Feature | apt/yum | Slurm Factory |
 |---------|---------|---------------|
 | **Slurm Versions** | 1-2 (distro-provided) | 4 (upstream releases) |
-| **GCC Versions** | 1 (system default) | 9 (7.5.0 → 15.1.0) |
+| **GCC Versions** | 1 (system default) | 9 (7.5.0 → 15.2.0) |
 | **Combinations** | 1-2 | 36 |
 | **Update Lag** | 6-12 months | 0 (same-day releases) |
 | **Relocatable** | No (hardcoded paths) | Yes (extract anywhere) |
@@ -407,7 +407,7 @@ strategy:
 spack mirror create -d ~/spack-mirror slurm openmpi mysql
 
 # Use local mirror for offline builds
-slurm-factory build --mirror ~/spack-mirror
+slurm-factory build-slurm --mirror ~/spack-mirror
 
 # Increase Docker resources for faster compilation
 export DOCKER_CPUS=16

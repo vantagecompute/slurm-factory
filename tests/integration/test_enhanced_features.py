@@ -140,19 +140,17 @@ class TestGCCRuntimeIntegration:
         """Test gcc-runtime package configuration."""
         config = generate_spack_config()
         packages = config["spack"]["packages"]
-        
         # gcc-runtime should be buildable (built during Slurm build phase)
         assert "gcc-runtime" in packages
         assert packages["gcc-runtime"]["buildable"] is True
         # Version should match the compiler version
         assert "version" in packages["gcc-runtime"]
 
-    def test_gcc_runtime_version_match(self):
+    def test_resolute_gcc_runtime_version_match(self):
         """Test that gcc-runtime is configured to be built with correct version."""
-        compiler_version = "13.4.0"
-        config = generate_spack_config(compiler_version=compiler_version)
+        compiler_version = "15.2.0"
+        config = generate_spack_config(toolchain="resolute")
         packages = config["spack"]["packages"]
-        
         # gcc-runtime should be buildable with matching compiler version
         assert "gcc-runtime" in packages
         assert packages["gcc-runtime"]["buildable"] is True
@@ -162,7 +160,6 @@ class TestGCCRuntimeIntegration:
         """Test that gcc-runtime prefix is exposed in module environment."""
         module_config = generate_module_config()
         slurm_env = module_config["default"]["lmod"]["slurm"]["environment"]["set"]
-        
         # Should have SLURM_GCC_RUNTIME_PREFIX
         assert "SLURM_GCC_RUNTIME_PREFIX" in slurm_env
         assert "{^gcc-runtime.prefix}" in slurm_env["SLURM_GCC_RUNTIME_PREFIX"]
@@ -202,12 +199,10 @@ class TestBackwardCompatibility:
         """Test that default parameters maintain backward compatibility."""
         # Old behavior should be preserved
         config_old = generate_spack_config()
-        
         # New behavior with defaults should match
         config_new = generate_spack_config(
             enable_hierarchy=False,
         )
-        
         # Both should have flat hierarchy
         assert config_old["spack"]["modules"]["default"]["lmod"]["hierarchy"] == []
         assert config_new["spack"]["modules"]["default"]["lmod"]["hierarchy"] == []
@@ -216,19 +211,17 @@ class TestBackwardCompatibility:
         """Test that existing test patterns still work."""
         # This mimics what existing tests do
         config = generate_spack_config(slurm_version="25.11", gpu_support=False)
-        
         assert "spack" in config
         assert "specs" in config["spack"]
         assert "modules" in config["spack"]
         assert "config" in config["spack"]
 
-    def test_all_compiler_versions_work(self):
+    def test_all_supported_os_versions_work(self):
         """Test that all compiler versions work with new features."""
-        compiler_versions = ["7.5.0", "8.5.0", "9.5.0", "10.5.0", "11.5.0", "12.5.0", "13.4.0", "14.2.0"]
-        
-        for version in compiler_versions:
+        supported_operating_systems = ["resolute", "noble", "jammy", "rockylinux10", "rockylinux9", "rockylinux8"]
+        for supported_os in supported_operating_systems:
             config = generate_spack_config(
-                compiler_version=version,
+                toolchain=supported_os,
                 enable_hierarchy=True,
             )
             assert "spack" in config
@@ -244,23 +237,9 @@ class TestParameterValidation:
     def test_hierarchy_with_different_slurm_versions(self):
         """Test hierarchy works with all Slurm versions."""
         versions = ["25.11", "24.11", "23.11"]
-        
         for version in versions:
             config = generate_spack_config(slurm_version=version, enable_hierarchy=True)
             assert "spack" in config
-
-    # Removed local buildcache tests
-    # def test_buildcache_with_different_configurations(self):
-    #     """Test buildcache works with different build configurations."""
-    #     configs = [
-    #         {"gpu_support": True},
-    #         {"gpu_support": False},
-    #     ]
-    #     
-    #     for config_params in configs:
-    #         config = generate_spack_config(**config_params)
-    #         assert "spack" in config
-
 
 if __name__ == "__main__":
     pytest.main([__file__])

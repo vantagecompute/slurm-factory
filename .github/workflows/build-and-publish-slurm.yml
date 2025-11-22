@@ -1,0 +1,225 @@
+# Copyright 2025 Vantage Compute Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: "Build and Publish Slurm"
+
+on:
+  workflow_dispatch:
+    inputs:
+      slurm_versions:
+        description: 'Slurm versions to build (comma-separated, e.g., "25.11,24.11" or "all")'
+        required: true
+        default: 'all'
+        type: string
+      toolchains:
+        description: 'Toolchains to use (comma-separated, e.g., "resolute,noble,rockylinux10" or "all")'
+        required: true
+        default: 'all'
+        type: string
+
+env:
+  S3_BUCKET: slurm-factory-spack-buildcache-4b670
+  CLOUDFRONT_URL: https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+jobs:
+  prepare-matrix:
+    runs-on: self-hosted
+    timeout-minutes: 3600
+    outputs:
+      slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
+      toolchain_matrix: ${{ steps.set-matrix.outputs.toolchain_matrix }}
+    steps:
+      - name: Prepare version matrices
+        timeout-minutes: 360
+        id: set-matrix
+        run: |
+          # Prepare Slurm versions matrix
+          if [ "${{ inputs.slurm_versions }}" = "all" ]; then
+            SLURM_VERSIONS='["25.11", "24.11", "23.11"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
+            SLURM_VERSIONS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              SLURM_VERSIONS="${SLURM_VERSIONS}\"${v}\","
+            done
+            SLURM_VERSIONS="${SLURM_VERSIONS%,}]"
+          fi
+          echo "slurm_matrix=${SLURM_VERSIONS}" >> $GITHUB_OUTPUT
+          echo "Building Slurm versions: ${SLURM_VERSIONS}"
+          
+          # Prepare compiler versions matrix
+          if [ "${{ inputs.toolchains }}" = "all" ]; then
+            TOOLCHAINS='["resolute", "noble", "jammy", "rockylinux10", "rockylinux9", "rockylinux8"]'
+          else
+            IFS=',' read -ra VERS <<< "${{ inputs.toolchains }}"
+            TOOLCHAINS="["
+            for v in "${VERS[@]}"; do
+              v=$(echo "$v" | xargs)
+              TOOLCHAINS="${TOOLCHAINS}\"${v}\","
+            done
+            TOOLCHAINS="${TOOLCHAINS%,}]"
+          fi
+          echo "toolchain_matrix=${TOOLCHAINS}" >> $GITHUB_OUTPUT
+          echo "Building with toolchains: ${TOOLCHAINS}"
+
+  build-slurm:
+    needs: prepare-matrix
+    runs-on: self-hosted
+    timeout-minutes: 3600
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    
+    strategy:
+      fail-fast: false
+      matrix:
+        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
+        toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
+
+    steps:
+      - name: Checkout
+        timeout-minutes: 360
+        uses: actions/checkout@v5
+
+      - name: "Set up Python"
+        timeout-minutes: 360
+        uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: Install uv
+        timeout-minutes: 360
+        run: |
+          curl -LsSf https://astral.sh/uv/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Clean previous builds
+        timeout-minutes: 360
+        run: |
+          # Clean up any previous builds for this version/compiler combo
+          docker images | grep "slurm-factory:${{ matrix.slurm_version }}-gcc${{ matrix.toolchain }}" | awk '{print $3}' | xargs -r docker rmi -f || true
+          
+          # Clean Spack cache directories to prevent state leakage between runs
+          # This ensures the buildcache test truly validates buildcache installation
+          rm -rf "$HOME/.spack"
+
+      - name: Configure AWS credentials
+        timeout-minutes: 360
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 10800  # 3 hours for long-running builds
+
+      - name: Validate GPG secrets
+        timeout-minutes: 360
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+        run: |
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY secret is not set"
+            exit 1
+          fi
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID secret is not set"
+            exit 1
+          fi
+          echo "✓ GPG secrets are configured"
+          echo "  GPG_KEY_ID: $GPG_KEY_ID"
+
+      - name: Build Slurm dependencies and publish to buildcache
+        timeout-minutes: 360
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.toolchain }}..."
+          if [ -z "$GPG_KEY_ID" ]; then
+            echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PRIVATE_KEY" ]; then
+            echo "Error: GPG_PRIVATE_KEY is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          if [ -z "$GPG_PASSPHRASE" ]; then
+            echo "Error: GPG_PASSPHRASE is not set. Signed packages are required for publishing."
+            exit 1
+          fi
+          echo "Using GPG signing key: $GPG_KEY_ID"
+          uv run slurm-factory build-slurm \
+            --slurm-version ${{ matrix.slurm_version }} \
+            --toolchain ${{ matrix.toolchain }} \
+            --gpu \
+            --no-cache \
+            --publish=slurm \
+            --signing-key "$GPG_KEY_ID" \
+            --gpg-private-key "$GPG_PRIVATE_KEY" \
+            --gpg-passphrase "$GPG_PASSPHRASE"
+
+          # Cleanup build cache
+          for i in `docker image list --format json | jq -r .ID`; do docker rmi $i -f; done
+          docker buildx prune -f
+
+      - name: Test Slurm Tarball
+        timeout-minutes: 360
+        run: |
+          echo "🧪 Testing Slurm ${{ matrix.slurm_version }} tarball with GCC ${{ matrix.toolchain }}..."
+          SLURM_VERSION="${{ matrix.slurm_version }}" TOOLCHAIN="${{ matrix.toolchain }}" ./scripts/test-tarball.sh
+
+      - name: Summary
+        timeout-minutes: 360
+        if: always()
+        run: |
+          echo "## Slurm Dependencies Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Version:** ${{ matrix.slurm_version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Toolchain:** ${{ matrix.toolchain }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/${{ matrix.toolchain}}/slurm/${{ matrix.slurm_version }}/\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/${{ matrix.slurm_version }}/" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Note:** This buildcache contains only Slurm dependencies (excluding Slurm itself)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
+          echo '```bash' >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-factory-deps-buildcache ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/deps/" >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-factory-slurm-buildcache ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/${{ matrix.slurm_version }}/" >> $GITHUB_STEP_SUMMARY
+          echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
+          echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+  summary:
+    needs: build-slurm
+    runs-on: self-hosted
+    timeout-minutes: 3600
+    if: always()
+    steps:
+      - name: Build Summary
+        timeout-minutes: 360
+        run: |
+          echo "## Overall Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "All Slurm dependency buildcaches have been built and published." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Slurm Versions:** ${{ inputs.slurm_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Compiler Versions:** ${{ inputs.compiler_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
+          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/slurm/" >> $GITHUB_STEP_SUMMARY
