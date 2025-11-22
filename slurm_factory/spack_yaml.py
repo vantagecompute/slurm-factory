@@ -225,7 +225,7 @@ def generate_spack_config(
     specs.append(f"openmpi@5.0.8 schedulers=slurm fabrics=auto {compiler_spec}")
     specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
     # Use custom MySQL from slurm_factory repo with ABI check disabled
-    specs.append(f"slurm_factory.mysql@8.0.35 +client_only {compiler_spec}")
+    specs.append(f"mysql@8.0.35 +client_only {compiler_spec}")
     specs.append(f"hdf5@1.14.6 +hl +cxx {compiler_spec}")
     specs.append(
         f"slurm_factory.slurm@{slurm_package_version} {gpu_flags} sysconfdir=/etc/slurm {compiler_spec}"

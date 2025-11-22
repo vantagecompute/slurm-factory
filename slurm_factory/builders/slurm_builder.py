@@ -10,6 +10,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Slurm build process management."""
+
 import logging
 import os
 import subprocess
@@ -115,7 +116,7 @@ def get_move_slurm_assets_to_container_str() -> str:
             # Read file content and base64 encode it
             try:
                 content_bytes = source_file.read_bytes()
-                encoded_content = base64.b64encode(content_bytes).decode('ascii')
+                encoded_content = base64.b64encode(content_bytes).decode("ascii")
 
                 # Use base64 decode to recreate the file
                 commands.append(f"echo '{encoded_content}' | base64 -d > {container_file}")
@@ -130,7 +131,6 @@ def get_move_slurm_assets_to_container_str() -> str:
 
     # Join all commands with && for a single RUN statement
     return " && \\\n    ".join(commands)
-
 
 
 def get_modulerc_creation_script(module_dir: str, modulerc_path: str) -> str:
@@ -241,7 +241,6 @@ def get_slurm_build_script(toolchain: str) -> str:
             case $f in *slurm*) cp "$f" {CONTAINER_SLURM_DIR}/modules/;; esac
         done
     """).strip()
-
 
 
 def get_create_slurm_tarball_script(
@@ -366,7 +365,6 @@ def _get_slurm_builder_dockerfile(
     create_slurm_tarball_script = get_create_slurm_tarball_script(
         modulerc_script, slurm_version, operating_system, gpu_support
     )
-
 
     return textwrap.dedent(
         f"""\
@@ -539,6 +537,230 @@ def _extract_slurm_tarball_from_image(
             logger.warning(f"Failed to remove temporary container: {e}")
 
 
+def sign_and_push_tarball_to_buildcache(
+    tarball_path: Path,
+    slurm_version: str,
+    toolchain: str,
+    gpg_private_key: str,
+    gpg_passphrase: str,
+    gpg_key_id: str,
+) -> None:
+    """
+    Sign a tarball with GPG and upload both tarball and signature to S3.
+
+    Creates a Docker container to handle GPG signing and S3 upload operations.
+
+    Args:
+        tarball_path: Path to the tarball file to sign and upload
+        slurm_version: Slurm version (e.g., "25.11")
+        toolchain: OS toolchain identifier (e.g., "noble")
+        gpg_private_key: GPG private key (base64 encoded)
+        gpg_passphrase: GPG key passphrase
+        gpg_key_id: GPG key ID for signing
+
+    Raises:
+        SlurmFactoryError: If signing or upload fails
+
+    """
+    console.print("[bold blue]Signing and uploading tarball to buildcache...[/bold blue]")
+
+    if not tarball_path.exists():
+        msg = f"Tarball not found at {tarball_path}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+
+    # Check for AWS credentials
+    aws_env = {}
+    if "AWS_ACCESS_KEY_ID" in os.environ:
+        aws_env["AWS_ACCESS_KEY_ID"] = os.environ["AWS_ACCESS_KEY_ID"]
+        aws_env["AWS_SECRET_ACCESS_KEY"] = os.environ["AWS_SECRET_ACCESS_KEY"]
+        if "AWS_SESSION_TOKEN" in os.environ:
+            aws_env["AWS_SESSION_TOKEN"] = os.environ["AWS_SESSION_TOKEN"]
+        if "AWS_DEFAULT_REGION" in os.environ:
+            aws_env["AWS_DEFAULT_REGION"] = os.environ["AWS_DEFAULT_REGION"]
+        if "AWS_REGION" in os.environ:
+            aws_env["AWS_REGION"] = os.environ["AWS_REGION"]
+        logger.debug("Using AWS credentials from environment")
+    else:
+        aws_dir = Path.home() / ".aws"
+        if not aws_dir.exists():
+            msg = "AWS credentials not found. Set AWS_ACCESS_KEY_ID or configure ~/.aws/"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+        logger.debug("Using AWS credentials from ~/.aws/")
+
+    tarball_name = tarball_path.name
+    s3_base_path = f"builds/{slurm_version}/{toolchain}"
+
+    try:
+        # Create temporary directory for Dockerfile
+        import tempfile
+
+        sign_dir = Path(tempfile.mkdtemp(prefix="slurm-factory-sign-"))
+        logger.debug(f"Created temporary signing directory: {sign_dir}")
+
+        # Create Dockerfile that handles signing and uploading in one container
+        dockerfile_content = textwrap.dedent("""
+            FROM ubuntu:24.04
+
+            RUN apt-get update && \\
+                apt-get install -y gnupg awscli && \\
+                rm -rf /var/lib/apt/lists/*
+
+            # Import GPG key
+            ARG GPG_PRIVATE_KEY
+            ARG GPG_PASSPHRASE
+            ARG GPG_KEY_ID
+
+            RUN echo "$GPG_PRIVATE_KEY" | base64 -d | \\
+                gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \\
+                    --pinentry-mode loopback --import
+
+            WORKDIR /workspace
+
+            # Set up the entrypoint script
+            COPY entrypoint.sh /entrypoint.sh
+            RUN chmod +x /entrypoint.sh
+
+            ENTRYPOINT ["/entrypoint.sh"]
+        """).strip()
+
+        # Create entrypoint script that signs and uploads
+        entrypoint_content = textwrap.dedent(f"""
+            #!/bin/bash
+            set -e
+
+            TARBALL_NAME="{tarball_name}"
+            S3_BUCKET="{S3_BUILDCACHE_BUCKET}"
+            S3_PATH="{s3_base_path}"
+
+            echo "🔐 Signing tarball with GPG key $GPG_KEY_ID..."
+            echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \\
+                --pinentry-mode loopback \\
+                --local-user "$GPG_KEY_ID" \\
+                --detach-sign \\
+                --armor \\
+                --output /workspace/$TARBALL_NAME.asc \\
+                /workspace/$TARBALL_NAME
+
+            echo "✓ Tarball signed successfully"
+
+            echo "📦 Uploading tarball to S3..."
+            aws s3 cp /workspace/$TARBALL_NAME \\
+                s3://$S3_BUCKET/$S3_PATH/$TARBALL_NAME
+
+            echo "✓ Tarball uploaded successfully"
+
+            echo "📦 Uploading signature to S3..."
+            aws s3 cp /workspace/$TARBALL_NAME.asc \\
+                s3://$S3_BUCKET/$S3_PATH/$TARBALL_NAME.asc
+
+            echo "✓ Signature uploaded successfully"
+            echo "✅ Tarball and signature published to s3://$S3_BUCKET/$S3_PATH/"
+        """).strip()
+
+        dockerfile_path = sign_dir / "Dockerfile.sign"
+        dockerfile_path.write_text(dockerfile_content)
+        entrypoint_path = sign_dir / "entrypoint.sh"
+        entrypoint_path.write_text(entrypoint_content)
+        logger.debug(f"Created Dockerfile at {dockerfile_path}")
+        logger.debug(f"Created entrypoint script at {entrypoint_path}")
+
+        # Build signing and upload image
+        console.print("[dim]Building GPG signing and upload container...[/dim]")
+        build_cmd = [
+            "docker",
+            "build",
+            "--build-arg",
+            f"GPG_PRIVATE_KEY={gpg_private_key}",
+            "--build-arg",
+            f"GPG_PASSPHRASE={gpg_passphrase}",
+            "--build-arg",
+            f"GPG_KEY_ID={gpg_key_id}",
+            "-f",
+            str(dockerfile_path),
+            "-t",
+            "tarball-signer-uploader",
+            str(sign_dir),
+        ]
+
+        result = subprocess.run(
+            build_cmd,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to build signing container: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        # Run signing and upload container
+        console.print(f"[dim]Signing tarball with GPG key {gpg_key_id} and uploading to S3...[/dim]")
+        # Build docker run command with environment variables
+        run_cmd = [
+            "docker",
+            "run",
+            "--rm",
+            "-v",
+            f"{tarball_path}:/workspace/{tarball_name}:ro",
+            "-e",
+            f"GPG_PASSPHRASE={gpg_passphrase}",
+            "-e",
+            f"GPG_KEY_ID={gpg_key_id}",
+        ]
+        # Add AWS credentials to container
+        for key, value in aws_env.items():
+            run_cmd.extend(["-e", f"{key}={value}"])
+        run_cmd.append("tarball-signer-uploader")
+
+        result = subprocess.run(
+            run_cmd,
+            capture_output=True,
+            text=True,
+            timeout=1800,  # 30 minutes for large uploads
+        )
+
+        if result.returncode != 0:
+            msg = f"Failed to sign and upload tarball: {result.stderr}"
+            logger.error(msg)
+            console.print(f"[bold red]{escape(msg)}[/bold red]")
+            raise SlurmFactoryError(msg)
+
+        console.print(f"[bold green]{result.stdout.strip()}[/bold green]")
+        logger.debug(result.stdout)
+
+        # Cleanup Docker image
+        subprocess.run(
+            ["docker", "rmi", "tarball-signer-uploader"],
+            capture_output=True,
+            timeout=30,
+        )
+
+        # Cleanup temporary directory
+        import shutil
+
+        shutil.rmtree(sign_dir, ignore_errors=True)
+        logger.debug(f"Cleaned up temporary signing directory: {sign_dir}")
+
+        console.print("[bold green]✓ Tarball and signature published successfully[/bold green]")
+
+    except subprocess.TimeoutExpired:
+        msg = "Signing or upload timed out"
+        logger.error(msg)
+        console.print(f"[bold red]{msg}[/bold red]")
+        raise SlurmFactoryError(msg)
+    except Exception as e:
+        msg = f"Failed to sign and upload tarball: {e}"
+        logger.error(msg)
+        console.print(f"[bold red]{escape(msg)}[/bold red]")
+        raise SlurmFactoryError(msg)
+
+
 def _push_slurm_to_buildcache(
     image_tag: str,
     slurm_version: str,
@@ -688,7 +910,7 @@ def _push_slurm_to_buildcache(
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 push_cmd,
                 # Update buildcache index after pushing (Spack 1.0+ requirement)
-                #update_index_cmd,
+                # update_index_cmd,
             ]
         )
 
@@ -812,7 +1034,7 @@ def create_slurm_package(
         )
 
         # If publish is enabled, push to buildcache
-        if publish != "none":
+        if (gpg_private_key and gpg_passphrase and signing_key) and (publish == "slurm" or publish == "deps"):
             console.print(f"[bold cyan]Publishing to buildcache ({publish})...[/bold cyan]")
             _push_slurm_to_buildcache(
                 image_tag=image_tag,
@@ -823,6 +1045,20 @@ def create_slurm_package(
                 gpg_private_key=gpg_private_key,
                 gpg_passphrase=gpg_passphrase,
             )
+
+            # Sign and upload the tarball if GPG credentials are provided
+            if publish == "slurm":
+                console.print("[bold cyan]Signing and uploading tarball...[/bold cyan]")
+                tarball_name = f"slurm-{slurm_version}-{toolchain}-software.tar.gz"
+                tarball_path = Path(cache_dir) / slurm_version / toolchain / tarball_name
+                sign_and_push_tarball_to_buildcache(
+                    tarball_path=tarball_path,
+                    slurm_version=slurm_version,
+                    toolchain=toolchain,
+                    gpg_private_key=gpg_private_key,
+                    gpg_passphrase=gpg_passphrase,
+                    gpg_key_id=signing_key,
+                )
 
         console.print("[bold green]✓ Slurm package built successfully[/bold green]")
 
