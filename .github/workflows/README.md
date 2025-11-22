@@ -24,7 +24,7 @@ slurm-factory build-compiler --compiler-version <version> --publish
 
 **Buildcache Location:**
 - S3: `s3://slurm-factory-spack-buildcache-4b670/compilers/<version>/buildcache`
-- CloudFront: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/<version>/buildcache`
+- CloudFront: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/<version>/`
 
 ---
 
@@ -54,7 +54,7 @@ slurm-factory build \
 
 **Buildcache Location:**
 - S3: `s3://slurm-factory-spack-buildcache-4b670/slurm/<slurm_version>/<compiler_version>/buildcache`
-- CloudFront: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/<slurm_version>/<compiler_version>/buildcache`
+- CloudFront: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/<slurm_version>/<compiler_version>/`
 
 **Use Case:**
 - Pre-build dependencies for faster Slurm builds
@@ -90,7 +90,7 @@ slurm-factory build \
 
 **Buildcache Location:**
 - S3: `s3://slurm-factory-spack-buildcache-4b670/slurm/<slurm_version>/<compiler_version>/buildcache`
-- CloudFront: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/<slurm_version>/<compiler_version>/buildcache`
+- CloudFront: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/<slurm_version>/<compiler_version>/`
 
 **Use Case:**
 - Create complete binary distributions
@@ -177,11 +177,11 @@ After workflows complete, use buildcaches in Spack:
 ```bash
 # Add compiler buildcache
 spack mirror add compiler-buildcache \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/13.4.0/
 
 # Add Slurm buildcache
 spack mirror add slurm-buildcache \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/buildcache
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
 
 # Import and trust GPG signing keys
 spack buildcache keys --install --trust
