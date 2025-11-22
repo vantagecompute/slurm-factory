@@ -1,0 +1,139 @@
+# Test Dockerfile to verify buildcache-based dependency installation
+# This mimics what the GitHub Actions workflow will do:
+# 1. Use compiler buildcache if available
+# 2. Use Slurm dependencies buildcache if available
+# 3. Fall back to building from source if not in cache
+
+ARG SLURM_VERSION=25.11
+ARG COMPILER_VERSION=13.4.0
+ARG BASE_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+FROM ubuntu:24.04
+
+ARG SLURM_VERSION
+ARG COMPILER_VERSION
+ARG BASE_URL
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=UTC
+
+# Install system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    build-essential \
+    ca-certificates \
+    curl \
+    file \
+    gcc \
+    g++ \
+    gfortran \
+    git \
+    gnupg2 \
+    make \
+    patch \
+    python3 \
+    python3-pip \
+    unzip \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Spack v1.0.0
+RUN git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git /opt/spack
+
+ENV SPACK_ROOT=/opt/spack
+ENV PATH=$SPACK_ROOT/bin:$PATH
+
+# Source Spack setup
+RUN bash -c 'source /opt/spack/share/spack/setup-env.sh && \
+    spack --version'
+
+# Create test script
+RUN cat > /test-buildcache-deps.sh <<'TESTEOF'
+#!/bin/bash
+set -ex
+
+source /opt/spack/share/spack/setup-env.sh
+
+echo "==> Testing buildcache-based dependency installation"
+echo "Slurm Version: ${SLURM_VERSION}"
+echo "Compiler Version: ${COMPILER_VERSION}"
+echo "Base URL: ${BASE_URL}"
+echo ""
+
+# Add compiler buildcache mirror
+echo "==> Adding compiler buildcache mirror..."
+spack mirror add slurm-factory-compilers \
+  "${BASE_URL}/compilers/${COMPILER_VERSION}"
+
+# Add Slurm dependencies buildcache mirror
+echo "==> Adding Slurm dependencies buildcache mirror..."
+spack mirror add slurm-factory-slurm-deps \
+  "${BASE_URL}/deps/${COMPILER_VERSION}"
+
+# Trust GPG keys from all mirrors
+echo "==> Importing GPG signing keys..."
+spack buildcache keys --install --trust
+
+# List available mirrors
+echo "==> Configured mirrors:"
+spack mirror list
+
+# Install GCC from buildcache (prefer cache, fall back to source)
+echo "==> Installing GCC ${COMPILER_VERSION}..."
+if spack buildcache list gcc@${COMPILER_VERSION} | grep -q "gcc@${COMPILER_VERSION}"; then
+    echo "   Found GCC in buildcache, installing..."
+    spack install gcc@${COMPILER_VERSION} languages=c,c++,fortran
+else
+    echo "   GCC not in buildcache, building from source..."
+    spack install gcc@${COMPILER_VERSION} languages=c,c++,fortran
+fi
+
+# Register compiler with Spack
+echo "==> Registering compiler..."
+spack compiler find $(spack location -i gcc@${COMPILER_VERSION})
+
+# Add custom Spack repo for slurm-factory namespace
+echo "==> Adding custom Spack repository..."
+spack repo add https://github.com/vantagecompute/slurm-factory-spack-repo.git /opt/slurm-factory-spack-repo
+
+# Check whats available in the Slurm buildcache
+echo "==> Checking Slurm buildcache contents..."
+spack buildcache list --allarch | head -30 || echo "Could not list buildcache"
+
+# Install Slurm (prefer cache, fall back to source)
+echo "==> Installing Slurm ${SLURM_VERSION}..."
+if spack buildcache list slurm@${SLURM_VERSION} | grep -q "slurm@${SLURM_VERSION}"; then
+    echo "   Found Slurm in buildcache"
+    # Try cache-only first, fall back to mixed mode
+    spack install slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
+else
+    echo "   Slurm not in buildcache, checking dependencies..."
+    # Even if Slurm isnt in cache, dependencies might be
+    spack install slurm@${SLURM_VERSION} %gcc@${COMPILER_VERSION}
+fi
+
+# Verify installation
+echo "==> Verifying installation..."
+spack find slurm
+spack find -l
+
+# Check what was installed from buildcache vs built from source
+echo "==> Installation summary:"
+echo "Total packages installed:"
+spack find | tail -1
+
+# Load and test
+echo "==> Loading Slurm..."
+eval $(spack load --sh slurm@${SLURM_VERSION})
+sinfo --version
+scontrol --version
+
+echo ""
+echo "==> SUCCESS! Buildcache-based dependency installation test passed."
+echo "   ✓ Compiler installed (from buildcache or source)"
+echo "   ✓ Slurm and dependencies installed (using buildcache where available)"
+echo "   ✓ Slurm binaries are functional"
+TESTEOF
+
+RUN chmod +x /test-buildcache-deps.sh
+
+CMD ["/test-buildcache-deps.sh"]
