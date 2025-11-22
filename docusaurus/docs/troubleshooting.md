@@ -14,7 +14,7 @@ newgrp docker
 **Build fails with cache errors:**
 ```bash
 slurm-factory clean --full
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 ```
 
 **Out of disk space:**
@@ -115,14 +115,14 @@ export DOCKER_BUILDKIT=1
 **Large package sizes:**
 ```bash
 # Skip GPU if not needed (builds are 2-5GB instead of 15-25GB)
-slurm-factory build --slurm-version 25.11  # no --gpu
+slurm-factory build-slurm --slurm-version 25.11  # no --gpu
 ```
 
 ## Getting Help
 
 ```bash
 # Verbose mode for debugging
-slurm-factory --verbose build --slurm-version 25.11
+slurm-factory --verbose build-slurm --slurm-version 25.11
 
 # Check build logs
 docker logs <container-id>
