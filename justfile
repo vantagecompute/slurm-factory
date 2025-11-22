@@ -145,3 +145,8 @@ show-config-gpu:
 [group("config")]
 show-versions:
     {{uv_run}} python -c "from slurm_factory.constants import SLURM_VERSIONS; print('Available Slurm versions:'); [print(f'  {k}: {v}') for k, v in SLURM_VERSIONS.items()]"
+
+# Test tarball
+[group("test-tarball")]
+test-tarball:
+    SLURM_VERSION="${SLURM_VERSION:-25.11}" TOOLCHAIN="${TOOLCHAIN:-resolute}" ./scripts/test-tarball.sh
