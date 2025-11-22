@@ -14,19 +14,19 @@ See [Build Artifacts](build-artifacts.md) for pre-built S3 packages covering all
 
 ```bash
 # Standard build with default compiler (GCC 13.4.0)
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 
 # Build specific version with default compiler
-slurm-factory build --slurm-version 24.11
+slurm-factory build-slurm --slurm-version 24.11
 
 # GPU support (~15-25GB)
-slurm-factory build --slurm-version 25.11 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --gpu
 
 # Verbose output
-slurm-factory --verbose build --slurm-version 25.11
+slurm-factory --verbose build-slurm --slurm-version 25.11
 
 # Custom project name
-slurm-factory --project-name prod build --slurm-version 25.11
+slurm-factory --project-name prod build-slurm --slurm-version 25.11
 ```
 
 ## Compiler Version Examples
@@ -35,19 +35,19 @@ Build with different GCC compiler versions for cross-distribution compatibility:
 
 ```bash
 # Latest compiler (Ubuntu 24.10+, Fedora 40+)
-slurm-factory build --slurm-version 25.11 --compiler-version 14.2.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 14.2.0
 
 # Default (Ubuntu 24.04, Debian 13+)
-slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
 
 # Ubuntu 22.04, Debian 12+
-slurm-factory build --slurm-version 24.11 --compiler-version 11.5.0
+slurm-factory build-slurm --slurm-version 24.11 --compiler-version 11.5.0
 
 # RHEL 8, Ubuntu 20.04, Debian 11+
-slurm-factory build --slurm-version 23.11 --compiler-version 10.5.0
+slurm-factory build-slurm --slurm-version 23.11 --compiler-version 10.5.0
 
 # Combine with GPU support
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 10.5.0 --gpu
 ```
 
 **Compiler Selection Guide:**
@@ -61,7 +61,6 @@ slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu
 | 10.5.0 | RHEL 8+, Ubuntu 20.04+ | 2.31 | Enterprise Linux |
 | 9.5.0 | RHEL 8+, CentOS 8+ | 2.28 | RHEL 8 compatibility |
 | 8.5.0 | RHEL 8+, CentOS 8+ | 2.28 | RHEL 8 minimal |
-| 7.5.0 | RHEL 7+, CentOS 7+ | 2.17 | Legacy systems |
 
 ## Deployment Examples
 
@@ -109,7 +108,7 @@ jobs:
       - name: Build
         run: |
           pipx install slurm-factory
-          slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+          slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
       - uses: actions/upload-artifact@v4
         with:
           name: slurm-package
@@ -124,7 +123,7 @@ build:
   script:
     - apt-get update && apt-get install -y pipx docker.io
     - pipx install slurm-factory
-    - slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+    - slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
   artifacts:
     paths:
       - ~/.slurm-factory/builds/
@@ -161,5 +160,5 @@ du -sh ~/.slurm-factory/
 
 # Rebuild from scratch
 slurm-factory clean --full
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 ```

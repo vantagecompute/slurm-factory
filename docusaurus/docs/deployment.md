@@ -8,13 +8,13 @@ Deploy relocatable Slurm packages to HPC clusters. Packages can be built locally
 
 ```bash
 # Build package (default: GCC 13.4.0 for Ubuntu 24.04)
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 
 # Build for RHEL 8 / Ubuntu 20.04 compatibility
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 10.5.0
 
 # Build for RHEL 7 compatibility
-slurm-factory build --slurm-version 25.11 --compiler-version 7.5.0
+slurm-factory build-slurm --slurm-version 25.11 --compiler-version 7.5.0
 
 # Deploy
 sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
@@ -51,9 +51,7 @@ Use `--compiler-version` to build packages compatible with older distributions:
 | 12.5.0           | Ubuntu 23.10+, Debian 12+             | 2.38  |
 | 11.5.0           | Ubuntu 22.04+, Debian 12+             | 2.35  |
 | 10.5.0           | RHEL 8+, Ubuntu 20.04+, Debian 11+    | 2.31  |
-| 9.5.0            | RHEL 8+, CentOS 8+                    | 2.28  |
 | 8.5.0            | RHEL 8+, CentOS 8+                    | 2.28  |
-| 7.5.0            | RHEL 7+, CentOS 7+                    | 2.17  |
 
 **Build time**: Older compilers add 30-60 minutes for toolchain bootstrap on first build.
 

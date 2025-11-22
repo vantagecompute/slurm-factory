@@ -1,0 +1,61 @@
+ARG SLURM_VERSION=25.11
+ARG TOOLCHAIN=jammy
+
+FROM ubuntu:${TOOLCHAIN}
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            ca-certificates curl gnupg lmod lua5.3 lua-posix build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
+    mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
+    curl -fsSLO "${TARBALL_URL}.asc" && \
+    curl -fsSLO "${TARBALL_URL}" && \
+    gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys FDEA90667641505264EFD114DFB92630BCA5AB71 && \
+    gpg --batch --verify \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
+    mkdir -p /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
+    rm -rf /tmp/slurm-tarball
+
+ENV MODULEPATH=/opt/slurm-factory/assets/modules:/usr/share/modulefiles \
+    SLURM_INSTALL_PREFIX=/opt/slurm-factory/view
+
+RUN mkdir -p /etc/slurm /var/spool/slurm/ctld /var/spool/slurm/d /var/log/slurm && \
+    cat >/etc/slurm/slurm.conf <<'SLURMCONF'
+ClusterName=tarball-demo
+SlurmctldHost=localhost
+AuthType=auth/slurm
+AuthInfo=/etc/slurm/slurm.key
+SlurmUser=root
+SlurmdUser=root
+StateSaveLocation=/var/spool/slurm/ctld
+SlurmdSpoolDir=/var/spool/slurm/d
+SlurmctldLogFile=/var/log/slurm/slurmctld.log
+SlurmdLogFile=/var/log/slurm/slurmd.log
+ProctrackType=proctrack/linuxproc
+TaskPlugin=task/none
+PluginDir=/opt/slurm-factory/view/lib/slurm
+NodeName=localhost CPUs=4 State=UNKNOWN
+PartitionName=debug Nodes=localhost Default=YES MaxTime=INFINITE State=UP
+SLURMCONF
+
+RUN dd if=/dev/urandom bs=1 count=1024 of=/etc/slurm/slurm.key 2>/dev/null && \
+    chmod 600 /etc/slurm/slurm.key
+
+
+
+RUN cat >/test-slurm.sh <<'TESTEOF'
+#!/bin/bash
+set -ex
+source /etc/profile.d/lmod.sh
+export MODULEPATH=/opt/slurm-factory/view/assets/modules:${MODULEPATH}
+module load slurm
+sinfo -V
+TESTEOF
+
+RUN chmod +x /test-slurm.sh
+
+CMD ["/bin/bash", "/test-slurm.sh"]
