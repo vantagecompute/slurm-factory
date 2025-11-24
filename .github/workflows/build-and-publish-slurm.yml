@@ -30,12 +30,12 @@ on:
       use_slurm_buildcache:
         description: 'Use binary packages from slurm buildcache'
         required: false
-        default: true
+        default: false
         type: boolean
       use_deps_buildcache:
         description: 'Use binary packages from deps buildcache'
         required: false
-        default: true
+        default: false
         type: boolean
 
 env:
@@ -186,11 +186,11 @@ jobs:
           )
           
           # Add buildcache flags based on inputs
-          if [ "${{ inputs.use_deps_buildcache }}" = "false" ]; then
-            BUILD_FLAGS+=(--no-use-deps-buildcache)
+          if [ "${{ inputs.use_deps_buildcache }}" = "true" ]; then
+            BUILD_FLAGS+=(--use-deps-buildcache)
           fi
-          if [ "${{ inputs.use_slurm_buildcache }}" = "false" ]; then
-            BUILD_FLAGS+=(--no-use-slurm-buildcache)
+          if [ "${{ inputs.use_slurm_buildcache }}" = "true" ]; then
+            BUILD_FLAGS+=(--use-slurm-buildcache)
           fi
           
           uv run slurm-factory build-slurm "${BUILD_FLAGS[@]}"
