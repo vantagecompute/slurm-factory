@@ -175,9 +175,15 @@ def get_slurm_build_script(toolchain: str) -> str:
     return textwrap.dedent(f"""        source {SPACK_SETUP_SCRIPT}
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
-        echo '==> Installing GPG keys from buildcache...'
-        spack buildcache keys --install --trust || {{
-            echo 'WARNING: Failed to install GPG keys from buildcache'
+        echo '==> Installing GPG keys from keyserver...'
+        gpg --batch --keyserver hkps://keyserver.ubuntu.com \\
+            --recv-keys FDEA90667641505264EFD114DFB92630BCA5AB71 || {{
+            echo 'WARNING: Failed to retrieve GPG key from keyserver'
+            echo 'Will continue but may not be able to use binary packages'
+        }}
+        gpg --armor --export FDEA90667641505264EFD114DFB92630BCA5AB71 > /tmp/vantage-spack.pub
+        spack gpg trust /tmp/vantage-spack.pub || {{
+            echo 'WARNING: Failed to trust GPG keys'
             echo 'Will continue but may not be able to use binary packages'
         }}
         echo '==> Checking custom Spack repositories...'
@@ -207,6 +213,7 @@ def get_slurm_build_script(toolchain: str) -> str:
         echo '✓ gcc@{gcc_version} available'
         spack compiler info gcc@{gcc_version}
         rm -f spack.lock
+
         echo '==> Concretizing Slurm packages with gcc@{gcc_version}...'
         spack -e . concretize -j $(nproc) -f --fresh
         echo '==> Installing Slurm and all dependencies...'
@@ -935,11 +942,12 @@ def _push_slurm_to_buildcache(
                 "cd /root/spack-project",
                 "spack env activate .",
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
-                # Trust all public keys from the buildcache to avoid GPG verification failures
                 "spack buildcache keys --install --trust",
+                "spack buildcache update-index s3-buildcache",
                 push_cmd,
                 # Update buildcache index after pushing (Spack 1.0+ requirement)
                 # update_index_cmd,
+                #"spack buildcache update-index s3-buildcache",
             ]
         )
 
@@ -1030,10 +1038,9 @@ def create_slurm_package(
 
         # Generate multi-stage Dockerfile with embedded spack.yaml
         # This creates 3 stages:
-        # 0. compiler-bootstrap: Build custom GCC toolchain (or reuse from buildcache)
-        # 1. init: Ubuntu + deps + Spack (heavily cached)
-        # 2. builder: Spack install + view + modules (cached on spack.yaml changes)
-        # 3. packager: Copy assets + create tarball (invalidates on asset changes)
+        # 1. init: Ubuntu + deps + Spack
+        # 2. builder: Spack install + view + modules
+        # 3. packager: Copy assets + create tarball
         logger.debug("Generating multi-stage Dockerfile")
         slurm_builder_dockerfile_content = _get_slurm_builder_dockerfile(
             spack_yaml,
