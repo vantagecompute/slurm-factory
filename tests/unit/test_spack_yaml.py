@@ -291,6 +291,37 @@ class TestConfigurationValidation:
         assert mirrors["spack-public"]["url"] == "https://mirror.spack.io"
         assert mirrors["spack-public"]["signed"] is False
 
+    def test_buildcache_mirrors_enabled_by_default(self):
+        """Test that buildcache mirrors are enabled by default."""
+        config = generate_spack_config()
+        mirrors = config["spack"]["mirrors"]
+        # Should have both buildcache mirrors
+        assert "slurm-factory-deps-buildcache" in mirrors
+        assert "slurm-factory-slurm-buildcache" in mirrors
+        # Both should have binary enabled by default
+        assert mirrors["slurm-factory-deps-buildcache"]["binary"] is True
+        assert mirrors["slurm-factory-slurm-buildcache"]["binary"] is True
+
+    def test_buildcache_mirrors_can_be_disabled(self):
+        """Test that buildcache mirrors can be disabled via parameters."""
+        # Disable deps buildcache
+        config = generate_spack_config(use_deps_buildcache=False)
+        mirrors = config["spack"]["mirrors"]
+        assert mirrors["slurm-factory-deps-buildcache"]["binary"] is False
+        assert mirrors["slurm-factory-slurm-buildcache"]["binary"] is True
+        
+        # Disable slurm buildcache
+        config = generate_spack_config(use_slurm_buildcache=False)
+        mirrors = config["spack"]["mirrors"]
+        assert mirrors["slurm-factory-deps-buildcache"]["binary"] is True
+        assert mirrors["slurm-factory-slurm-buildcache"]["binary"] is False
+        
+        # Disable both
+        config = generate_spack_config(use_deps_buildcache=False, use_slurm_buildcache=False)
+        mirrors = config["spack"]["mirrors"]
+        assert mirrors["slurm-factory-deps-buildcache"]["binary"] is False
+        assert mirrors["slurm-factory-slurm-buildcache"]["binary"] is False
+
 
 class TestParameterValidation:
     """Test parameter validation."""

@@ -1011,6 +1011,8 @@ def create_slurm_package(
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
     gpg_passphrase: str | None = None,
+    use_deps_buildcache: bool = True,
+    use_slurm_buildcache: bool = True,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
@@ -1033,6 +1035,8 @@ def create_slurm_package(
             toolchain=toolchain,
             gpu_support=gpu_support,
             enable_hierarchy=enable_hierarchy,
+            use_deps_buildcache=use_deps_buildcache,
+            use_slurm_buildcache=use_slurm_buildcache,
         )
         logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
 

@@ -46,6 +46,8 @@ def build_slurm(
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
     gpg_passphrase: str | None = None,
+    use_deps_buildcache: bool = True,
+    use_slurm_buildcache: bool = True,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -111,6 +113,8 @@ def build_slurm(
             signing_key=signing_key,
             gpg_private_key=gpg_private_key,
             gpg_passphrase=gpg_passphrase,
+            use_deps_buildcache=use_deps_buildcache,
+            use_slurm_buildcache=use_slurm_buildcache,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")
@@ -188,6 +192,20 @@ def build_slurm_command(
             help="Passphrase for the GPG private key (if encrypted)",
         ),
     ] = None,
+    use_deps_buildcache: Annotated[
+        bool,
+        typer.Option(
+            "--use-deps-buildcache",
+            help="Use binary packages from deps buildcache (default: True)",
+        ),
+    ] = True,
+    use_slurm_buildcache: Annotated[
+        bool,
+        typer.Option(
+            "--use-slurm-buildcache",
+            help="Use binary packages from slurm buildcache (default: True)",
+        ),
+    ] = True,
 ):
     """
     Build a specific Slurm version.
@@ -218,7 +236,9 @@ def build_slurm_command(
     Remote Spack buildcache:
     - Always enabled via mirror in spack.yaml
     - Automatically downloads pre-built compiler binaries when available
-    - No flag needed - works automatically
+    - --use-deps-buildcache: Toggle use of deps buildcache (default: True)
+    - --use-slurm-buildcache: Toggle use of slurm buildcache (default: True)
+    - Set to --no-use-deps-buildcache or --no-use-slurm-buildcache to disable
 
     Advanced Spack 1.x features:
     - --enable-hierarchy: Enable Core/Compiler/MPI 3-tier module hierarchy
@@ -245,6 +265,8 @@ def build_slurm_command(
         slurm-factory build-slurm --publish=all                     # Build and publish all to buildcache
         slurm-factory build-slurm --publish=slurm                   # Build and publish only Slurm
         slurm-factory build-slurm --publish=deps                    # Build and publish only dependencies
+        slurm-factory build-slurm --no-use-deps-buildcache          # Build deps from source (no buildcache)
+        slurm-factory build-slurm --no-use-slurm-buildcache         # Build slurm from source (no buildcache)
         slurm-factory build-slurm --use-local-buildcache            # Use local compiler tarball (advanced)
 
     """
@@ -290,6 +312,16 @@ def build_slurm_command(
     if enable_hierarchy:
         console.print("[bold cyan]Enabling Core/Compiler/MPI module hierarchy[/bold cyan]")
 
+    if not use_deps_buildcache:
+        console.print(
+            "[bold yellow]Deps buildcache disabled - building dependencies from source[/bold yellow]"
+        )
+
+    if not use_slurm_buildcache:
+        console.print(
+            "[bold yellow]Slurm buildcache disabled - building Slurm from source[/bold yellow]"
+        )
+
     build_slurm(
         ctx,
         slurm_version,
@@ -302,4 +334,6 @@ def build_slurm_command(
         signing_key,
         gpg_private_key,
         gpg_passphrase,
+        use_deps_buildcache,
+        use_slurm_buildcache,
     )
