@@ -147,6 +147,8 @@ def generate_spack_config(
     view_root: str = "/opt/slurm/view",  # Use separate view directory
     toolchain: str = "noble",
     enable_hierarchy: bool = False,
+    use_deps_buildcache: bool = True,
+    use_slurm_buildcache: bool = True,
 ) -> Dict[str, Any]:
     """
     Generate a Spack environment configuration dictionary.
@@ -158,6 +160,8 @@ def generate_spack_config(
         view_root: Root directory for Spack view
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
+        use_deps_buildcache: Whether to use binary packages from deps buildcache (default: True)
+        use_slurm_buildcache: Whether to use binary packages from slurm buildcache (default: True)
 
     Returns:
         Dictionary representing the Spack environment configuration
@@ -451,13 +455,13 @@ def generate_spack_config(
                 "slurm-factory-deps-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/slurm/deps",
                     "signed": True,
-                    "binary": True,
+                    "binary": use_deps_buildcache,
                     "source": False,
                 },
                 "slurm-factory-slurm-buildcache": {
                     "url": f"https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/slurm/{slurm_version}",
                     "signed": True,
-                    "binary": True,
+                    "binary": use_slurm_buildcache,
                     "source": False,
                 },
                 # Fallback to public Spack mirror for source downloads only (lowest priority)
@@ -492,6 +496,8 @@ def generate_yaml_string(
     toolchain: str = "noble",
     gpu_support: bool = False,
     enable_hierarchy: bool = False,
+    use_deps_buildcache: bool = True,
+    use_slurm_buildcache: bool = True,
 ) -> str:
     """
     Generate a YAML string representation of the Spack environment configuration.
@@ -501,6 +507,8 @@ def generate_yaml_string(
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         gpu_support: Whether to include GPU support
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
+        use_deps_buildcache: Whether to use binary packages from deps buildcache
+        use_slurm_buildcache: Whether to use binary packages from slurm buildcache
 
     Returns:
         YAML string representation of the configuration
@@ -513,6 +521,8 @@ def generate_yaml_string(
         toolchain=toolchain,
         gpu_support=gpu_support,
         enable_hierarchy=enable_hierarchy,
+        use_deps_buildcache=use_deps_buildcache,
+        use_slurm_buildcache=use_slurm_buildcache,
     )
     header = get_comment_header(slurm_version, gpu_support)
 
