@@ -313,10 +313,14 @@ def build_slurm_command(
         console.print("[bold cyan]Enabling Core/Compiler/MPI module hierarchy[/bold cyan]")
 
     if not use_deps_buildcache:
-        console.print("[bold yellow]Deps buildcache disabled - building dependencies from source[/bold yellow]")
+        console.print(
+            "[bold yellow]Deps buildcache disabled - building dependencies from source[/bold yellow]"
+        )
 
     if not use_slurm_buildcache:
-        console.print("[bold yellow]Slurm buildcache disabled - building Slurm from source[/bold yellow]")
+        console.print(
+            "[bold yellow]Slurm buildcache disabled - building Slurm from source[/bold yellow]"
+        )
 
     build_slurm(
         ctx,
