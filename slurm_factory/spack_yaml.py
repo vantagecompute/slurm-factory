@@ -240,7 +240,7 @@ def generate_spack_config(
             },
             "concretizer": {
                 "unify": "when_possible",
-                "reuse": False,  # Disable buildcache reuse - build everything from source
+                "reuse": True,  # Enable buildcache reuse for faster builds
             },
             "config": {
                 "verify": {

@@ -278,8 +278,8 @@ class TestConfigurationValidation:
         concretizer = config["spack"]["concretizer"]
         # unify is set to "when_possible" for better dependency resolution
         assert concretizer["unify"] == "when_possible"
-        # Reuse is disabled (False) to build everything from source
-        assert concretizer["reuse"] is False
+        # Reuse is enabled (True) to use packages from buildcache when available
+        assert concretizer["reuse"] is True
 
     def test_mirror_configuration(self):
         """Test mirror configuration."""
