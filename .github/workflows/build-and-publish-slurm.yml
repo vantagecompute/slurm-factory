@@ -27,6 +27,16 @@ on:
         required: true
         default: 'all'
         type: string
+      use_slurm_buildcache:
+        description: 'Use binary packages from slurm buildcache'
+        required: false
+        default: false
+        type: boolean
+      use_deps_buildcache:
+        description: 'Use binary packages from deps buildcache'
+        required: false
+        default: false
+        type: boolean
 
 env:
   S3_BUCKET: slurm-factory-spack-buildcache-4b670
@@ -162,15 +172,28 @@ jobs:
             exit 1
           fi
           echo "Using GPG signing key: $GPG_KEY_ID"
-          uv run slurm-factory build-slurm \
-            --slurm-version ${{ matrix.slurm_version }} \
-            --toolchain ${{ matrix.toolchain }} \
-            --gpu \
-            --no-cache \
-            --publish=slurm \
-            --signing-key "$GPG_KEY_ID" \
-            --gpg-private-key "$GPG_PRIVATE_KEY" \
+          
+          # Build flags array
+          BUILD_FLAGS=(
+            --slurm-version ${{ matrix.slurm_version }}
+            --toolchain ${{ matrix.toolchain }}
+            --gpu
+            --no-cache
+            --publish=slurm
+            --signing-key "$GPG_KEY_ID"
+            --gpg-private-key "$GPG_PRIVATE_KEY"
             --gpg-passphrase "$GPG_PASSPHRASE"
+          )
+          
+          # Add buildcache flags based on inputs
+          if [ "${{ inputs.use_deps_buildcache }}" = "true" ]; then
+            BUILD_FLAGS+=(--use-deps-buildcache)
+          fi
+          if [ "${{ inputs.use_slurm_buildcache }}" = "true" ]; then
+            BUILD_FLAGS+=(--use-slurm-buildcache)
+          fi
+          
+          uv run slurm-factory build-slurm "${BUILD_FLAGS[@]}"
 
           # Cleanup build cache
           for i in `docker image list --format json | jq -r .ID`; do docker rmi $i -f; done
