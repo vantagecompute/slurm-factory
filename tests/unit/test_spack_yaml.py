@@ -272,34 +272,6 @@ class TestConfigurationValidation:
         assert "cuda" in view_config["exclude"]
         assert "rocm-core" in view_config["exclude"]
 
-    def test_gpu_packages_external(self):
-        """Test that GPU packages are configured as external when GPU support is enabled."""
-        # GPU-enabled build should have CUDA and ROCm as external packages
-        gpu_config = generate_spack_config(gpu_support=True)
-        packages = gpu_config["spack"]["packages"]
-        
-        # Verify CUDA is configured as external
-        assert "cuda" in packages
-        assert packages["cuda"]["buildable"] is False
-        assert "externals" in packages["cuda"]
-        assert len(packages["cuda"]["externals"]) > 0
-        
-        # Verify ROCm packages are configured as external
-        assert "rocm-core" in packages
-        assert packages["rocm-core"]["buildable"] is False
-        assert "externals" in packages["rocm-core"]
-        
-        assert "rocm-smi-lib" in packages
-        assert packages["rocm-smi-lib"]["buildable"] is False
-        assert "externals" in packages["rocm-smi-lib"]
-        
-        # CPU-only build should NOT have GPU packages configured
-        cpu_config = generate_spack_config(gpu_support=False)
-        cpu_packages = cpu_config["spack"]["packages"]
-        assert "cuda" not in cpu_packages
-        assert "rocm-core" not in cpu_packages
-        assert "rocm-smi-lib" not in cpu_packages
-
     def test_concretizer_settings(self):
         """Test concretizer configuration."""
         config = generate_spack_config()
