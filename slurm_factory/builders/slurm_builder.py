@@ -529,6 +529,9 @@ def _extract_slurm_tarball_from_image(
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to extract package: {e}"
         logger.error(msg)
@@ -774,6 +777,9 @@ def sign_and_push_tarball_to_buildcache(
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to sign and upload tarball: {e}"
         logger.error(msg)
@@ -943,11 +949,9 @@ def _push_slurm_to_buildcache(
                 "spack env activate .",
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 "spack buildcache keys --install --trust",
-                "spack buildcache update-index s3-buildcache",
                 push_cmd,
-                # Update buildcache index after pushing (Spack 1.0+ requirement)
-                # update_index_cmd,
-                #"spack buildcache update-index s3-buildcache",
+                # Update buildcache index after pushing to ensure it's current
+                "spack buildcache update-index s3-buildcache",
             ]
         )
 
@@ -991,6 +995,9 @@ def _push_slurm_to_buildcache(
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to push to buildcache: {e}"
         logger.error(msg)
@@ -1107,6 +1114,9 @@ def create_slurm_package(
         logger.error(msg)
         console.print(f"[bold red]{escape(msg)}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to create slurm package: {e}"
         logger.error(msg)
