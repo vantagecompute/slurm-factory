@@ -949,11 +949,11 @@ def _push_slurm_to_buildcache(
                 "spack env activate .",
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
                 "spack buildcache keys --install --trust",
-                "spack buildcache update-index s3-buildcache",
+                # Update index before push (non-fatal - path may not exist yet on first push)
+                "spack buildcache update-index s3-buildcache || true",
                 push_cmd,
-                # Update buildcache index after pushing (Spack 1.0+ requirement)
-                # update_index_cmd,
-                #"spack buildcache update-index s3-buildcache",
+                # Update buildcache index after pushing to ensure it's current
+                "spack buildcache update-index s3-buildcache",
             ]
         )
 
