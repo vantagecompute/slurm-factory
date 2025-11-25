@@ -479,6 +479,35 @@ def generate_spack_config(
         }
     }
 
+    # Add GPU packages as external (non-buildable) when GPU support is enabled
+    # CUDA and ROCm are system-provided packages (installed via drivers) and should not be built by Spack
+    if gpu_support:
+        config["spack"]["packages"]["cuda"] = {
+            "buildable": False,
+            "externals": [
+                {"spec": "cuda@11.0.0", "prefix": "/usr/local/cuda-11.0"},
+                {"spec": "cuda@11.8.0", "prefix": "/usr/local/cuda-11.8"},
+                {"spec": "cuda@12.0.0", "prefix": "/usr/local/cuda-12.0"},
+                {"spec": "cuda@12.4.0", "prefix": "/usr/local/cuda-12.4"},
+            ],
+        }
+        config["spack"]["packages"]["rocm-core"] = {
+            "buildable": False,
+            "externals": [
+                {"spec": "rocm-core@5.0.0", "prefix": "/opt/rocm-5.0.0"},
+                {"spec": "rocm-core@5.4.0", "prefix": "/opt/rocm-5.4.0"},
+                {"spec": "rocm-core@6.0.0", "prefix": "/opt/rocm-6.0.0"},
+            ],
+        }
+        config["spack"]["packages"]["rocm-smi-lib"] = {
+            "buildable": False,
+            "externals": [
+                {"spec": "rocm-smi-lib@5.0.0", "prefix": "/opt/rocm-5.0.0"},
+                {"spec": "rocm-smi-lib@5.4.0", "prefix": "/opt/rocm-5.4.0"},
+                {"spec": "rocm-smi-lib@6.0.0", "prefix": "/opt/rocm-6.0.0"},
+            ],
+        }
+
     return config
 
 
