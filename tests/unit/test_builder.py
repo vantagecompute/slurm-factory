@@ -60,7 +60,7 @@ class TestExceptionHandling:
         """Test that SlurmFactoryError is not re-wrapped when raised in _push_slurm_to_buildcache."""
         # Mock Path.home() to return a path with .aws directory
         mock_home = MagicMock()
-        mock_home.__truediv__ = lambda self, other: MagicMock(exists=lambda: True)
+        mock_home.__truediv__.return_value = MagicMock(exists=lambda: True)
         mock_path.home.return_value = mock_home
 
         # Mock subprocess.run to return a failed result
