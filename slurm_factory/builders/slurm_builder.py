@@ -529,6 +529,9 @@ def _extract_slurm_tarball_from_image(
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to extract package: {e}"
         logger.error(msg)
@@ -774,6 +777,9 @@ def sign_and_push_tarball_to_buildcache(
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to sign and upload tarball: {e}"
         logger.error(msg)
@@ -991,6 +997,9 @@ def _push_slurm_to_buildcache(
         logger.error(msg)
         console.print(f"[bold red]{msg}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to push to buildcache: {e}"
         logger.error(msg)
@@ -1107,6 +1116,9 @@ def create_slurm_package(
         logger.error(msg)
         console.print(f"[bold red]{escape(msg)}[/bold red]")
         raise SlurmFactoryError(msg)
+    except SlurmFactoryError:
+        # Re-raise SlurmFactoryError without wrapping to avoid nested error messages
+        raise
     except Exception as e:
         msg = f"Failed to create slurm package: {e}"
         logger.error(msg)
