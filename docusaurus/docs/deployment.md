@@ -7,55 +7,53 @@ Deploy relocatable Slurm packages to HPC clusters. Packages can be built locally
 ### Option 1: Build Locally
 
 ```bash
-# Build package (default: GCC 13.4.0 for Ubuntu 24.04)
-slurm-factory build --slurm-version 25.11
+# Build package for Ubuntu 24.04 (Noble)
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
 
-# Build for RHEL 8 / Ubuntu 20.04 compatibility
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
+# Build for Ubuntu 22.04 (Jammy)
+slurm-factory build-slurm --slurm-version 25.11 --toolchain jammy
 
-# Build for RHEL 7 compatibility
-slurm-factory build --slurm-version 25.11 --compiler-version 7.5.0
+# Build for Rocky Linux 9
+slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9
 
 # Deploy
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-noble-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 ```
 
 ### Option 2: Download Pre-Built Package from S3
 
 ```bash
-# Download from S3
-aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.11-gcc13.4.0-software.tar.gz /tmp/
+# Download from S3 (Ubuntu 24.04)
+wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz
 
 # Deploy
-sudo tar -xzf /tmp/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
+sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 ```
 
-See [Build Artifacts](build-artifacts.md) for all available S3 packages.
+See [Build Artifacts](build-artifacts.md) for all available packages.
 
-## Cross-Distro Compatibility
+## Toolchain Compatibility
 
-Use `--compiler-version` to build packages compatible with older distributions:
+Use `--toolchain` to build packages for your target distribution:
 
-| Compiler Version | Compatible Distros                    | glibc |
-|------------------|---------------------------------------|-------|
-| 14.2.0           | Ubuntu 24.10+, Fedora 40+             | 2.40+ |
-| 13.4.0 (default) | Ubuntu 24.04+, Debian 13+             | 2.39  |
-| 12.5.0           | Ubuntu 23.10+, Debian 12+             | 2.38  |
-| 11.5.0           | Ubuntu 22.04+, Debian 12+             | 2.35  |
-| 10.5.0           | RHEL 8+, Ubuntu 20.04+, Debian 11+    | 2.31  |
-| 9.5.0            | RHEL 8+, CentOS 8+                    | 2.28  |
-| 8.5.0            | RHEL 8+, CentOS 8+                    | 2.28  |
-| 7.5.0            | RHEL 7+, CentOS 7+                    | 2.17  |
+| Toolchain | Target OS | GCC Version | glibc |
+|-----------|-----------|-------------|-------|
+| resolute | Ubuntu 25.04 | 15.x | 2.41+ |
+| noble | Ubuntu 24.04 | 13.x | 2.39 |
+| jammy | Ubuntu 22.04 | 11.x | 2.35 |
+| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.x | 2.39+ |
+| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.x | 2.34 |
+| rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.x | 2.28 |
 
-**Build time**: Older compilers add 30-60 minutes for toolchain bootstrap on first build.
+**Note**: Each toolchain uses the OS-provided compiler for maximum binary compatibility.
 
 ## Installation Script Options
 
@@ -85,10 +83,10 @@ sudo ./slurm_install.sh --full-init --org-id myorg --ldap-uri ldap://ldap.exampl
 Each tarball contains:
 
 ```text
-slurm-{version}-gcc{compiler}-software.tar.gz
+slurm-{version}-{toolchain}-software.tar.gz
 ├── data/slurm_assets/          # Configuration templates & install script
 ├── modules/slurm/              # Lmod modulefiles
-│   └── {version}-gcc{compiler}.lua
+│   └── {version}-{toolchain}.lua
 └── view/                       # Slurm installation
     ├── bin/                    # srun, sbatch, squeue, sinfo
     ├── sbin/                   # slurmd, slurmctld, slurmdbd
@@ -100,7 +98,7 @@ slurm-{version}-gcc{compiler}-software.tar.gz
 ```bash
 # Custom path deployment
 export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 
 # Verify
 which srun
@@ -111,14 +109,14 @@ echo $SLURM_ROOT
 
 ```bash
 # Deploy multiple versions
-sudo tar -xzf slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/slurm-25.11/
-sudo tar -xzf slurm-24.11-gcc11.5.0-software.tar.gz -C /opt/slurm-24.11/
+sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/slurm-25.11/
+sudo tar -xzf slurm-24.11-jammy-software.tar.gz -C /opt/slurm-24.11/
 
 cd /opt/slurm-25.11 && sudo ./data/slurm_assets/slurm_install.sh
 cd /opt/slurm-24.11 && sudo ./data/slurm_assets/slurm_install.sh
 
 # Switch versions
-module load slurm/25.11-gcc13.4.0  # or slurm/24.11-gcc11.5.0
+module load slurm/25.11-noble  # or slurm/24.11-jammy
 ```
 
 ## Basic Configuration

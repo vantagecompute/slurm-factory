@@ -35,6 +35,11 @@ class Settings:
         return self.home_cache_dir / "builds"
 
     @property
+    def spack_stage_dir(self) -> Path:
+        """Get the ~/.slurm-factory/spack-stage directory."""
+        return self.home_cache_dir / "spack-stage"
+
+    @property
     def spack_buildcache_dir(self) -> Path:
         """Get the ~/.slurm-factory/spack-buildcache directory."""
         return self.home_cache_dir / "spack-buildcache"

@@ -64,7 +64,7 @@ pip install slurm-factory
 slurm-factory --help
 
 # Test with version info
-slurm-factory build --help
+slurm-factory build-slurm --help
 ```
 
 ### Option 2: Install with pipx (Isolated Environment)
@@ -142,14 +142,14 @@ After installation, verify that Slurm Factory is working correctly:
 slurm-factory --help
 
 # Check available commands
-slurm-factory build --help
+slurm-factory build-slurm --help
 slurm-factory clean --help
 
 # Verify Docker integration (should show Docker version)
 docker --version
 
 # Test basic functionality (builds a Slurm package)
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 ```
 
 ## Configuration
@@ -163,7 +163,7 @@ Slurm Factory supports these environment variables:
 export IF_PROJECT_NAME=my-slurm-builds
 
 # Now all commands use this project by default
-slurm-factory build --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 25.11
 ```
 
 ### Cache Directory
@@ -185,20 +185,23 @@ Build caches are stored in your home directory:
 Once installed, you can immediately start building Slurm packages:
 
 ```bash
-# Build latest Slurm with default compiler (GCC 13.4.0)
-slurm-factory build --slurm-version 25.11
+# Build latest Slurm for Ubuntu 24.04 (noble)
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
 
-# Build with specific compiler for RHEL 8 / Ubuntu 20.04 compatibility
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
+# Build for Ubuntu 22.04 (jammy)
+slurm-factory build-slurm --slurm-version 25.11 --toolchain jammy
 
-# Build for RHEL 7 compatibility
-slurm-factory build --slurm-version 24.11 --compiler-version 7.5.0
+# Build for Rocky Linux 9 / RHEL 9
+slurm-factory build-slurm --slurm-version 24.11 --toolchain rockylinux9
+
+# Build for Rocky Linux 8 / RHEL 8
+slurm-factory build-slurm --slurm-version 24.11 --toolchain rockylinux8
 
 # Build with GPU support (CUDA/ROCm)
-slurm-factory build --slurm-version 25.11 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --gpu
 
 # Use custom project name (for container naming)
-slurm-factory --project-name production build --slurm-version 25.11 --compiler-version 13.4.0
+slurm-factory --project-name production build-slurm --slurm-version 25.11 --toolchain noble
 
 # Clean up when done
 slurm-factory clean --full
@@ -207,9 +210,9 @@ slurm-factory clean --full
 **Available Versions:**
 
 - **Slurm**: 25.11, 24.11, 23.11
-- **Compilers**: 14.2.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
+- **Toolchains**: resolute, noble, jammy, rockylinux10, rockylinux9, rockylinux8
 
-See [Build Artifacts](build-artifacts.md) for pre-built S3 packages.
+See [Build Artifacts](build-artifacts.md) for pre-built packages.
 
 ## Troubleshooting
 

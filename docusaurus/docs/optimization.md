@@ -4,130 +4,94 @@ How Slurm Factory achieves extreme build efficiency through intelligent caching,
 
 ## Architecture Overview
 
-Slurm Factory employs a **three-tier caching strategy** that dramatically reduces build times and ensures consistency across any Slurm version × GCC compiler combination.
+Slurm Factory employs a **two-tier caching strategy** organized by OS toolchain, dramatically reducing build times and ensuring consistency across any Slurm version × toolchain combination.
 
 ```mermaid
 graph TD
-    A[User Request] --> B{Compiler in Buildcache?}
-    B -->|Yes| C[Download GCC from S3/CloudFront]
-    B -->|No| D[Build GCC from Source<br/>~45 min]
+    A[User Request] --> B{Dependencies in Buildcache?}
+    B -->|Yes| C[Download Deps from S3/CloudFront]
+    B -->|No| D[Build Dependencies<br/>~30 min]
     D --> E[Publish to S3 Buildcache]
     E --> C
     
-    C --> F{Dependencies in Buildcache?}
-    F -->|Yes| G[Download Slurm Deps from S3]
-    F -->|No| H[Build Dependencies<br/>~30 min]
-    H --> I[Publish Deps to S3]
+    C --> F{Final Slurm in Buildcache?}
+    F -->|Yes| G[Download Complete Slurm<br/>~2 min]
+    F -->|No| H[Build Slurm Binary<br/>~5 min]
+    H --> I[Publish to S3]
     I --> G
     
-    G --> J{Final Slurm in Buildcache?}
-    J -->|Yes| K[Download Complete Slurm<br/>~2 min]
-    J -->|No| L[Build Slurm Binary<br/>~5 min]
-    L --> M[Publish to S3]
-    M --> K
-    
-    K --> N[Extract & Deploy<br/>~30 sec]
+    G --> J[Extract & Deploy<br/>~30 sec]
     
     style C fill:#90EE90
     style G fill:#90EE90
-    style K fill:#90EE90
-    style N fill:#FFD700
+    style J fill:#FFD700
 ```
 
-## CI/CD Lifecycle: Three-Stage Pipeline
+## CI/CD Lifecycle: Two-Stage Pipeline
 
-Our GitHub Actions workflows create a **dependency pyramid** that maximizes cache reuse:
+Our GitHub Actions workflows create a **dependency pyramid** that maximizes cache reuse, organized by OS toolchain:
 
 ```mermaid
 graph LR
-    subgraph "Stage 1: Compiler Buildcache"
-        A1[GCC 15.1.0] --> BC1[(S3 Buildcache)]
-        A2[GCC 14.2.0] --> BC1
-        A3[GCC 13.4.0] --> BC1
-        A4[GCC 12.5.0] --> BC1
-        A5[GCC 11.5.0] --> BC1
-        A6[GCC 10.5.0] --> BC1
-        A7[GCC 9.5.0] --> BC1
-        A8[GCC 8.5.0] --> BC1
-        A9[GCC 7.5.0] --> BC1
+    subgraph "Stage 1: Dependencies Buildcache"
+        A1[resolute] --> BC1[(S3 Buildcache)]
+        A2[noble] --> BC1
+        A3[jammy] --> BC1
+        A4[rockylinux10] --> BC1
+        A5[rockylinux9] --> BC1
+        A6[rockylinux8] --> BC1
     end
     
-    subgraph "Stage 2: Dependencies Buildcache"
-        BC1 --> B1[Slurm 25.11 Deps × 8 Compilers]
-        BC1 --> B2[Slurm 24.11 Deps × 8 Compilers]
-        BC1 --> B3[Slurm 23.11 Deps × 8 Compilers]
-        B1 --> BC2[(S3 Buildcache)]
+    subgraph "Stage 2: Complete Slurm Packages"
+        BC1 --> B1[Slurm 25.11 × 6 Toolchains]
+        BC1 --> B2[Slurm 24.11 × 6 Toolchains]
+        BC1 --> B3[Slurm 23.11 × 6 Toolchains]
+        B1 --> BC2[(S3 Buildcache<br/>+ CDN)]
         B2 --> BC2
         B3 --> BC2
     end
     
-    subgraph "Stage 3: Complete Slurm Packages"
-        BC2 --> C1[Slurm 25.11 × 8 Compilers]
-        BC2 --> C2[Slurm 24.11 × 8 Compilers]
-        BC2 --> C3[Slurm 23.11 × 8 Compilers]
-        C1 --> BC3[(S3 Buildcache<br/>+ CDN)]
-        C2 --> BC3
-        C3 --> BC3
-    end
-    
-    BC3 --> D[End Users:<br/>Instant Download]
+    BC2 --> D[End Users:<br/>Instant Download]
     
     style BC1 fill:#FFE4B5
-    style BC2 fill:#FFE4B5
-    style BC3 fill:#90EE90
+    style BC2 fill:#90EE90
     style D fill:#FFD700
 ```
 
-### Stage 1: Compiler Bootstrap (Build Once, Use Forever)
+### Stage 1: Dependency Buildcache (Toolchain-Specific)
 
-**Workflow:** `build-and-publish-compiler-buildcache.yml`
+**Workflow:** `build-and-publish-slurm-dependencies.yml`
 
-- **Builds:** 9 GCC compiler versions (7.5.0 → 15.1.0)
-- **Runtime:** ~45 minutes per compiler (parallel execution)
-- **Frequency:** Once per compiler version (rarely updated)
-- **Output:** Relocatable GCC compilers with gcc-runtime libraries
-- **Storage:** Published to S3 at `s3://slurm-factory-spack-buildcache-4b670/build_cache/`
-
-```bash
-# Each compiler is self-contained and relocatable
-gcc-7.5.0-compiler.tar.gz   # RHEL 7 compatible (glibc 2.17)
-gcc-13.4.0-compiler.tar.gz  # Ubuntu 24.04 (glibc 2.39) - default
-gcc-15.1.0-compiler.tar.gz  # Latest (glibc 2.40)
-```
-
-**Key Optimization:** Compilers are built once and reused across **all** Slurm versions and dependency combinations.
-
-### Stage 2: Dependency Buildcache (Compiler-Specific, Slurm-Agnostic)
-
-**Workflow:** `build-and-publish-slurm-deps-all-compilers.yml`
-
-- **Builds:** Dependencies for each Slurm version × compiler combination
-- **Matrix:** 4 Slurm versions × 8 compilers = 32 dependency sets
-- **Runtime:** ~30 minutes per combination (downloads compiler from Stage 1)
-- **Frequency:** When Slurm versions change or dependencies update
-- **Dependencies:** OpenMPI, MySQL, hwloc, JSON-C, YAML, JWT, Lua, etc.
+- **Builds:** Dependencies for each OS toolchain
+- **Toolchains:** 6 (resolute, noble, jammy, rockylinux10, rockylinux9, rockylinux8)
+- **Runtime:** ~30 minutes per toolchain
+- **Frequency:** When dependencies update
+- **Dependencies:** OpenMPI, PMIx, hwloc, JSON-C, YAML, JWT, Lua, Munge, etc.
 
 ```bash
-# Dependencies are compiler-specific but Slurm-agnostic
-slurm-25.11-deps-gcc-13.4.0/   # All deps for Slurm 25.11 with GCC 13.4.0
-slurm-24.11-deps-gcc-11.5.0/   # All deps for Slurm 24.11 with GCC 11.5.0
+# Dependencies are toolchain-specific and published per OS
+noble/slurm/deps/     # Dependencies for Ubuntu 24.04
+jammy/slurm/deps/     # Dependencies for Ubuntu 22.04
+rockylinux9/slurm/deps/  # Dependencies for Rocky Linux 9
 ```
 
-**Key Optimization:** Dependencies are built once per compiler and shared across multiple Slurm patch releases.
+**Key Optimization:** Dependencies are built once per toolchain using the OS-provided compiler for maximum binary compatibility.
 
-### Stage 3: Final Slurm Packages (Binary Distribution)
+### Stage 2: Final Slurm Packages (Binary Distribution)
 
-**Workflow:** `build-and-publish-all-packages.yml`
+**Workflow:** `build-and-publish-slurm.yml`
 
 - **Builds:** Complete Slurm installations (binary + dependencies + modules)
-- **Runtime:** ~5 minutes (downloads from Stages 1 & 2, builds only Slurm binary)
+- **Matrix:** 3 Slurm versions × 6 toolchains = 18 combinations
+- **Runtime:** ~5 minutes (downloads from Stage 1, builds only Slurm binary)
 - **Frequency:** For each new Slurm release or configuration change
 - **Output:** Production-ready tarballs with Lmod modules
 
 ```bash
 # Final deployable packages
-slurm-25.11-gcc-13.4.0-x86_64.tar.gz   # Complete installation
-slurm-24.11-gcc-11.5.0-x86_64.tar.gz   # Different version/compiler
+noble/slurm/25.11/     # Slurm 25.11 for Ubuntu 24.04
+jammy/slurm/24.11/     # Slurm 24.11 for Ubuntu 22.04
+rockylinux9/slurm/23.11/  # Slurm 23.11 for Rocky Linux 9
 ```
 
 **Key Optimization:** Only Slurm itself is compiled; everything else is downloaded from cache.
@@ -136,64 +100,63 @@ slurm-24.11-gcc-11.5.0-x86_64.tar.gz   # Different version/compiler
 
 ### Without Buildcache (Traditional Spack)
 ```
-First Build:     90 minutes  (compile GCC + deps + Slurm)
+First Build:     90 minutes  (compile all deps + Slurm)
 Second Build:    90 minutes  (no sharing between versions)
-Third Build:     90 minutes  (no sharing between compilers)
+Third Build:     90 minutes  (no sharing between toolchains)
 Total Time:      4.5 hours for 3 combinations
 ```
 
 ### With Slurm Factory Buildcache
 ```
-Stage 1 (one-time):    45 min  (build 1 compiler)
-Stage 2 (per Slurm):   30 min  (build deps, reuse compiler)
-Stage 3 (final):        5 min  (build Slurm, reuse everything)
-Subsequent builds:      2 min  (download pre-built from S3/CDN)
+Stage 1 (per toolchain): 30 min  (build deps)
+Stage 2 (per Slurm):      5 min  (build Slurm, reuse deps)
+Subsequent builds:        2 min  (download pre-built from S3/CDN)
 
-Total for first combo:  80 min
-Total for 2nd combo:     2 min  (if compiler/deps exist)
-Total for 3rd combo:     2 min  (if compiler/deps exist)
-Total Time:             84 minutes for 3 combinations (94% reduction)
+Total for first combo:   35 min
+Total for 2nd combo:      2 min  (if deps exist)
+Total for 3rd combo:      2 min  (if deps exist)
+Total Time:              39 minutes for 3 combinations (86% reduction)
 ```
 
 ### Cache Hit Rates in Production
 
 | Scenario | Cache Hits | Build Time | Speedup |
 |----------|------------|------------|---------|
-| **First-time user, popular combo** (Slurm 25.11 + GCC 13.4.0) | Compiler + Deps + Slurm | ~2 min | **45x faster** |
-| **New Slurm version, existing compiler** (Slurm 25.11 + GCC 13.4.0) | Compiler + Deps | ~5 min | **18x faster** |
-| **New compiler, existing Slurm** (Slurm 25.11 + GCC 16.0.0) | None | ~80 min | **1x (builds cache)** |
+| **First-time user, popular combo** (Slurm 25.11, noble) | Deps + Slurm | ~2 min | **45x faster** |
+| **New Slurm version, existing toolchain** (Slurm 25.11, noble) | Deps | ~5 min | **18x faster** |
+| **New toolchain** | None | ~35 min | **1x (builds cache)** |
 | **Rebuild same config** | Everything | ~2 min | **45x faster** |
 
 ## Consistency Across Configurations
 
-### Supported Matrix: 4 Slurm × 9 GCC = 36 Combinations
+### Supported Matrix: 3 Slurm × 6 Toolchains = 18 Combinations
 
-| Slurm Version | GCC Versions | Total Configs |
-|---------------|-------------|---------------|
-| **25.11** (latest) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.1.0 | 9 |
-| **24.11** (stable) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.1.0 | 9 |
-| **23.11** (LTS) | 7.5.0, 8.5.0, 9.5.0, 10.5.0, 11.5.0, 12.5.0, 13.4.0, 14.2.0, 15.1.0 | 9 |
+| Slurm Version | Toolchains | Total Configs |
+|---------------|------------|---------------|
+| **25.11** (latest) | resolute, noble, jammy, rockylinux10, rockylinux9, rockylinux8 | 6 |
+| **24.11** (stable) | resolute, noble, jammy, rockylinux10, rockylinux9, rockylinux8 | 6 |
+| **23.11** (LTS) | resolute, noble, jammy, rockylinux10, rockylinux9, rockylinux8 | 6 |
 
 **Every combination produces:**
 - ✅ Identical module structure (Lmod-based)
 - ✅ Consistent RPATH configuration (no LD_LIBRARY_PATH needed)
 - ✅ Relocatable binaries (extract anywhere)
-- ✅ Same dependency versions (per Slurm release)
+- ✅ Same dependency versions (per toolchain)
 - ✅ Predictable file layout (`/opt/slurm/view/`)
 
 ### Configuration Consistency Examples
 
 ```bash
-# Load Slurm 25.11 with GCC 13.4.0
-module load slurm/25.11-gcc-13.4.0
+# Load Slurm 25.11 for Ubuntu 24.04
+module load slurm/25.11-noble
 which scontrol  # /opt/slurm/view/bin/scontrol
 
-# Switch to GCC 11.5.0 build (same Slurm version)
-module swap slurm/25.11-gcc-11.5.0
+# Switch to Ubuntu 22.04 build (same Slurm version)
+module swap slurm/25.11-jammy
 which scontrol  # /opt/slurm/view/bin/scontrol (same path, different binary)
 
-# Switch to Slurm 24.11 (same compiler)
-module swap slurm/24.11-gcc-13.4.0
+# Switch to Slurm 24.11 (same toolchain)
+module swap slurm/24.11-noble
 which scontrol  # /opt/slurm/view/bin/scontrol (same path, different version)
 ```
 
@@ -201,7 +164,7 @@ which scontrol  # /opt/slurm/view/bin/scontrol (same path, different version)
 - Same configuration file paths (`/etc/slurm/slurm.conf`)
 - Same environment variables (`SLURM_CONF`, `SLURM_ROOT`)
 - Same service management (systemd units)
-- Same module metadata (version, compiler, architecture)
+- Same module metadata (version, toolchain, architecture)
 
 ## Public Buildcache Distribution
 
@@ -220,9 +183,13 @@ Slurm Factory automatically configures Spack to use the public buildcache:
 ```yaml
 # Auto-generated in spack.yaml
 mirrors:
-  slurm-factory:
-    url: https://slurm-factory-spack-binary-cache.vantagecompute.ai/build_cache
-    signed: false
+  slurm-factory-deps:
+    url: https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/deps/
+    signed: true
+
+  slurm-factory-slurm:
+    url: https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/25.11/
+    signed: true
 
 config:
   install_tree:
@@ -240,13 +207,13 @@ sequenceDiagram
     participant CloudFront
     participant S3
     
-    User->>Spack: slurm-factory build
-    Spack->>CloudFront: GET /build_cache/linux-ubuntu24.04-x86_64/gcc-13.4.0/index.json
+    User->>Spack: slurm-factory build-slurm --toolchain noble
+    Spack->>CloudFront: GET /noble/slurm/deps/buildcache/index.json
     CloudFront->>S3: Cache miss?
     S3-->>CloudFront: index.json
     CloudFront-->>Spack: index.json (cached)
     
-    Spack->>CloudFront: GET /build_cache/.../slurm-25-11-0-1.spack
+    Spack->>CloudFront: GET /noble/slurm/25.11/buildcache/...
     CloudFront-->>Spack: Binary package (cached at edge)
     
     Spack->>User: Extract & install (2 minutes)
@@ -268,17 +235,16 @@ sequenceDiagram
 ### Storage Efficiency
 
 ```bash
-# Traditional approach: 36 full builds
-36 configs × 450 MB = 16.2 GB total storage
+# Traditional approach: 18 full builds
+18 configs × 450 MB = 8.1 GB total storage
 
 # Slurm Factory approach: layered caching
-9 compilers × 180 MB  = 1.6 GB  (Stage 1)
-32 dep sets × 200 MB  = 6.4 GB  (Stage 2)
-36 Slurm pkgs × 50 MB = 1.8 GB  (Stage 3 - only Slurm binary)
-Total storage:          9.8 GB  (40% reduction)
+6 toolchain deps × 350 MB = 2.1 GB  (Stage 1)
+18 Slurm pkgs × 100 MB    = 1.8 GB  (Stage 2 - only Slurm + minimal deps)
+Total storage:              3.9 GB  (52% reduction)
 ```
 
-**Deduplication:** Shared dependencies (OpenMPI, MySQL) are stored once per compiler, not per Slurm version.
+**Deduplication:** Shared dependencies (OpenMPI, PMIx) are stored once per toolchain, not per Slurm version.
 
 ## Local Build Optimization
 
@@ -292,31 +258,28 @@ Even when building locally (not using public buildcache), Slurm Factory caches i
 │   └── linux-ubuntu24.04-x86_64/
 ├── spack-sourcecache/     # Source tarballs (never re-downloaded)
 │   ├── slurm-25.11.tar.bz2
-│   └── gcc-13.4.0.tar.gz
-├── compilers/             # Built compilers (reused across Slurm versions)
-│   ├── gcc-13.4.0/
-│   └── gcc-11.5.0/
+│   └── openmpi-5.0.6.tar.gz
 └── builds/                # Final outputs
-    └── slurm-25.11-gcc-13.4.0/
+    └── slurm-25.11-noble/
 ```
 
 ### Build Performance (Local)
 
 ```bash
 # First build: Downloads from S3 buildcache
-$ time slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+$ time slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
 real    2m15s  # Download + extract
 
-# Different Slurm version, same compiler: Reuses compiler, downloads Slurm deps
-$ time slurm-factory build --slurm-version 24.11 --compiler-version 13.4.0
-real    1m45s  # Compiler cached locally
+# Different Slurm version, same toolchain: Reuses deps, builds Slurm
+$ time slurm-factory build-slurm --slurm-version 24.11 --toolchain noble
+real    1m45s  # Deps cached locally
 
-# Same Slurm, different compiler: Downloads new compiler + deps
-$ time slurm-factory build --slurm-version 25.11 --compiler-version 11.5.0
-real    2m30s  # New compiler from buildcache
+# Same Slurm, different toolchain: Downloads new deps
+$ time slurm-factory build-slurm --slurm-version 25.11 --toolchain jammy
+real    2m30s  # New deps from buildcache
 
 # Rebuild same config: Everything cached
-$ time slurm-factory build --slurm-version 25.11 --compiler-version 13.4.0
+$ time slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
 real    0m45s  # All local caches hit
 ```
 
@@ -326,10 +289,10 @@ real    0m45s  # All local caches hit
 
 ```bash
 # Deploy to 100 compute nodes in parallel (using Ansible/parallel-ssh)
-time ansible compute -m copy -a "src=slurm-25.11-gcc-13.4.0.tar.gz dest=/tmp/"
+time ansible compute -m copy -a "src=slurm-25.11-noble.tar.gz dest=/tmp/"
 # ~2 minutes (network I/O)
 
-time ansible compute -m shell -a "tar -xzf /tmp/slurm-25.11-gcc-13.4.0.tar.gz -C /opt/"
+time ansible compute -m shell -a "tar -xzf /tmp/slurm-25.11-noble.tar.gz -C /opt/"
 # ~30 seconds (parallel extraction)
 
 time ansible compute -m shell -a "systemctl restart slurmd"
@@ -343,8 +306,8 @@ time ansible compute -m shell -a "systemctl restart slurmd"
 When upgrading Slurm versions, only changed files are updated:
 
 ```bash
-# Upgrade from 25.11 to 25.11 (same compiler)
-rsync -av --delete slurm-25.11-gcc-13.4.0/ /opt/slurm/
+# Upgrade from 24.11 to 25.11 (same toolchain)
+rsync -av --delete slurm-25.11-noble/ /opt/slurm/
 # Only Slurm binaries changed (~50 MB)
 # Dependencies unchanged (~400 MB reused)
 ```
@@ -355,9 +318,9 @@ rsync -av --delete slurm-25.11-gcc-13.4.0/ /opt/slurm/
 
 | Feature | apt/yum | Slurm Factory |
 |---------|---------|---------------|
-| **Slurm Versions** | 1-2 (distro-provided) | 4 (upstream releases) |
-| **GCC Versions** | 1 (system default) | 9 (7.5.0 → 15.1.0) |
-| **Combinations** | 1-2 | 36 |
+| **Slurm Versions** | 1-2 (distro-provided) | 3 (upstream releases) |
+| **Toolchains** | 1 (system default) | 6 |
+| **Combinations** | 1-2 | 18 |
 | **Update Lag** | 6-12 months | 0 (same-day releases) |
 | **Relocatable** | No (hardcoded paths) | Yes (extract anywhere) |
 | **Consistency** | Varies by distro | Identical everywhere |
@@ -388,8 +351,8 @@ rsync -av --delete slurm-25.11-gcc-13.4.0/ /opt/slurm/
 ### For CI/CD Pipelines
 
 ```yaml
-# GitHub Actions: Use self-hosted runners with local caches
-runs-on: self-hosted  # Persistent disk caches
+# GitHub Actions: Use larger runners for parallel builds
+runs-on: ubuntu-latest-8-cores
 timeout-minutes: 480  # Allow long builds
 
 # Fail-fast: false = build all combinations even if one fails
@@ -397,17 +360,17 @@ strategy:
   fail-fast: false
   matrix:
     slurm_version: ["25.11", "24.11", "23.11"]
-    compiler_version: ["13.4.0", "11.5.0", "10.5.0"]
+    toolchain: ["noble", "jammy", "rockylinux9"]
 ```
 
 ### For Local Development
 
 ```bash
 # Pre-download all sources to avoid network retries
-spack mirror create -d ~/spack-mirror slurm openmpi mysql
+spack mirror create -d ~/spack-mirror slurm openmpi pmix
 
 # Use local mirror for offline builds
-slurm-factory build --mirror ~/spack-mirror
+slurm-factory build-slurm --mirror ~/spack-mirror
 
 # Increase Docker resources for faster compilation
 export DOCKER_CPUS=16
@@ -418,24 +381,24 @@ export DOCKER_MEMORY=32g
 
 ```bash
 # Use shared filesystem to deploy once, mount everywhere
-tar -xzf slurm-25.11-gcc-13.4.0.tar.gz -C /shared/nfs/slurm/
+tar -xzf slurm-25.11-noble.tar.gz -C /shared/nfs/slurm/
 
 # Nodes mount /shared/nfs/slurm -> /opt/slurm (read-only)
 # No extraction needed on compute nodes
 
 # Or use container registries for immutable deployments
-skopeo copy dir:slurm-25.11-gcc-13.4.0 docker://registry/slurm:25.11
+skopeo copy dir:slurm-25.11-noble docker://registry/slurm:25.11
 ```
 
 ## Conclusion
 
-Slurm Factory's three-tier buildcache strategy achieves:
+Slurm Factory's two-tier buildcache strategy achieves:
 
 - ⚡ **45x faster builds** for cached combinations (2 min vs 90 min)
-- 🔄 **100% consistency** across 36 Slurm × GCC combinations
-- 💾 **40% storage savings** through intelligent deduplication
+- 🔄 **100% consistency** across 18 Slurm × toolchain combinations
+- 💾 **52% storage savings** through intelligent deduplication
 - 🌐 **Global CDN distribution** via CloudFront (no credentials needed)
 - 🔒 **Reproducible builds** guaranteed by Docker + public buildcache
 - 📦 **Modular architecture** enabling mix-and-match versions
 
-**The result:** Any user can deploy any supported Slurm version with any supported GCC compiler in under 3 minutes, with zero configuration and guaranteed reproducibility.
+**The result:** Any user can deploy any supported Slurm version for any supported OS toolchain in under 3 minutes, with zero configuration and guaranteed reproducibility.

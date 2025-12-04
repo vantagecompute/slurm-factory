@@ -263,12 +263,12 @@ In addition to local caching, Slurm Factory can use the **public buildcache**:
 
 **Compiler Buildcache**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/buildcache
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{version}/
 ```
 
 **Slurm Buildcache**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/buildcache
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{compiler_version}/
 ```
 
 Benefits:
@@ -307,11 +307,11 @@ setenv("SLURM_ROOT", prefix)
 
 ```bash
 # Default location
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 
 # Custom location
 export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 ```
 
 ## Package Structure
@@ -319,7 +319,7 @@ module load slurm/25.11-gcc13.4.0
 Single tarball output containing everything needed:
 
 ```text
-slurm-{version}-gcc{compiler}-software.tar.gz (2-25GB depending on options)
+slurm-{version}-{toolchain}-software.tar.gz (2-25GB depending on options)
 ├── view/                                  # Slurm installation
 │   ├── bin/                               # Slurm binaries (srun, sbatch, etc.)
 │   ├── sbin/                              # Daemons (slurmd, slurmctld, slurmdbd)
@@ -333,7 +333,7 @@ slurm-{version}-gcc{compiler}-software.tar.gz (2-25GB depending on options)
 │       ├── man/                           # Man pages
 │       └── doc/                           # Documentation
 ├── modules/slurm/                         # Lmod modulefiles
-│   └── {version}-gcc{compiler}.lua        # Modulefile for this build
+│   └── {version}-{toolchain}.lua          # Modulefile for this build
 └── data/slurm_assets/                     # Configuration and scripts
     ├── slurm_install.sh                   # Installation script
     ├── defaults/                          # Systemd unit files
@@ -350,41 +350,39 @@ slurm-{version}-gcc{compiler}-software.tar.gz (2-25GB depending on options)
 
 **Package naming examples:**
 
-- `slurm-25.11-gcc13.4.0-software.tar.gz` - Slurm 25.11 with GCC 13.4.0
-- `slurm-24.11-gcc10.5.0-software.tar.gz` - Slurm 24.11 with GCC 10.5.0  
-- `slurm-23.11-gcc7.5.0-software.tar.gz` - Slurm 23.11 with GCC 7.5.0
+- `slurm-25.11-noble-software.tar.gz` - Slurm 25.11 for Ubuntu 24.04
+- `slurm-24.11-jammy-software.tar.gz` - Slurm 24.11 for Ubuntu 22.04
+- `slurm-23.11-rockylinux9-software.tar.gz` - Slurm 23.11 for Rocky Linux 9
 
-## Compiler Toolchain
+## Toolchain Support
 
-Builds support 8 different GCC versions for cross-distribution compatibility:
+Builds support multiple OS toolchains for cross-distribution compatibility:
 
-| Compiler | Compatible Distros | glibc | Bootstrap Time |
-|----------|-------------------|-------|----------------|
-| GCC 14.2.0 | Ubuntu 24.10+, Fedora 40+ | 2.40+ | +60 min |
-| GCC 13.4.0 | Ubuntu 24.04+, Debian 13+ | 2.39 | Default |
-| GCC 12.5.0 | Ubuntu 23.10+, Debian 12+ | 2.38 | +45 min |
-| GCC 11.5.0 | Ubuntu 22.04+, Debian 12+ | 2.35 | +45 min |
-| GCC 10.5.0 | RHEL 8+, Ubuntu 20.04+ | 2.31 | +50 min |
-| GCC 9.5.0 | RHEL 8+, CentOS 8+ | 2.28 | +50 min |
-| GCC 8.5.0 | RHEL 8+, CentOS 8+ | 2.28 | +55 min |
-| GCC 7.5.0 | RHEL 7+, CentOS 7+ | 2.17 | +60 min |
+| Toolchain | Target OS | GCC Version | glibc |
+|-----------|-----------|-------------|-------|
+| resolute | Ubuntu 25.04 | 15.x | 2.41+ |
+| noble | Ubuntu 24.04 | 13.x | 2.39 |
+| jammy | Ubuntu 22.04 | 11.x | 2.35 |
+| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.x | 2.39+ |
+| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.x | 2.34 |
+| rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.x | 2.28 |
 
-Older compilers add build time for initial toolchain bootstrap, but use cached binaries on subsequent builds.
+Each toolchain uses the OS-provided compiler for maximum binary compatibility.
 
 ## Build Options
 
 ```bash
-# CPU-optimized with default compiler (recommended)
-slurm-factory build --slurm-version 25.11
+# CPU-optimized for Ubuntu 24.04 (recommended)
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
 
-# Specific compiler for RHEL 8 compatibility
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0
+# For Rocky Linux 9 compatibility
+slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9
 
 # With GPU support (CUDA/ROCm)
-slurm-factory build --slurm-version 25.11 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble --gpu
 
-# Combined: RHEL 8 with GPU support
-slurm-factory build --slurm-version 25.11 --compiler-version 10.5.0 --gpu
+# Combined: Rocky Linux 8 with GPU support
+slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux8 --gpu
 ```
 
 ## Docker Integration
@@ -502,7 +500,7 @@ raise BuildError(
     "Failed to build package 'slurm'",
     context={
         "package": "slurm@25.11",
-        "compiler": "gcc@13.4.0",
+        "toolchain": "noble",
         "stage": "compilation",
         "log_file": "/tmp/slurm-build.log"
     }
