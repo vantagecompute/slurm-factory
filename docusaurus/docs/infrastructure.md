@@ -81,20 +81,18 @@ graph TB
 **Directory Structure**:
 ```
 s3://slurm-factory-spack-buildcache-4b670/
-├── compilers/
-│   ├── 7.5.0/buildcache/
-│   ├── 8.5.0/buildcache/
-│   ├── 9.5.0/buildcache/
-│   ├── 10.5.0/buildcache/
-│   ├── 11.5.0/buildcache/
-│   ├── 12.5.0/buildcache/
-│   ├── 13.4.0/buildcache/
-│   ├── 14.2.0/buildcache/
-│   └── 15.1.0/buildcache/
-└── slurm/
-    ├── 25.11/{compiler}/buildcache/
-    ├── 24.11/{compiler}/buildcache/
-    └── 23.11/{compiler}/buildcache/
+├── {toolchain}/slurm/deps/buildcache/     # Dependencies
+│   ├── noble/slurm/deps/buildcache/       # Ubuntu 24.04
+│   ├── jammy/slurm/deps/buildcache/       # Ubuntu 22.04
+│   ├── resolute/slurm/deps/buildcache/    # Ubuntu 25.04
+│   ├── rockylinux10/slurm/deps/buildcache/ # Rocky 10
+│   ├── rockylinux9/slurm/deps/buildcache/ # Rocky 9
+│   └── rockylinux8/slurm/deps/buildcache/ # Rocky 8
+└── {toolchain}/slurm/{version}/buildcache/ # Slurm packages
+    ├── noble/slurm/25.11/buildcache/
+    ├── noble/slurm/24.11/buildcache/
+    ├── jammy/slurm/25.11/buildcache/
+    └── ...
 ```
 
 ### CloudFront Distribution

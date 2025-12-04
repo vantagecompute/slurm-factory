@@ -1,0 +1,175 @@
+---
+title: "Slurm Factory - Modern HPC Package Builder"
+description: "Build and deploy GPG-signed, optimized Slurm packages using public buildcache or custom Docker builds"
+slug: /
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+# Slurm Factory
+
+**Slurm Factory** builds and deploys **GPG-signed, relocatable** Slurm workload manager packages for HPC environments. Use the **public binary cache** for instant installations (5-15 min) or build custom packages with Docker.
+
+## Key Features
+
+- 🔐 **GPG-Signed Packages** - Cryptographically signed for security
+- ⚡ **Instant Deployment** - Install from cache in 5-15 minutes
+- 📦 **Relocatable** - Deploy to any filesystem path
+- 🎮 **GPU Support** - CUDA/ROCm-enabled builds
+- 🌐 **Global CDN** - CloudFront distribution worldwide
+- 📊 **Lmod Modules** - Easy environment management
+
+## Quick Start - Select Your OS
+
+<Tabs>
+<TabItem value="noble" label="Ubuntu 24.04 (Noble)" default>
+
+```bash
+# Download and verify tarball for Ubuntu 24.04
+SLURM_VERSION=25.11
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/${SLURM_VERSION}/slurm-${SLURM_VERSION}-noble-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/${SLURM_VERSION}/slurm-${SLURM_VERSION}-noble-software.tar.gz.asc
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-noble-software.tar.gz.asc
+sudo tar -xzf slurm-${SLURM_VERSION}-noble-software.tar.gz -C /opt/
+```
+
+</TabItem>
+<TabItem value="jammy" label="Ubuntu 22.04 (Jammy)">
+
+```bash
+# Download and verify tarball for Ubuntu 22.04
+SLURM_VERSION=25.11
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/jammy/${SLURM_VERSION}/slurm-${SLURM_VERSION}-jammy-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/jammy/${SLURM_VERSION}/slurm-${SLURM_VERSION}-jammy-software.tar.gz.asc
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-jammy-software.tar.gz.asc
+sudo tar -xzf slurm-${SLURM_VERSION}-jammy-software.tar.gz -C /opt/
+```
+
+</TabItem>
+<TabItem value="resolute" label="Ubuntu 26.04 (Resolute)">
+
+```bash
+# Download and verify tarball for Ubuntu 26.04
+SLURM_VERSION=25.11
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/resolute/${SLURM_VERSION}/slurm-${SLURM_VERSION}-resolute-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/resolute/${SLURM_VERSION}/slurm-${SLURM_VERSION}-resolute-software.tar.gz.asc
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-resolute-software.tar.gz.asc
+sudo tar -xzf slurm-${SLURM_VERSION}-resolute-software.tar.gz -C /opt/
+```
+
+</TabItem>
+<TabItem value="rockylinux10" label="Rocky Linux 10">
+
+```bash
+# Download and verify tarball for Rocky Linux 10
+SLURM_VERSION=25.11
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux10/${SLURM_VERSION}/slurm-${SLURM_VERSION}-rockylinux10-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux10/${SLURM_VERSION}/slurm-${SLURM_VERSION}-rockylinux10-software.tar.gz.asc
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-rockylinux10-software.tar.gz.asc
+sudo tar -xzf slurm-${SLURM_VERSION}-rockylinux10-software.tar.gz -C /opt/
+```
+
+</TabItem>
+<TabItem value="rockylinux9" label="Rocky Linux 9">
+
+```bash
+# Download and verify tarball for Rocky Linux 9
+SLURM_VERSION=25.11
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux9/${SLURM_VERSION}/slurm-${SLURM_VERSION}-rockylinux9-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux9/${SLURM_VERSION}/slurm-${SLURM_VERSION}-rockylinux9-software.tar.gz.asc
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-rockylinux9-software.tar.gz.asc
+sudo tar -xzf slurm-${SLURM_VERSION}-rockylinux9-software.tar.gz -C /opt/
+```
+
+</TabItem>
+<TabItem value="rockylinux8" label="Rocky Linux 8">
+
+```bash
+# Download and verify tarball for Rocky Linux 8
+SLURM_VERSION=25.11
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux8/${SLURM_VERSION}/slurm-${SLURM_VERSION}-rockylinux8-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux8/${SLURM_VERSION}/slurm-${SLURM_VERSION}-rockylinux8-software.tar.gz.asc
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-${SLURM_VERSION}-rockylinux8-software.tar.gz.asc
+sudo tar -xzf slurm-${SLURM_VERSION}-rockylinux8-software.tar.gz -C /opt/
+```
+
+</TabItem>
+</Tabs>
+
+:::tip Slurm Versions
+Replace `SLURM_VERSION=25.11` with `24.11` or `23.11` for other versions.
+:::
+
+## Install via Spack Buildcache
+
+For Spack users, install directly from the buildcache:
+
+```bash
+# Install Spack and configure mirrors
+git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
+source spack/share/spack/setup-env.sh
+
+SLURM_VERSION=25.11
+TOOLCHAIN=noble  # or: jammy, resolute, rockylinux9, rockylinux10, rockylinux8
+CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
+
+spack mirror add slurm-factory-deps "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/deps/"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/${SLURM_VERSION}/"
+spack buildcache keys --install --trust
+spack install slurm@${SLURM_VERSION} target=x86_64_v3
+```
+
+**→ Complete guide:** [Installing Slurm from Buildcache](installing-slurm-from-buildcache.md)
+
+## Build Custom Packages
+
+For custom builds, install the slurm-factory CLI tool:
+
+```bash
+pip install slurm-factory
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble --gpu  # GPU support
+```
+
+**→ Complete guide:** [Installing slurm-factory Tool](installation.md)
+
+## GPG Signing & Verification
+
+All packages are signed with GPG key `DFB92630BCA5AB71` (Vantage Compute Corporation).
+
+```bash
+# Import key and verify
+gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
+gpg --verify slurm-25.11-noble-software.tar.gz.asc
+
+# For Spack users - automatic verification
+spack buildcache keys --install --trust
+spack install slurm@25.11  # Signature verified automatically
+```
+
+## Requirements
+
+| For Buildcache | For Local Builds |
+|----------------|------------------|
+| Spack v1.0.0+ | Python 3.12+, Docker 24.0+ |
+| 10-25GB disk | 50GB disk, 16GB RAM |
+
+## Next Steps
+
+- **[Installing from Buildcache](./installing-slurm-from-buildcache.md)** - Fast pre-built installation
+- **[Installing from Tarball](./installing-slurm-from-tarball.md)** - Direct tarball deployment
+- **[slurm-factory Tool](./installation.md)** - Build custom packages
+- **[API Reference](./api-reference.md)** - CLI command documentation
+- **[Architecture](./architecture.md)** - Build system internals
+- **[GitHub Actions](./github-actions.md)** - CI/CD workflows
+
+---
+
+**Built with ❤️ by [Vantage Compute](https://vantagecompute.ai)**

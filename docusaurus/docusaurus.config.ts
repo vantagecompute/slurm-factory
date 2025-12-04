@@ -120,6 +120,13 @@ const config: Config = {
               description: 'Guide for installing pre-built Slurm binaries from the public buildcache using Spack'
             },
             {
+              filename: 'llms-installing-slurm-from-tarball.txt',
+              includePatterns: ['docs/installing-slurm-from-tarball.md'],
+              fullContent: true,
+              title: 'Installing Slurm from Tarball Documentation',
+              description: 'Guide for installing pre-built Slurm tarball artifacts'
+            },
+            {
               filename: 'llms-deployment.txt',
               includePatterns: ['docs/deployment.md'],
               fullContent: true,
