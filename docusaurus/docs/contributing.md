@@ -238,7 +238,7 @@ SLURM_VERSIONS = {
 
 2. **Test the new version**:
 ```bash
-uv run slurm-factory build 25.11
+uv run slurm-factory build-slurm 25.11
 ```
 
 3. **Update documentation**:
