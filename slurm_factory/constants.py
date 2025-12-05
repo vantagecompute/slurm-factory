@@ -24,7 +24,7 @@ SLURM_VERSIONS = {
 }
 
 RHEL_SETUP_SCRIPT = """
-# RHEL (derivative) setup script for Slurm Factory
+# RHEL (derivative) setup script for Slurm Factory (Rocky 8/9)
 # Install EPEL repository
 yum install -y epel-release
 # Enable CRB (CodeReady Builder) repository for EPEL dependencies
@@ -32,8 +32,6 @@ yum install -y epel-release
 /usr/bin/crb enable
 # Update system packages AND install build tools in one transaction
 # This ensures glibc and gcc versions are compatible
-# if rocky10+ use bzip2-libs
-
 yum update -y && yum install -y \
     gcc \
     gcc-c++ \
@@ -55,15 +53,49 @@ yum update -y && yum install -y \
     unzip \
     findutils \
     diffutils \
-    kernel-headers
-    if [ "$(rpm -E %{rhel})" -ge 10 ]; then
-        yum install -y bzip2-libs;
-    else
-      true
-        yum install -y lbzip2;
-    fi
-    yum clean all && rm -rf /var/cache/yum
-    PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
+    kernel-headers \
+    lbzip2
+yum clean all && rm -rf /var/cache/yum
+PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
+"""
+
+RHEL10_SETUP_SCRIPT = """
+# Rocky Linux 10 / RHEL 10 setup script for Slurm Factory
+# Rocky 10 has different package names and repository structure
+# Install EPEL repository
+yum install -y epel-release
+# Enable CRB (CodeReady Builder) repository for EPEL dependencies
+/usr/bin/crb enable
+# Update system packages AND install build tools in one transaction
+# This ensures glibc and gcc versions are compatible
+yum update -y && yum install -y \
+    gcc \
+    gcc-c++ \
+    gcc-gfortran \
+    libgfortran \
+    libstdc++-devel \
+    glibc-devel \
+    make \
+    wget \
+    tar \
+    git \
+    lua \
+    lua-filesystem \
+    lua-posix \
+    Lmod \
+    python3 \
+    python3-pip \
+    which \
+    patch \
+    xz \
+    unzip \
+    findutils \
+    diffutils \
+    kernel-headers \
+    bzip2 \
+    bzip2-libs
+yum clean all && rm -rf /var/cache/yum
+PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
 """
 
 UBUNTU_SETUP_SCRIPT = """
@@ -164,7 +196,7 @@ COMPILER_TOOLCHAINS = {
         "14.3.1",
         "2.39",
         "rockylinux/rockylinux:10",
-        RHEL_SETUP_SCRIPT,
+        RHEL10_SETUP_SCRIPT,
     ),
     "jammy": (
         "Ubuntu 22.04 (Jammy)",
