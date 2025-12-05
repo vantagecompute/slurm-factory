@@ -29,6 +29,7 @@ from slurm_factory.constants import (
     INSTANCE_NAME_PREFIX,
     BUILD_TIMEOUT,
     DOCKER_BUILD_TIMEOUT,
+    DOCKER_COMMIT_TIMEOUT,
     SPACK_SETUP_SCRIPT,
 )
 
@@ -126,6 +127,12 @@ class TestDockerConfiguration:
         assert DOCKER_BUILD_TIMEOUT > 0
         assert DOCKER_BUILD_TIMEOUT == 600
 
+    def test_docker_commit_timeout(self):
+        """Test Docker commit timeout."""
+        assert isinstance(DOCKER_COMMIT_TIMEOUT, int)
+        assert DOCKER_COMMIT_TIMEOUT > 0
+        assert DOCKER_COMMIT_TIMEOUT == 600
+
     def test_build_timeout(self):
         """Test build timeout."""
         assert isinstance(BUILD_TIMEOUT, int)
@@ -166,6 +173,7 @@ class TestConstantTypes:
         """Test integer constant types."""
         assert isinstance(BUILD_TIMEOUT, int)
         assert isinstance(DOCKER_BUILD_TIMEOUT, int)
+        assert isinstance(DOCKER_COMMIT_TIMEOUT, int)
 
 
 class TestConstantValidation:

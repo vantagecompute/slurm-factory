@@ -38,37 +38,33 @@ slurm-factory build-slurm [OPTIONS]
 
 **Description:**
 
-Builds Slurm packages using Docker containers and Spack. Supports multiple GCC versions, GPU acceleration, and buildcache publishing with GPG signing.
+Builds Slurm packages using Docker containers and Spack. Supports multiple OS toolchains, GPU acceleration, and buildcache publishing with GPG signing.
 
 **Options:**
 
 - `--slurm-version [25.11|24.11|23.11]` - Slurm version to build [default: 25.11]
-- `--compiler-version TEXT` - GCC compiler version (15.2.0, 14.2.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0) [default: 13.4.0]
+- `--toolchain TEXT` - OS toolchain to use (noble, jammy, resolute, rockylinux10, rockylinux9, rockylinux8) [default: noble]
 - `--gpu` - Enable GPU support (CUDA/ROCm) - creates larger packages
 - `--verify` - Enable relocatability verification (for CI/testing)
 - `--no-cache` - Force a fresh build without using Docker cache
-- `--use-local-buildcache` - Use locally cached compiler tarball instead of building from source
-- `--publish-s3` - Upload binaries to S3 (s3://slurm-factory-spack-buildcache-4b670)
-- `--publish TEXT` - Publish to buildcache: none (default), slurm (only Slurm), deps (only dependencies), all (Slurm + deps) [default: none]
+- `--buildcache TEXT` - Use buildcache: none (default), all (dependencies + Slurm), deps (only dependencies) [default: none]
+- `--publish TEXT` - Publish to buildcache: none (default), slurm (only Slurm), deps (only dependencies) [default: none]
 - `--enable-hierarchy` - Enable Core/Compiler/MPI module hierarchy
 - `--signing-key TEXT` - GPG key ID for signing buildcache packages (e.g., '0xKEYID')
 - `--gpg-private-key TEXT` - Base64-encoded GPG private key to import into Docker container for signing
 - `--gpg-passphrase TEXT` - Passphrase for the GPG private key (if encrypted)
 - `--help` - Show help message and exit
 
-**Compiler Toolchains:**
+**OS Toolchains:**
 
-All compilers are built with Spack for relocatability:
+Each toolchain uses the OS-provided compiler for maximum binary compatibility:
 
-- **15.2.0**: GCC 15.2, glibc 2.40, latest GCC 15
-- **14.2.0**: GCC 14.2, glibc 2.39, latest stable
-- **13.4.0** (default): GCC 13.4, glibc 2.39, Ubuntu 24.04 compatible
-- **12.5.0**: GCC 12.5, glibc 2.35, Ubuntu 22.04 compatible
-- **11.5.0**: GCC 11.5, glibc 2.35, good compatibility
-- **10.5.0**: GCC 10.5, glibc 2.31, RHEL 8/Ubuntu 20.04 compatible
-- **9.5.0**: GCC 9.5, glibc 2.28, wide compatibility
-- **8.5.0**: GCC 8.5, glibc 2.28, RHEL 8 minimum
-- **7.5.0**: GCC 7.5, glibc 2.17, RHEL 7 compatible (maximum compatibility)
+- **resolute**: Ubuntu 25.04, GCC 15.x, glibc 2.41 (latest)
+- **noble** (default): Ubuntu 24.04, GCC 13.x, glibc 2.39
+- **jammy**: Ubuntu 22.04, GCC 11.x, glibc 2.35
+- **rockylinux10**: Rocky Linux 10 / RHEL 10, GCC 14.x, glibc 2.39
+- **rockylinux9**: Rocky Linux 9 / RHEL 9, GCC 11.x, glibc 2.34
+- **rockylinux8**: Rocky Linux 8 / RHEL 8, GCC 8.x, glibc 2.28
 
 **Build Types:**
 
@@ -80,23 +76,20 @@ All compilers are built with Spack for relocatability:
 **Examples:**
 
 ```bash
-# Build default CPU version (25.11, gcc 13.4.0)
+# Build default CPU version (25.11, noble)
 slurm-factory build-slurm
 
 # Build specific version
-slurm-factory build-slurm --slurm-version 24.11 24.11
+slurm-factory build-slurm --slurm-version 24.11
 
-# Build with specific compiler
-slurm-factory build-slurm --compiler-version 14.2.0
+# Build for Ubuntu 22.04
+slurm-factory build-slurm --toolchain jammy
 
-# Build with gcc 12 - Ubuntu 22.04 compatibility
-slurm-factory build-slurm --compiler-version 12.5.0
+# Build for Rocky Linux 9 / RHEL 9
+slurm-factory build-slurm --toolchain rockylinux9
 
-# Build with gcc 10.5 - RHEL 8 compatibility
-slurm-factory build-slurm --compiler-version 10.5.0
-
-# Build with gcc 7.5 - RHEL 7 compatibility
-slurm-factory build-slurm --compiler-version 7.5.0
+# Build for Rocky Linux 8 / RHEL 8
+slurm-factory build-slurm --toolchain rockylinux8
 
 # Build with GPU support
 slurm-factory build-slurm --gpu
@@ -110,10 +103,10 @@ slurm-factory build-slurm --no-cache
 # Build with module hierarchy
 slurm-factory build-slurm --enable-hierarchy
 
-# Build and publish all to buildcache
-slurm-factory build-slurm --publish=all
+# Build using remote buildcache for dependencies
+slurm-factory build-slurm --buildcache=deps
 
-# Build and publish only Slurm
+# Build and publish to buildcache
 slurm-factory build-slurm --publish=slurm
 
 # Build and publish only dependencies
@@ -124,66 +117,6 @@ slurm-factory build-slurm --publish=all --signing-key 0xDFB92630BCA5AB71
 
 # Use local compiler tarball (advanced)
 slurm-factory build-slurm --use-local-buildcache
-```
-
----
-
-### build-compiler
-
-Build a GCC compiler toolchain for use in Slurm builds.
-
-```bash
-slurm-factory build-compiler [OPTIONS]
-```
-
-**Description:**
-
-Builds a relocatable GCC compiler toolchain using Spack and optionally publishes it to S3 buildcache for reuse across builds.
-
-**Options:**
-
-- `--compiler-version TEXT` - GCC compiler version to build (15.2.0, 14.2.0, 13.4.0, 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0) [default: 13.4.0]
-- `--no-cache` - Force a fresh build without using Docker cache
-- `--publish TEXT` - Publish to buildcache: none (default), compiler (publish compiler), all (same as compiler) [default: none]
-- `--signing-key TEXT` - GPG key ID for signing buildcache packages (e.g., '0xKEYID')
-- `--gpg-private-key TEXT` - Base64-encoded GPG private key to import into Docker container for signing
-- `--gpg-passphrase TEXT` - GPG private key passphrase for signing packages
-- `--help` - Show help message and exit
-
-**Compiler Toolchains:**
-
-All toolchains are built with Spack for relocatability:
-
-- **15.2.0**: GCC 15.2, glibc 2.40, latest GCC 15
-- **14.2.0**: GCC 14.2, glibc 2.39, latest stable
-- **13.4.0** (default): GCC 13.4, glibc 2.39, Ubuntu 24.04 compatible
-- **12.5.0**: GCC 12.5, glibc 2.35, Ubuntu 22.04 compatible
-- **11.5.0**: GCC 11.5, glibc 2.35, good compatibility
-- **10.5.0**: GCC 10.5, glibc 2.31, RHEL 8/Ubuntu 20.04 compatible
-- **9.5.0**: GCC 9.5, glibc 2.28, wide compatibility
-- **8.5.0**: GCC 8.5, glibc 2.28, RHEL 8 minimum
-- **7.5.0**: GCC 7.5, glibc 2.17, RHEL 7 compatible (maximum compatibility)
-
-**Examples:**
-
-```bash
-# Build default compiler (gcc 13.4.0)
-slurm-factory build-compiler
-
-# Build gcc 14.2
-slurm-factory build-compiler --compiler-version 14.2.0
-
-# Build gcc 10.5 for RHEL 8
-slurm-factory build-compiler --compiler-version 10.5.0
-
-# Build and publish to S3 buildcache
-slurm-factory build-compiler --publish=compiler
-
-# Build and publish with GPG signing
-slurm-factory build-compiler --publish=all --signing-key 0xDFB92630BCA5AB71
-
-# Build without Docker cache
-slurm-factory build-compiler --no-cache
 ```
 
 ---
@@ -223,8 +156,8 @@ slurm-factory clean --full
 from slurm_factory.builder import build
 from slurm_factory.config import Settings
 
-# Basic build with defaults (Slurm 25.11, GCC 13.4.0)
-build(slurm_version="25.11", compiler_version="13.4.0")
+# Basic build with defaults (Slurm 25.11, noble toolchain)
+build(slurm_version="25.11", toolchain="noble")
 
 # GPU-enabled build
 build(slurm_version="25.11", gpu=True)
@@ -280,10 +213,11 @@ Build outputs are stored in `~/.slurm-factory/builds/`:
 
 ```
 ~/.slurm-factory/builds/
-├── slurm-25.11-gcc13.4.0-software.tar.gz       # Standard build
-├── slurm-25.11-gcc13.4.0-gpu-software.tar.gz   # GPU build
-├── slurm-25.11-gcc10.5.0-software.tar.gz       # RHEL 8 compatible
-└── slurm-24.11-gcc7.5.0-software.tar.gz        # RHEL 7 compatible
+├── slurm-25.11-noble-software.tar.gz          # Ubuntu 24.04 build
+├── slurm-25.11-noble-gpu-software.tar.gz      # GPU build
+├── slurm-25.11-jammy-software.tar.gz          # Ubuntu 22.04 build
+├── slurm-25.11-rockylinux9-software.tar.gz    # Rocky Linux 9 / RHEL 9
+└── slurm-24.11-rockylinux8-software.tar.gz    # Rocky Linux 8 / RHEL 8
 ```
 
 ---
@@ -321,7 +255,7 @@ Packages signed with GPG can be verified by Spack:
 spack buildcache keys --install --trust
 
 # Install with automatic signature verification
-spack install slurm@25.11%gcc@13.4.0
+spack install slurm@25.11
 ```
 
 ---

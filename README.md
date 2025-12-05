@@ -27,18 +27,17 @@ Use Spack to install GPG-signed pre-built binaries (**no slurm-factory tool need
 git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
 source spack/share/spack/setup-env.sh
 
-# Add mirrors for compilers, dependencies, and Slurm
+# Add mirrors for dependencies and Slurm
 SLURM_VERSION=25.11
-COMPILER_VERSION=15.2.0
+TOOLCHAIN=noble  # or: jammy, resolute, rockylinux9, rockylinux10, rockylinux8
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
-spack mirror add slurm-factory-build-toolchain "${CLOUDFRONT_URL}/compilers/${COMPILER_VERSION}"
-spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${COMPILER_VERSION}"
-spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${COMPILER_VERSION}"
+spack mirror add slurm-factory-deps "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/deps/"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/${SLURM_VERSION}/"
 
 # Import GPG keys and install Slurm (5-15 min!)
 spack buildcache keys --install --trust
-spack install slurm@${SLURM_VERSION}%gcc@${COMPILER_VERSION}
+spack install slurm@${SLURM_VERSION}
 ```
 
 **→ Full guide:** [Installing Slurm from Buildcache](https://vantagecompute.github.io/slurm-factory/installing-slurm-from-buildcache)
@@ -157,11 +156,11 @@ source spack/share/spack/setup-env.sh
 
 # Configure mirrors for buildcache
 SLURM_VERSION=25.11
-TOOLCHAIN=noble  # or: jammy, rockylinux9, etc.
+TOOLCHAIN=noble  # or: jammy, resolute, rockylinux9, rockylinux10, rockylinux8
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
-spack mirror add slurm-factory-slurm-deps "${CLOUDFRONT_URL}/deps/${TOOLCHAIN}"
-spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/slurm/${SLURM_VERSION}/${TOOLCHAIN}"
+spack mirror add slurm-factory-deps "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/deps/"
+spack mirror add slurm-factory-slurm "${CLOUDFRONT_URL}/${TOOLCHAIN}/slurm/${SLURM_VERSION}/"
 
 # Import GPG signing keys and trust
 spack buildcache keys --install --trust
@@ -229,53 +228,44 @@ The public buildcache is organized by OS toolchain for optimal performance:
 
 ```text
 https://slurm-factory-spack-binary-cache.vantagecompute.ai/
-├── deps/
-│   ├── rockylinux10/    # Slurm dependencies for Rocky Linux 10 (GPG-signed)
-│   ├── rockylinux9/     # Slurm dependencies for Rocky Linux 9 (GPG-signed)
-│   ├── rockylinux8/     # Slurm dependencies for Rocky Linux 8 (GPG-signed)
-│   ├── jammy/           # Slurm dependencies for Ubuntu 22.04 (GPG-signed)
-│   ├── noble/           # Slurm dependencies for Ubuntu 24.04 (GPG-signed)
-│   └── resolute/        # Slurm dependencies for Ubuntu 25.04 (GPG-signed)
-├── slurm/
-│   ├── 25.11/
-│   │   ├── rockylinux10/ # Slurm 25.11 for Rocky Linux 10 (GPG-signed)
-│   │   ├── rockylinux9/ # Slurm 25.11 for Rocky Linux 9 (GPG-signed)
-│   │   ├── rockylinux8/ # Slurm 25.11 for Rocky Linux 8 (GPG-signed)
-│   │   ├── jammy/       # Slurm 25.11 for Ubuntu 22.04 (GPG-signed)
-│   │   ├── noble/       # Slurm 25.11 for Ubuntu 24.04 (GPG-signed)
-│   │   └── resolute/    # Slurm 25.11 for Ubuntu 25.04 (GPG-signed)
-│   ├── 24.11/
-│   │   └── ...          # All OS toolchains (GPG-signed)
-│   └── 23.11/
-│       └── ...          # All OS toolchains (GPG-signed)
+├── <toolchain>/
+│   └── slurm/
+│       ├── deps/            # Slurm dependencies (GPG-signed)
+│       ├── 25.11/           # Slurm 25.11 packages (GPG-signed)
+│       ├── 24.11/           # Slurm 24.11 packages (GPG-signed)
+│       └── 23.11/           # Slurm 23.11 packages (GPG-signed)
+├── noble/                   # Ubuntu 24.04
+│   └── slurm/
+│       ├── deps/
+│       ├── 25.11/
+│       ├── 24.11/
+│       └── 23.11/
+├── jammy/                   # Ubuntu 22.04
+├── resolute/                # Ubuntu 25.04
+├── rockylinux10/            # Rocky Linux 10
+├── rockylinux9/             # Rocky Linux 9
+├── rockylinux8/             # Rocky Linux 8
 └── builds/
-    ├── 25.11/
-    │   ├── rockylinux10/
-    │   │   ├── slurm-25.11-rockylinux10-software.tar.gz      # Complete tarball
-    │   │   └── slurm-25.11-rockylinux10-software.tar.gz.asc  # GPG signature
-    │   ├── noble/
-    │   │   ├── slurm-25.11-noble-software.tar.gz
-    │   │   └── slurm-25.11-noble-software.tar.gz.asc
-    │   └── ...          # All OS toolchains
-    ├── 24.11/
-    │   └── ...
-    └── 23.11/
-        └── ...
+    └── <slurm_version>/
+        └── <toolchain>/
+            ├── slurm-<version>-<toolchain>-software.tar.gz      # Complete tarball
+            └── slurm-<version>-<toolchain>-software.tar.gz.asc  # GPG signature
+```
 ```
 
 ### Mirror Architecture
 
-The buildcache uses a **two-tier mirror structure** for efficient caching and dependency resolution:
+The buildcache uses a **toolchain-first structure** organized by OS for efficient caching:
 
-1. **`deps/`** - Slurm runtime dependencies (OpenMPI, PMIx, Munge, etc.) per OS toolchain
-2. **`slurm/`** - Slurm packages compiled with OS-native compilers
+1. **`<toolchain>/slurm/deps/`** - Slurm runtime dependencies (OpenMPI, PMIx, Munge, etc.)
+2. **`<toolchain>/slurm/<version>/`** - Slurm packages for each version
 
 This separation allows:
 
-- ✅ **Better caching** - Dependencies shared across Slurm versions
-- ✅ **Reduced storage** - No duplication of common packages
-- ✅ **Parallel downloads** - Spack can fetch from multiple mirrors simultaneously
+- ✅ **Better caching** - Dependencies shared across Slurm versions within a toolchain
 - ✅ **OS compatibility** - Packages built with native system compilers
+- ✅ **Reduced storage** - No duplication of common packages per toolchain
+- ✅ **Parallel downloads** - Spack can fetch from multiple mirrors simultaneously
 
 ## Requirements
 
