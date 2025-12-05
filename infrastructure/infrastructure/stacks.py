@@ -250,7 +250,7 @@ class SlurmFactoryBinaryCache(Stack):
                 assume_role_action="sts:AssumeRoleWithWebIdentity",
             ),
             description=f"Role for GitHub Actions in {github_org}/{github_repo}",
-            max_session_duration=Duration.hours(3),  # 3 hours for long-running builds
+            max_session_duration=Duration.hours(12),  # 12 hours for long-running builds
         )
 
         # Grant GitHub Actions role permissions
