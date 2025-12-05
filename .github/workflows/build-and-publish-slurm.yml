@@ -122,7 +122,7 @@ jobs:
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
-          role-duration-seconds: 10800  # 3 hours for long-running builds
+          role-duration-seconds: 14400  # 4 hours for long-running builds
 
       - name: Validate GPG secrets
         timeout-minutes: 360
