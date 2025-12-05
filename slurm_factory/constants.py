@@ -211,7 +211,7 @@ INSTANCE_NAME_PREFIX = "slurm-factory"
 # Timeouts (in seconds)
 BUILD_TIMEOUT = 14400  # 4 hours for full source build
 DOCKER_BUILD_TIMEOUT = 600  # 10 minutes for image build
-DOCKER_COMMIT_TIMEOUT = 600  # 10 minutes for container commit (large GPU images)
+DOCKER_COMMIT_TIMEOUT = 1800  # 30 minutes for container commit (large GPU images)
 
 # Spack buildcache configuration
 SLURM_FACTORY_SPACK_CACHE_BASE_URL = "https://slurm-factory-spack-binary-cache.vantagecompute.ai"

@@ -131,7 +131,7 @@ class TestDockerConfiguration:
         """Test Docker commit timeout."""
         assert isinstance(DOCKER_COMMIT_TIMEOUT, int)
         assert DOCKER_COMMIT_TIMEOUT > 0
-        assert DOCKER_COMMIT_TIMEOUT == 600
+        assert DOCKER_COMMIT_TIMEOUT == 1800
 
     def test_build_timeout(self):
         """Test build timeout."""
