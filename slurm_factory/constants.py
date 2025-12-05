@@ -161,7 +161,7 @@ COMPILER_TOOLCHAINS = {
     ),
     "rockylinux10": (
         "Rocky Linux 10",
-        "14.2.1",
+        "14.3.1",
         "2.39",
         "rockylinux/rockylinux:10",
         RHEL_SETUP_SCRIPT,

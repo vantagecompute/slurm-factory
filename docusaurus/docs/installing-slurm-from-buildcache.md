@@ -102,7 +102,7 @@ All 27 combinations of Slurm × GCC are available in the buildcache:
 | **noble** | Ubuntu 24.04 (Noble) | 13.2.0 | 2.39 |
 | **jammy** | Ubuntu 22.04 (Jammy) | 11.4.0 | 2.35 |
 | **focal** | Ubuntu 20.04 (Focal) | 9.4.0 | 2.31 |
-| **rockylinux10** | Rocky Linux 10 / RHEL 10 | 14.2.1 | 2.40 |
+| **rockylinux10** | Rocky Linux 10 / RHEL 10 | 14.3.1 | 2.40 |
 | **rockylinux9** | Rocky Linux 9 / RHEL 9 | 11.4.0 | 2.34 |
 | **rockylinux8** | Rocky Linux 8 / RHEL 8 | 8.5.0 | 2.28 |
 
