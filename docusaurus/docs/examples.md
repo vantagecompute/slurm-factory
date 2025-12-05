@@ -6,17 +6,17 @@ Practical examples for building and deploying Slurm packages with different vers
 
 **Slurm Versions:** 25.11, 24.11, 23.11
 
-**GCC Compilers:** 14.2.0, 13.4.0 (default), 12.5.0, 11.5.0, 10.5.0, 9.5.0, 8.5.0, 7.5.0
+**Toolchains:** resolute, noble (default), jammy, rockylinux10, rockylinux9, rockylinux8
 
-See [Build Artifacts](build-artifacts.md) for pre-built S3 packages covering all version combinations.
+See [Build Artifacts](build-artifacts.md) for pre-built packages covering all version combinations.
 
 ## Basic Build Examples
 
 ```bash
-# Standard build with default compiler (GCC 13.4.0)
+# Standard build with default toolchain (noble)
 slurm-factory build-slurm --slurm-version 25.11
 
-# Build specific version with default compiler
+# Build specific version with default toolchain
 slurm-factory build-slurm --slurm-version 24.11
 
 # GPU support (~15-25GB)
@@ -29,68 +29,73 @@ slurm-factory --verbose build-slurm --slurm-version 25.11
 slurm-factory --project-name prod build-slurm --slurm-version 25.11
 ```
 
-## Compiler Version Examples
+## Toolchain Examples
 
-Build with different GCC compiler versions for cross-distribution compatibility:
+Build for different operating systems:
 
 ```bash
-# Latest compiler (Ubuntu 24.10+, Fedora 40+)
-slurm-factory build-slurm --slurm-version 25.11 --compiler-version 14.2.0
+# Ubuntu 25.04 (latest)
+slurm-factory build-slurm --slurm-version 25.11 --toolchain resolute
 
-# Default (Ubuntu 24.04, Debian 13+)
-slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
+# Ubuntu 24.04 (default, recommended)
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
 
-# Ubuntu 22.04, Debian 12+
-slurm-factory build-slurm --slurm-version 24.11 --compiler-version 11.5.0
+# Ubuntu 22.04 LTS
+slurm-factory build-slurm --slurm-version 24.11 --toolchain jammy
 
-# RHEL 8, Ubuntu 20.04, Debian 11+
-slurm-factory build-slurm --slurm-version 23.11 --compiler-version 10.5.0
+# Rocky Linux 10 / RHEL 10
+slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux10
+
+# Rocky Linux 9 / RHEL 9
+slurm-factory build-slurm --slurm-version 23.11 --toolchain rockylinux9
+
+# Rocky Linux 8 / RHEL 8
+slurm-factory build-slurm --slurm-version 23.11 --toolchain rockylinux8
 
 # Combine with GPU support
-slurm-factory build-slurm --slurm-version 25.11 --compiler-version 10.5.0 --gpu
+slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9 --gpu
 ```
 
-**Compiler Selection Guide:**
+**Toolchain Selection Guide:**
 
-| Version | Compatible Distros | glibc | Use Case |
-|---------|-------------------|-------|----------|
-| 14.2.0 | Ubuntu 24.10+, Fedora 40+ | 2.40+ | Latest features |
-| 13.4.0 | Ubuntu 24.04+, Debian 13+ | 2.39 | **Default** |
-| 12.5.0 | Ubuntu 23.10+, Debian 12+ | 2.38 | Wide compatibility |
-| 11.5.0 | Ubuntu 22.04+, Debian 12+ | 2.35 | LTS distributions |
-| 10.5.0 | RHEL 8+, Ubuntu 20.04+ | 2.31 | Enterprise Linux |
-| 9.5.0 | RHEL 8+, CentOS 8+ | 2.28 | RHEL 8 compatibility |
-| 8.5.0 | RHEL 8+, CentOS 8+ | 2.28 | RHEL 8 minimal |
+| Toolchain | Target OS | GCC Version | glibc | Use Case |
+|-----------|-----------|-------------|-------|----------|
+| resolute | Ubuntu 25.04 | 15.x | 2.41+ | Latest features |
+| noble | Ubuntu 24.04 | 13.x | 2.39 | **Default** |
+| jammy | Ubuntu 22.04 | 11.x | 2.35 | LTS distributions |
+| rockylinux10 | Rocky 10 / RHEL 10 | 14.x | 2.39+ | Latest Enterprise Linux |
+| rockylinux9 | Rocky 9 / RHEL 9 | 11.x | 2.34 | Enterprise Linux |
+| rockylinux8 | Rocky 8 / RHEL 8 | 8.x | 2.28 | Legacy Enterprise |
 
 ## Deployment Examples
 
 ```bash
-# Standard deployment with default compiler
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
+# Standard deployment for Ubuntu 24.04
+sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-noble-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 
-# Deploy RHEL 8 compatible build
-sudo tar -xzf ~/.slurm-factory/builds/slurm-24.11-gcc10.5.0-software.tar.gz -C /opt/
+# Deploy Rocky Linux 9 compatible build
+sudo tar -xzf ~/.slurm-factory/builds/slurm-24.11-rockylinux9-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
-module load slurm/24.11-gcc10.5.0
+module load slurm/24.11-rockylinux9
 
-# Deploy from S3
-aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.11-gcc13.4.0-software.tar.gz /tmp/
-sudo tar -xzf /tmp/slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/
+# Download from CDN
+wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz
+sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 
 # Custom path
 export SLURM_INSTALL_PREFIX=/shared/apps/slurm
-module load slurm/25.11-gcc13.4.0
+module load slurm/25.11-noble
 
 # Multi-version deployment
-sudo tar -xzf slurm-25.11-gcc13.4.0-software.tar.gz -C /opt/slurm-25.11/
-sudo tar -xzf slurm-24.11-gcc11.5.0-software.tar.gz -C /opt/slurm-24.11/
+sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/slurm-25.11/
+sudo tar -xzf slurm-24.11-jammy-software.tar.gz -C /opt/slurm-24.11/
 cd /opt/slurm-25.11 && sudo ./data/slurm_assets/slurm_install.sh
 cd /opt/slurm-24.11 && sudo ./data/slurm_assets/slurm_install.sh
-module load slurm/25.11-gcc13.4.0  # or slurm/24.11-gcc11.5.0
+module load slurm/25.11-noble  # or slurm/24.11-jammy
 ```
 
 ## CI/CD Integration
@@ -108,7 +113,7 @@ jobs:
       - name: Build
         run: |
           pipx install slurm-factory
-          slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
+          slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
       - uses: actions/upload-artifact@v4
         with:
           name: slurm-package
@@ -123,7 +128,7 @@ build:
   script:
     - apt-get update && apt-get install -y pipx docker.io
     - pipx install slurm-factory
-    - slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
+    - slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
   artifacts:
     paths:
       - ~/.slurm-factory/builds/

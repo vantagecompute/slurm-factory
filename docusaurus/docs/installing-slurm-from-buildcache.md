@@ -320,13 +320,13 @@ sinfo --version
 Each tarball contains:
 
 ```text
-slurm-25.11-gcc15.2.0-software.tar.gz
-├── view/                      # Slurm binaries & libraries
-├── modules/slurm/25.11.lua    # Lmod module (relocatable)
-└── data/slurm_assets/         # Config templates & install script
-    ├── slurm_install.sh       # Installation script
-    ├── defaults/              # Default configuration files
-    ├── systemd/               # Systemd service units
+slurm-25.11-noble-software.tar.gz
+├── view/                          # Slurm binaries & libraries
+├── modules/slurm/25.11-noble.lua  # Lmod module (relocatable)
+└── data/slurm_assets/             # Config templates & install script
+    ├── slurm_install.sh           # Installation script
+    ├── defaults/                  # Default configuration files
+    ├── systemd/                   # Systemd service units
     └── ...
 ```
 
@@ -352,7 +352,7 @@ gpg --list-keys DFB92630BCA5AB71
 spack gpg list
 
 # Packages are automatically verified during installation
-spack install slurm@25.11%gcc@13.4.0
+spack install slurm@25.11
 # ✓ All packages verified with GPG signatures
 ```
 
@@ -393,9 +393,9 @@ spack install slurm@24.11  # Uses slurm-24-jammy mirrors
 
 ```bash
 # Install for specific CPU microarchitecture
-spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3  # Recommended
-spack install slurm@25.11%gcc@13.4.0 target=x86_64_v4  # Latest CPUs
-spack install slurm@25.11%gcc@13.4.0 target=x86_64     # Maximum compatibility
+spack install slurm@25.11 target=x86_64_v3  # Recommended
+spack install slurm@25.11 target=x86_64_v4  # Latest CPUs
+spack install slurm@25.11 target=x86_64     # Maximum compatibility
 ```
 
 ### Verify Before Installing
@@ -419,7 +419,7 @@ After installing from buildcache, deploy Slurm to your system. See the [Deployme
 
 ```bash
 # 1. Install from buildcache (as shown above)
-spack install slurm@25.11%gcc@13.4.0 target=x86_64_v3
+spack install slurm@25.11 target=x86_64_v3
 
 # 2. Find installation location
 spack location -i slurm@25.11
@@ -440,9 +440,9 @@ sudo cp -r $(spack location -i slurm@25.11) /opt/slurm
 curl -I https://slurm-factory-spack-binary-cache.vantagecompute.ai/
 
 # Remove and re-add mirror
-spack mirror remove slurm-factory
-spack mirror add slurm-factory \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/13.4.0/
+spack mirror remove slurm-factory-slurm
+spack mirror add slurm-factory-slurm \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/25.11/
 ```
 
 ### GPG Key Issues
@@ -477,12 +477,12 @@ spack mirror list
 ```bash
 # The buildcache uses CloudFront CDN, but downloads can still be slow for large packages
 # Monitor progress with verbose output
-spack -d install slurm@25.11%gcc@13.4.0
+spack -d install slurm@25.11
 
 # Or install specific dependencies first
 spack install openssl@3:
 spack install munge
-spack install slurm@25.11%gcc@13.4.0
+spack install slurm@25.11
 ```
 
 ## Comparison: Buildcache vs Building

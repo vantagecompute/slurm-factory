@@ -30,6 +30,7 @@ from slurm_factory.constants import (
     CONTAINER_SLURM_DIR,
     CONTAINER_SPACK_PROJECT_DIR,
     CONTAINER_SPACK_TEMPLATES_DIR,
+    DOCKER_COMMIT_TIMEOUT,
     S3_BUILDCACHE_BUCKET,
     SPACK_SETUP_SCRIPT,
 )
@@ -1288,7 +1289,7 @@ def create_slurm_package(
                 ["docker", "commit", container_name, temp_image_tag],
                 capture_output=True,
                 text=True,
-                timeout=120,
+                timeout=DOCKER_COMMIT_TIMEOUT,
             )
             if commit_result.returncode != 0:
                 error_msg = commit_result.stderr.strip() or commit_result.stdout.strip() or "Unknown error"

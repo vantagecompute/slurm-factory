@@ -216,14 +216,14 @@ Similar URLs for Slurm 23.11 with all compiler versions.
 
 All buildcache packages are available via CloudFront:
 
-**Compiler Buildcache URLs**:
+**Dependencies Buildcache URLs**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/{toolchain}/
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/slurm/deps/
 ```
 
 **Slurm Buildcache URLs**:
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/{slurm_version}/{toolchain}/
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/slurm/{slurm_version}/
 ```
 
 See [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) for complete buildcache documentation.
@@ -293,7 +293,7 @@ sinfo --version
 pip install slurm-factory
 
 # Build will use buildcache for dependencies
-slurm-factory build-slurm --slurm-version 25.11 --compiler-version 13.4.0
+slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
 ```
 
 ## Artifact Verification
@@ -302,11 +302,11 @@ Each tarball includes verification information:
 
 ```bash
 # Extract and verify contents
-tar -tzf slurm-25.11-gcc13.4.0-software.tar.gz | head -20
+tar -tzf slurm-25.11-noble-software.tar.gz | head -20
 
 # Check modulefile
-tar -xzf slurm-25.11-gcc13.4.0-software.tar.gz modules/slurm/25.11-gcc13.4.0.lua
-cat modules/slurm/25.11-gcc13.4.0.lua
+tar -xzf slurm-25.11-noble-software.tar.gz modules/slurm/25.11-noble.lua
+cat modules/slurm/25.11-noble.lua
 ```
 
 ## Installation from Artifacts
@@ -343,17 +343,17 @@ Install Slurm directly with Spack:
 
 ```bash
 # 1. Add buildcache mirrors
-spack mirror add slurm-factory-compilers \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/compilers/noble/
+spack mirror add slurm-factory-deps \
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/deps/
 
 spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/slurm/25.11/noble/
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/25.11/
 
 # 2. Import and trust GPG signing keys
 spack buildcache keys --install --trust
 
 # 3. Install from signed buildcache (5-15 minutes!)
-spack install slurm@25.11%gcc@13.4.0
+spack install slurm@25.11
 
 # 4. Load and verify
 spack load slurm@25.11
@@ -375,7 +375,7 @@ Each build is tagged with metadata:
 
 - **Build Date**: When the package was created
 - **Slurm Version**: e.g., 25.11, 24.11
-- **Compiler**: e.g., gcc@13.4.0
+- **Toolchain**: e.g., noble, jammy, rockylinux9
 - **Architecture**: x86_64_v3 (optimized for modern CPUs)
 - **Features**: OpenMPI version, GPU support, etc.
 
