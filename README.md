@@ -75,11 +75,11 @@ All combinations use **OS-provided compilers** and are available in the public b
 Slurm is built using the default system compiler from each OS distribution:
 
 | OS | Codename | GCC Version | GLIBC | Use Case |
-|----|----------|-------------|-------|----------|
+|----|----------|-------------|-------|---------|
 | **Ubuntu 24.04** | **Noble** | **13.2.0** | **2.39** | **Recommended - Modern stable** |
 | Ubuntu 25.04 | Resolute | 15.2.0 | 2.42 | Latest features (development) |
 | Ubuntu 22.04 | Jammy | 11.4.0 | 2.35 | LTS - Wide compatibility |
-| Rocky Linux 10 | - | 14.2.1 | 2.40 | RHEL 10 compatible |
+| Rocky Linux 10 | - | 14.3.1 | 2.40 | RHEL 10 compatible |
 | Rocky Linux 9 | - | 11.4.1 | 2.34 | RHEL 9 compatible |
 | Rocky Linux 8 | - | 8.5.0 | 2.28 | RHEL 8 compatible |
 

@@ -245,7 +245,7 @@ All OS toolchains use the system GCC and glibc from the base OS:
 | **noble** | Ubuntu 24.04 | 13.2.0 | 2.39 | **Recommended** - Modern stable |
 | resolute | Ubuntu 25.04 | 15.2.0 | 2.42 | Latest features |
 | jammy | Ubuntu 22.04 | 11.4.0 | 2.35 | LTS - Wide compatibility |
-| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.2.1 | 2.40 | RHEL 10 compatible |
+| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.3.1 | 2.40 | RHEL 10 compatible |
 | rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.4.1 | 2.34 | RHEL 9 compatible |
 | rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.5.0 | 2.28 | RHEL 8 compatible |
 

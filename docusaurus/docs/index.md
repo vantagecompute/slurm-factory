@@ -39,7 +39,7 @@ All toolchains use the system GCC and glibc from the base OS:
 - **noble** (Ubuntu 24.04 - Recommended, GCC 13.2, glibc 2.39)
 - **jammy** (Ubuntu 22.04 - LTS, GCC 11.2, glibc 2.35)
 - **focal** (Ubuntu 20.04 - Legacy, GCC 9.4, glibc 2.31)
-- **rockylinux10** (Rocky Linux 10 / RHEL 10, GCC 14.2, glibc 2.40)
+- **rockylinux10** (Rocky Linux 10 / RHEL 10, GCC 14.3, glibc 2.40)
 - **rockylinux9** (Rocky Linux 9 / RHEL 9, GCC 11.4, glibc 2.34)
 - **rockylinux8** (Rocky Linux 8 / RHEL 8, GCC 8.5, glibc 2.28)
 

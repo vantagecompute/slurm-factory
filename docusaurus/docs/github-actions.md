@@ -102,7 +102,7 @@ env:
 | **resolute** | Ubuntu 25.04 | 15.2.0 | Latest features |
 | **noble** | Ubuntu 24.04 | 13.2.0 | **Recommended** |
 | **jammy** | Ubuntu 22.04 | 11.4.0 | LTS |
-| **rockylinux10** | Rocky Linux 10 | 14.2.1 | RHEL 10 |
+| **rockylinux10** | Rocky Linux 10 | 14.3.1 | RHEL 10 |
 | **rockylinux9** | Rocky Linux 9 | 11.4.1 | RHEL 9 |
 | **rockylinux8** | Rocky Linux 8 | 8.5.0 | RHEL 8 |
 
