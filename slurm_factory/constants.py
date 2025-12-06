@@ -75,6 +75,7 @@ yum update -y && yum install -y \
     libgfortran \
     libstdc++-devel \
     glibc-devel \
+    gnupg2 \
     make \
     wget \
     tar \

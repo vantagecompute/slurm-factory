@@ -857,6 +857,13 @@ def _push_slurm_to_buildcache(
         if gpg_private_key:
             bash_script_parts.extend(
                 [
+                    # Ensure GPG is installed (Rocky Linux 10 and some distros don't have it by default)
+                    (
+                        "if ! command -v gpg &> /dev/null; then "
+                        "if command -v yum &> /dev/null; then yum install -y gnupg2; "
+                        "elif command -v apt-get &> /dev/null; then apt-get update && apt-get install -y gnupg; "
+                        "fi; fi"
+                    ),
                     # Ensure GPG home directory exists
                     "mkdir -p /opt/spack/opt/spack/gpg",
                     # Configure GPG with loopback pinentry BEFORE importing keys
