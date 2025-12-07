@@ -9,7 +9,7 @@ RUN dnf -y install epel-release && \
     dnf -y install --allowerasing curl gnupg2 Lmod lua-posix gcc gcc-c++ && \
     dnf clean all && rm -rf /var/cache/dnf
 
-RUN TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
+RUN TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOOLCHAIN}/slurm/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
     curl -fsSLO "${TARBALL_URL}.asc" && \
     curl -fsSLO "${TARBALL_URL}" && \
