@@ -4,6 +4,10 @@ ARG BASE_IMAGE=rockylinux/rockylinux:10
 
 FROM ${BASE_IMAGE}
 
+# Re-declare ARGs after FROM to make them available in subsequent instructions
+ARG SLURM_VERSION
+ARG TOOLCHAIN
+
 RUN dnf -y install epel-release && \
     dnf config-manager --set-enabled crb && \
     dnf -y install --allowerasing curl gnupg2 Lmod lua-posix gcc gcc-c++ && \

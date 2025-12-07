@@ -4,6 +4,10 @@ ARG BASE_IMAGE=ubuntu:jammy
 
 FROM ${BASE_IMAGE}
 
+# Re-declare ARGs after FROM to make them available in subsequent instructions
+ARG SLURM_VERSION
+ARG TOOLCHAIN
+
 RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates curl gnupg lmod lua5.3 lua-posix build-essential && \
