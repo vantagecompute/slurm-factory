@@ -249,12 +249,17 @@ log_verbose "Docker build command: docker build ${BUILD_ARGS[*]}"
 # Run docker build with timeout
 if [[ "${VERBOSE}" == "true" ]]; then
     timeout "${TIMEOUT}" docker build "${BUILD_ARGS[@]}"
+    BUILD_EXIT_CODE=$?
 else
     timeout "${TIMEOUT}" docker build "${BUILD_ARGS[@]}" > /dev/null
+    BUILD_EXIT_CODE=$?
 fi
 
-if [[ $? -eq 124 ]]; then
+if [[ $BUILD_EXIT_CODE -eq 124 ]]; then
     log_error "Docker build timed out after ${TIMEOUT} seconds"
+    exit 1
+elif [[ $BUILD_EXIT_CODE -ne 0 ]]; then
+    log_error "Docker build failed with exit code ${BUILD_EXIT_CODE}"
     exit 1
 fi
 
@@ -269,12 +274,17 @@ log_verbose "Docker run command: docker run --rm slurm-tarball-test:${SLURM_VERS
 # Run docker container with timeout
 if [[ "${VERBOSE}" == "true" ]]; then
     timeout "${TIMEOUT}" docker run --rm "slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}"
+    RUN_EXIT_CODE=$?
 else
     timeout "${TIMEOUT}" docker run --rm "slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}" > /dev/null
+    RUN_EXIT_CODE=$?
 fi
 
-if [[ $? -eq 124 ]]; then
+if [[ $RUN_EXIT_CODE -eq 124 ]]; then
     log_error "Docker run timed out after ${TIMEOUT} seconds"
+    exit 1
+elif [[ $RUN_EXIT_CODE -ne 0 ]]; then
+    log_error "Docker run failed with exit code ${RUN_EXIT_CODE}"
     exit 1
 fi
 
