@@ -23,13 +23,51 @@ SLURM_VERSIONS = {
     "23.11": "23-11-11-1",
 }
 
-RHEL_SETUP_SCRIPT = """
-# RHEL (derivative) setup script for Slurm Factory (Rocky 8/9)
+RHEL8_SETUP_SCRIPT = """
+# RHEL 8 / Rocky Linux 8 setup script for Slurm Factory
+# Rocky 8 uses 'powertools' repository (not 'crb' like Rocky 9+)
+# Install EPEL repository
+yum install -y epel-release
+# Enable PowerTools repository for EPEL dependencies (Rocky 8 specific)
+# On Rocky Linux 8, this is required for lua-filesystem and lua-posix (Lmod dependencies)
+dnf config-manager --set-enabled powertools || exit 1
+# Update system packages AND install build tools in one transaction
+# This ensures glibc and gcc versions are compatible
+yum update -y && yum install -y \
+    gcc \
+    gcc-c++ \
+    gcc-gfortran \
+    glibc-devel \
+    make \
+    wget \
+    tar \
+    git \
+    lua \
+    lua-filesystem \
+    lua-posix \
+    Lmod \
+    python3 \
+    python3-pip \
+    which \
+    patch \
+    xz \
+    unzip \
+    findutils \
+    diffutils \
+    kernel-headers \
+    lbzip2
+yum clean all && rm -rf /var/cache/yum
+PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
+"""
+
+RHEL9_SETUP_SCRIPT = """
+# RHEL 9 / Rocky Linux 9 setup script for Slurm Factory
+# Rocky 9 uses 'crb' (CodeReady Builder) repository
 # Install EPEL repository
 yum install -y epel-release
 # Enable CRB (CodeReady Builder) repository for EPEL dependencies
-# On Rocky Linux 8/9, this is required for lua-filesystem and lua-posix (Lmod dependencies)
-/usr/bin/crb enable
+# On Rocky Linux 9, this is required for lua-filesystem and lua-posix (Lmod dependencies)
+dnf config-manager --set-enabled crb || exit 1
 # Update system packages AND install build tools in one transaction
 # This ensures glibc and gcc versions are compatible
 yum update -y && yum install -y \
@@ -183,14 +221,14 @@ COMPILER_TOOLCHAINS = {
         "8.5.0",
         "2.28",
         "rockylinux/rockylinux:8",
-        RHEL_SETUP_SCRIPT,
+        RHEL8_SETUP_SCRIPT,
     ),
     "rockylinux9": (
         "Rocky Linux 9",
         "11.5.0",
         "2.34",
         "rockylinux/rockylinux:9",
-        RHEL_SETUP_SCRIPT,
+        RHEL9_SETUP_SCRIPT,
     ),
     "rockylinux10": (
         "Rocky Linux 10",
