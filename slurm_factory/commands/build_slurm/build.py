@@ -152,7 +152,10 @@ def build_slurm_command(
         str,
         typer.Option(
             "--publish",
-            help=("Publish to buildcache: none (default), slurm (only Slurm), deps (only dependencies)"),
+            help=(
+                "Publish to buildcache: none (default), slurm (only Slurm), deps "
+                "only dependencies), all (Slurm and dependencies)"
+            ),
         ),
     ] = "none",
     buildcache: Annotated[
@@ -205,6 +208,7 @@ def build_slurm_command(
 
     Buildcache publishing (--publish):
     - none (default): Don't publish to buildcache
+    - all: Publish all packages (Slurm and dependencies)
     - slurm: Publish only the Slurm package
     - deps: Publish only dependencies (excluding Slurm)
 
@@ -242,7 +246,7 @@ def build_slurm_command(
     console = Console()
 
     # Validate publish parameter
-    valid_publish_options = ["none", "slurm", "deps"]
+    valid_publish_options = ["none", "slurm", "deps", "all"]
     if publish not in valid_publish_options:
         console.print(f"[bold red]Error: Invalid --publish value '{publish}'[/bold red]")
         console.print(f"[bold yellow]Valid options: {', '.join(valid_publish_options)}[/bold yellow]")

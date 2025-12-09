@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: "Build and Publish Slurm Dependencies for All Toolchains"
+name: "Build and Publish Slurm Dependencies for Each Supported OS"
 
 on:
   workflow_dispatch:
@@ -145,7 +145,7 @@ jobs:
             --toolchain ${{ matrix.toolchain }} \
             --gpu \
             --no-cache \
-            --publish=deps \
+            --publish=all \
             --signing-key "$GPG_KEY_ID" \
             --gpg-private-key "$GPG_PRIVATE_KEY" \
             --gpg-passphrase "$GPG_PASSPHRASE"

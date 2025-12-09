@@ -770,8 +770,7 @@ def _push_slurm_to_buildcache(
     """
     console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
 
-    # NOTE: Spack adds build_cache/ subdirectory automatically - do NOT append /buildcache here
-    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/{slurm_version}"
+    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/deps"
 
     logger.debug(f"Publishing Slurm {slurm_version} to {S3_BUILDCACHE_BUCKET} (mode: {publish_mode})")
 
@@ -813,6 +812,7 @@ def _push_slurm_to_buildcache(
 
         # Determine what to push based on publish_mode
         if publish_mode == "slurm":
+            s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/{slurm_version}"
             # Push only slurm package
             push_cmd = (
                 f"spack buildcache push {signing_flags} --force --update-index "
@@ -820,7 +820,6 @@ def _push_slurm_to_buildcache(
             )
         elif publish_mode == "deps":
             # Push only dependencies (everything except slurm)
-            s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/deps"
             push_cmd = (
                 f"spack -e . buildcache push {signing_flags} --force --update-index "
                 "--only=dependencies --with-build-dependencies s3-buildcache slurm"
