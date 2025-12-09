@@ -241,12 +241,14 @@ def generate_spack_config(
         # The GCC version is determined by the OS toolchain (e.g., noble = GCC 13.2.0)
         f"gcc@{gcc_version} +binutils +piclibs languages=c,c++,fortran",
         # All packages below will use %gcc@{compiler_version}
+        f"gettext@0.23.1 {compiler_spec}",  # Provides libintl.so.8 needed by glib, krb5, etc.
         f"zlib@1.3.1 {compiler_spec}",  # Build zlib first (needed by OpenSSL and others)
         # Build OpenSSL with explicit zlib dependency
         f"openssl@3.6.0 ^zlib@1.3.1 {compiler_spec}",
         f"jansson@2.14 {compiler_spec}",  # JSON library for libjwt
         # JWT library with all dependencies - let Spack choose available version
         f"libjwt ^openssl@3.6.0 ^zlib@1.3.1 ^jansson@2.14 {compiler_spec}",
+        f"gettext {compiler_spec}",  # Provides libintl.so.8 needed by glib, krb5, etc.
         openldap_spec,  # Build openldap before curl since curl+ldap needs it
         curl_spec,
         f"patchelf@0.18.0 {compiler_spec}",  # For RPATH fixing during relocatability
