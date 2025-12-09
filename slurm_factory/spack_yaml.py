@@ -470,7 +470,6 @@ def generate_spack_config(
                         "pkgconf",
                         "diffutils",
                         "findutils",
-                        "gettext",
                         "libbsd",
                         "libsigsegv",
                         "tar",
