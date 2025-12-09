@@ -53,14 +53,22 @@ slurm-factory = "slurm_factory.main:app"
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.hatch.build]
+exclude = [
+    "/.github",
+    "/.commitlintrc.yml",
+    "/.gitignore",
+    "/.python-version",
+    "/docusaurus",
+    "/infrastructure",
+    "/scripts",
+    "/tests",
+    "/justfile",
+    "/uv.lock",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["slurm_factory"]
-exclude = [
-    "git-cliff-*",
-    "justfile",
-    "docs",
-    "tests",
-]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "data/templates" = "share/slurm-factory/templates"
@@ -68,12 +76,6 @@ exclude = [
 
 
 [tool.hatch.build.targets.sdist]
-exclude = [
-    "git-cliff-*",
-    "justfile",
-    "docs",
-    "tests",
-]
 
 # ===== Development Tools =====
 [tool.black]
