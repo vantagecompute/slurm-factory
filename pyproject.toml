@@ -65,6 +65,7 @@ exclude = [
     "/tests",
     "/justfile",
     "/uv.lock",
+    "/git-cliff-*",
 ]
 
 [tool.hatch.build.targets.wheel]
