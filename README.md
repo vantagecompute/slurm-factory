@@ -141,10 +141,7 @@ slurm-factory build-slurm --slurm-version 25.11 --gpu
 slurm-factory build-slurm --slurm-version 25.11 --toolchain jammy
 
 # Build and publish to buildcache with GPG signing
-slurm-factory build-slurm --slurm-version 25.11 --publish \
-  --signing-key $GPG_KEY_ID \
-  --gpg-private-key "$GPG_PRIVATE_KEY" \
-  --gpg-passphrase "$GPG_PASSPHRASE"
+slurm-factory build-slurm --slurm-version 25.11
 ```
 
 ### Install Pre-built from Buildcache (Fastest!)
