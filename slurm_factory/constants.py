@@ -18,7 +18,7 @@ from enum import Enum
 
 # Mapping of user-facing version strings to Spack package versions
 SLURM_VERSIONS = {
-    "25.11": "25-11-0-1",
+    "25.11": "25-11-1-1",
     "24.11": "24-11-6-1",
     "23.11": "23-11-11-1",
 }
