@@ -397,7 +397,9 @@ fi  # End of installation section
 if [[ -n "$ORG_ID" ]] && [[ -n "$SSSD_BINDER_PASSWORD" ]] && [[ -n "$LDAP_URI" ]]; then
     echo
     echo "=== Configuring SSSD ==="
+    apt update && apt install -y libsss-sudo
     SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    cp "$SCRIPT_DIR/nsswitch/nsswitch.conf" /etc/nsswitch.conf
     cp "$SCRIPT_DIR/sssd/sssd.conf" /etc/sssd/sssd.conf
     chmod 600 /etc/sssd/sssd.conf
     chown root:root /etc/sssd/sssd.conf
