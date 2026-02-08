@@ -276,7 +276,7 @@ def generate_spack_config(
             "repos": {
                 "slurm_factory": {
                     "git": "https://github.com/vantagecompute/slurm-factory-spack-repo.git",
-                    "branch": "release/0.0.1",
+                    "branch": "main",
                 },
             },
             "concretizer": {
