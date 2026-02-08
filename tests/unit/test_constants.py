@@ -46,7 +46,7 @@ class TestSlurmVersions:
     def test_slurm_versions_mapping(self):
         """Test that version mappings are correct."""
         # Test known mappings (updated for actual format)
-        assert SLURM_VERSIONS["25.11"] == "25-11-1-1"
+        assert SLURM_VERSIONS["25.11"] == "25-11-2-1"
         assert SLURM_VERSIONS["24.11"] == "24-11-6-1"
         assert SLURM_VERSIONS["23.11"] == "23-11-11-1"
 
