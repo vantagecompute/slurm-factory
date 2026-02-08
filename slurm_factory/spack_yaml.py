@@ -441,11 +441,10 @@ def generate_spack_config(
                     "buildable": True,
                     "version": [gcc_version],
                 },
-                "slurm": {
+                "slurm_factory.slurm": {
                     "version": [slurm_package_version],
                     "buildable": True,
                     "variants": "+shared ~static +pic",  # Consistent shared library preference
-                    "prefer": ["slurm_factory.slurm"],  # Prefer our custom namespace
                 },
                 # OpenMPI configuration for consistent build
                 "openmpi": {
