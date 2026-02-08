@@ -255,7 +255,7 @@ def generate_spack_config(
     ]
     # s2n-tls for internal TLS support (tls/s2n plugin)
     # Ref: https://slurm.schedmd.com/tls.html
-    specs.append(f"s2n-tls +shared {compiler_spec}")
+    specs.append(f"slurm_factory.s2n-tls +shared {compiler_spec}")
     # Using slurm_factory.freeipmi@1.6.16 for GCC 14 compatibility
     # (1.6.9 has implicit function declaration errors)
     specs.append(f"slurm_factory.freeipmi@1.6.16 {compiler_spec}")
