@@ -150,3 +150,4 @@ show-versions:
 [group("test-tarball")]
 test-tarball:
     SLURM_VERSION="${SLURM_VERSION:-25.11}" TOOLCHAIN="${TOOLCHAIN:-resolute}" ./scripts/test-tarball.sh
+
