@@ -305,6 +305,19 @@ def get_create_slurm_tarball_script(
             done && \\
         """).strip()
 
+    # Copy SSSD NSS module from system to view for LDAP/AD user lookups
+    sssd_nss_script = textwrap.dedent(f"""\
+        echo "DEBUG: Copying SSSD NSS libraries from system..." && \\
+        mkdir -p {CONTAINER_SLURM_DIR}/view/lib/sssd && \\
+        for lib in libnss_sss.so; do \\
+            find /usr/lib /usr/lib64 /lib /lib64 -name "$lib*" \\
+                \\( -type f -o -type l \\) 2>/dev/null | while read -r libfile; do \\
+                echo "DEBUG: Copying SSSD library: $libfile" && \\
+                cp -P "$libfile" {CONTAINER_SLURM_DIR}/view/lib/sssd/ || true; \\
+            done; \\
+        done && \\
+    """).strip()
+
     return textwrap.dedent(f"""\
         set -e && \\
         [ -d "{CONTAINER_SLURM_DIR}/view" ] || {{ \\
@@ -326,7 +339,7 @@ def get_create_slurm_tarball_script(
         fi && \\
         echo "DEBUG: Packaging view directly (projections create FHS layout)..." && \\
         cd {CONTAINER_SLURM_DIR}/view && \\
-        {gpu_handling_script if gpu_handling_script else ""}find . -name "include" -type d \\
+        {gpu_handling_script if gpu_handling_script else ""}{sssd_nss_script}find . -name "include" -type d \\
             -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/lib/pkgconfig" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/share/doc" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\

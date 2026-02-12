@@ -391,7 +391,10 @@ def generate_spack_config(
                     "buildable": True,
                     "variants": "system-socket=/var/run/dbus/system_bus_socket",
                 },
-                "glib": {"buildable": True},
+                "glib": {
+                    "buildable": True,
+                    "version": ["2.82.5"],  # Pin to 2.82.x - glib 2.86+ has gi-docgen issues
+                },
                 "libxml2": {"buildable": True},
                 # Build these inside Spack to avoid Perl XS module linking to external system libraries
                 "gdbm": {"buildable": True},

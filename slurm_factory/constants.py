@@ -55,7 +55,8 @@ yum update -y && yum install -y \
     findutils \
     diffutils \
     kernel-headers \
-    lbzip2
+    lbzip2 \
+    sssd-client
 yum clean all && rm -rf /var/cache/yum
 PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
 """
@@ -92,7 +93,8 @@ yum update -y && yum install -y \
     findutils \
     diffutils \
     kernel-headers \
-    lbzip2
+    lbzip2 \
+    sssd-client
 yum clean all && rm -rf /var/cache/yum
 PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
 """
@@ -132,7 +134,8 @@ yum update -y && yum install -y \
     diffutils \
     kernel-headers \
     bzip2 \
-    bzip2-libs
+    bzip2-libs \
+    sssd-client
 yum clean all && rm -rf /var/cache/yum
 PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
 """
@@ -158,7 +161,8 @@ apt-get install -y \
     bzip2 \
     gzip \
     xz-utils \
-    diffutils && \
+    diffutils \
+    libnss-sss && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
     PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
 """
@@ -166,7 +170,8 @@ apt-get install -y \
 UBUNTU_RESOLUTE_SETUP_SCRIPT = """
 # Ubuntu 26.04 (Resolute) setup script with CUDA workarounds
 # Resolute uses uutils coreutils (Rust) which is incompatible with CUDA installers
-# Workaround: Install GNU coreutils and Noble dependencies
+# Workaround: Install GNU coreutils and libxml2-16 for CUDA installer
+# Note: Ubuntu 26.04 renamed libxml2 to libxml2-16 (SONAME 16)
 
 apt-get update
 apt-get install -y \
@@ -188,24 +193,16 @@ apt-get install -y \
     gzip \
     xz-utils \
     diffutils \
-    gnu-coreutils
+    gnu-coreutils \
+    libxml2-16 \
+    libnss-sss
 
 # Replace uutils dd with GNU dd (required for CUDA installer compatibility)
 rm -f /usr/bin/dd && ln -s /usr/bin/gnudd /usr/bin/dd
 
-# Download and install Noble (Ubuntu 24.04) dependencies for CUDA compatibility
-cd /tmp
-wget -q http://archive.ubuntu.com/ubuntu/pool/main/libx/libxml2/libxml2_2.9.14+dfsg-1.3ubuntu3.6_amd64.deb
-wget -q http://archive.ubuntu.com/ubuntu/pool/main/i/icu/libicu74_74.2-1ubuntu3.1_amd64.deb
-
-# Extract and install libraries
-dpkg-deb -x libxml2_2.9.14+dfsg-1.3ubuntu3.6_amd64.deb /tmp/extract
-dpkg-deb -x libicu74_74.2-1ubuntu3.1_amd64.deb /tmp/extract
-cp /tmp/extract/usr/lib/x86_64-linux-gnu/*.so.* /usr/lib/x86_64-linux-gnu/
-ldconfig
-
-# Cleanup
-rm -rf /tmp/extract libxml2_2.9.14+dfsg-1.3ubuntu3.6_amd64.deb libicu74_74.2-1ubuntu3.1_amd64.deb
+# Create libxml2.so.2 symlink for CUDA installer compatibility
+# CUDA installer is built against libxml2.so.2, but Ubuntu 26.04 has libxml2.so.16
+ln -sf /usr/lib/x86_64-linux-gnu/libxml2.so.16 /usr/lib/x86_64-linux-gnu/libxml2.so.2
 
 apt-get clean && rm -rf /var/lib/apt/lists/*
 PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
