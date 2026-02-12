@@ -33,6 +33,7 @@ yum install -y epel-release
 dnf config-manager --set-enabled powertools || exit 1
 # Update system packages AND install build tools in one transaction
 # This ensures glibc and gcc versions are compatible
+# Note: python39 is required because re2c needs Python 3.7+, and Rocky 8 defaults to Python 3.6
 yum update -y && yum install -y \
     gcc \
     gcc-c++ \
@@ -46,8 +47,8 @@ yum update -y && yum install -y \
     lua-filesystem \
     lua-posix \
     Lmod \
-    python3 \
-    python3-pip \
+    python39 \
+    python39-pip \
     which \
     patch \
     xz \
@@ -57,6 +58,8 @@ yum update -y && yum install -y \
     kernel-headers \
     lbzip2 \
     sssd-client
+# Set python3.9 as the default python3 (re2c and other tools need Python 3.7+)
+alternatives --set python3 /usr/bin/python3.9
 yum clean all && rm -rf /var/cache/yum
 PIP_BREAK_SYSTEM_PACKAGES=1 pip3 install boto3
 """
