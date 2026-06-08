@@ -85,7 +85,7 @@ jobs:
 
   # ── Job 1: Build ─────────────────────────────────────────────────────
   # Compiles Slurm via Spack, pushes spack binary packages to buildcache,
-  # and uploads the redistributable tarball as a GitHub Actions artifact.
+  # and stages the redistributable tarball in S3 for downstream jobs.
   build-slurm:
     needs: prepare-matrix
     runs-on: self-hosted
@@ -211,22 +211,27 @@ jobs:
           echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT
           echo "✓ Tarball found: $(du -h "$TARBALL_PATH" | cut -f1) at $TARBALL_PATH"
 
-      - name: Upload tarball artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}
-          path: ${{ steps.tarball.outputs.tarball_path }}
-          retention-days: 7
-          compression-level: 0  # tarball is already gzipped
+      - name: Stage tarball for downstream jobs
+        run: |
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${{ steps.tarball.outputs.tarball_name }}"
+          echo "📤 Staging tarball at s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
+          aws s3 cp \
+            "${{ steps.tarball.outputs.tarball_path }}" \
+            "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
+          echo "✓ Tarball staged for downstream jobs"
 
   # ── Job 2: Test ──────────────────────────────────────────────────────
-  # Downloads the tarball artifact and validates it in a Docker container
+  # Downloads the staged tarball and validates it in a Docker container
   # (module load, sinfo -V). Runs BEFORE publish so a test failure does
   # not leave a broken tarball in the production buildcache.
   test-slurm:
     needs: [prepare-matrix, build-slurm]
     runs-on: self-hosted
     timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
 
     strategy:
       fail-fast: false
@@ -238,11 +243,22 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Download tarball artifact
-        uses: actions/download-artifact@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          name: slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}
-          path: /tmp/slurm-tarball
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 3600
+
+      - name: Download staged tarball
+        run: |
+          mkdir -p /tmp/slurm-tarball
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${TARBALL_NAME}"
+          echo "📥 Downloading staged tarball from s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
+          aws s3 cp \
+            "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" \
+            "/tmp/slurm-tarball/${TARBALL_NAME}"
 
       - name: Test Slurm tarball
         run: |
@@ -280,18 +296,22 @@ jobs:
         toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
 
     steps:
-      - name: Download tarball artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}
-          path: /tmp/slurm-publish
-
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
           role-duration-seconds: 3600
+
+      - name: Download staged tarball
+        run: |
+          mkdir -p /tmp/slurm-publish
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${TARBALL_NAME}"
+          echo "📥 Downloading staged tarball from s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
+          aws s3 cp \
+            "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" \
+            "/tmp/slurm-publish/${TARBALL_NAME}"
 
       - name: Sign and publish tarball to S3
         env:
@@ -338,7 +358,11 @@ jobs:
 
       - name: Cleanup
         if: always()
-        run: rm -rf /tmp/slurm-publish
+        run: |
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${TARBALL_NAME}"
+          aws s3 rm "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" || true
+          rm -rf /tmp/slurm-publish
 
   # ── Summary ──────────────────────────────────────────────────────────
   summary:
