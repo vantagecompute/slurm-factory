@@ -1310,7 +1310,7 @@ def create_slurm_package(
         # Check if we need to keep the container for publishing
         needs_publish = bool(
             gpg_private_key and gpg_passphrase and signing_key
-            and (publish == "slurm" or publish == "deps")
+            and publish in ("slurm", "spack", "deps")
         )
 
         # Run the Spack build inside a container with mounted volumes
@@ -1329,7 +1329,7 @@ def create_slurm_package(
         tarball_build_output_dir = settings.builds_dir / toolchain / slurm_version
 
         # If publish is enabled, push to buildcache
-        if (gpg_private_key and gpg_passphrase and signing_key) and (publish == "slurm" or publish == "deps"):
+        if (gpg_private_key and gpg_passphrase and signing_key) and publish in ("slurm", "spack", "deps"):
             console.print(f"[bold cyan]Publishing to buildcache ({publish})...[/bold cyan]")
 
             # Commit the container to an image so we can use it with _push_slurm_to_buildcache
@@ -1354,13 +1354,13 @@ def create_slurm_package(
                     image_tag=temp_image_tag,
                     slurm_version=slurm_version,
                     toolchain=toolchain,
-                    publish_mode=publish,
+                    publish_mode="slurm" if publish == "spack" else publish,
                     signing_key=signing_key,
                     gpg_private_key=gpg_private_key,
                     gpg_passphrase=gpg_passphrase,
                 )
 
-                # Sign and upload the tarball if publishing slurm
+                # Sign and upload the tarball if publishing slurm (skip for spack-only mode)
                 if publish == "slurm":
                     console.print("[bold cyan]Signing and uploading tarball...[/bold cyan]")
                     tarball_name = f"slurm-{slurm_version}-{toolchain}-software.tar.gz"

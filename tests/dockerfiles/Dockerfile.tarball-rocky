@@ -1,8 +1,9 @@
 ARG SLURM_VERSION=25.11
 ARG TOOLCHAIN=rockylinux10
 ARG BASE_IMAGE=rockylinux/rockylinux:10
+ARG TARBALL_SOURCE=remote
 
-FROM ${BASE_IMAGE}
+FROM ${BASE_IMAGE} AS base
 
 # Re-declare ARGs after FROM to make them available in subsequent instructions
 ARG SLURM_VERSION
@@ -14,6 +15,9 @@ RUN dnf -y install epel-release && \
     dnf -y install --allowerasing curl gnupg2 Lmod lua-posix gcc gcc-c++ && \
     dnf clean all && rm -rf /var/cache/dnf
 
+FROM base AS remote-tarball
+ARG SLURM_VERSION
+ARG TOOLCHAIN
 RUN TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
     mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
     curl -fsSLO "${TARBALL_URL}.asc" && \
@@ -25,6 +29,18 @@ RUN TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOO
     mkdir -p /opt/slurm-factory && \
     tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
+
+FROM base AS local-tarball
+ARG SLURM_VERSION
+ARG TOOLCHAIN
+COPY tarball/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz /tmp/
+RUN mkdir -p /opt/slurm-factory && \
+    tar -xzf /tmp/slurm-*.tar.gz -C /opt/slurm-factory && \
+    rm -f /tmp/slurm-*.tar.gz
+
+ARG TARBALL_SOURCE
+# hadolint ignore=DL3006
+FROM ${TARBALL_SOURCE}-tarball
 
 ENV MODULEPATH=/opt/slurm-factory/assets/modules:/usr/share/modulefiles \
     SLURM_INSTALL_PREFIX=/opt/slurm-factory/view

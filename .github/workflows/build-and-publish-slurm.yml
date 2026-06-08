@@ -45,13 +45,12 @@ env:
 jobs:
   prepare-matrix:
     runs-on: self-hosted
-    timeout-minutes: 3600
+    timeout-minutes: 5
     outputs:
       slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
       toolchain_matrix: ${{ steps.set-matrix.outputs.toolchain_matrix }}
     steps:
       - name: Prepare version matrices
-        timeout-minutes: 360
         id: set-matrix
         run: |
           # Prepare Slurm versions matrix
@@ -68,7 +67,7 @@ jobs:
           fi
           echo "slurm_matrix=${SLURM_VERSIONS}" >> $GITHUB_OUTPUT
           echo "Building Slurm versions: ${SLURM_VERSIONS}"
-          
+
           # Prepare compiler versions matrix
           if [ "${{ inputs.toolchains }}" = "all" ]; then
             TOOLCHAINS='["resolute", "noble", "jammy", "rockylinux10", "rockylinux9", "rockylinux8"]'
@@ -84,6 +83,9 @@ jobs:
           echo "toolchain_matrix=${TOOLCHAINS}" >> $GITHUB_OUTPUT
           echo "Building with toolchains: ${TOOLCHAINS}"
 
+  # ── Job 1: Build ─────────────────────────────────────────────────────
+  # Compiles Slurm via Spack, pushes spack binary packages to buildcache,
+  # and uploads the redistributable tarball as a GitHub Actions artifact.
   build-slurm:
     needs: prepare-matrix
     runs-on: self-hosted
@@ -92,7 +94,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -101,39 +103,29 @@ jobs:
 
     steps:
       - name: Checkout
-        timeout-minutes: 360
         uses: actions/checkout@v5
 
       - name: Install uv
-        timeout-minutes: 360
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: "Set up Python"
-        timeout-minutes: 360
+      - name: Set up Python
         run: uv python install 3.12
 
       - name: Clean previous builds
-        timeout-minutes: 360
         run: |
-          # Clean up any previous builds for this version/compiler combo
           docker images | grep "slurm-factory:${{ matrix.slurm_version }}-gcc${{ matrix.toolchain }}" | awk '{print $3}' | xargs -r docker rmi -f || true
-          
-          # Clean Spack cache directories to prevent state leakage between runs
-          # This ensures the buildcache test truly validates buildcache installation
           rm -rf "$HOME/.spack"
 
       - name: Configure AWS credentials
-        timeout-minutes: 360
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
-          role-duration-seconds: 14400  # 4 hours for long-running builds
+          role-duration-seconds: 14400
 
       - name: Validate GPG secrets
-        timeout-minutes: 360
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
@@ -149,14 +141,14 @@ jobs:
           echo "✓ GPG secrets are configured"
           echo "  GPG_KEY_ID: $GPG_KEY_ID"
 
-      - name: Build Slurm dependencies and publish to buildcache
+      - name: Build Slurm and push spack buildcache
         timeout-minutes: 360
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          echo "🔨 Building Slurm ${{ matrix.slurm_version }} dependencies with GCC ${{ matrix.toolchain }}..."
+          echo "🔨 Building Slurm ${{ matrix.slurm_version }} with toolchain ${{ matrix.toolchain }}..."
           if [ -z "$GPG_KEY_ID" ]; then
             echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
             exit 1
@@ -170,8 +162,7 @@ jobs:
             exit 1
           fi
           echo "Using GPG signing key: $GPG_KEY_ID"
-          
-          # Determine buildcache option based on inputs
+
           BUILDCACHE_OPT=""
           if [ "${{ inputs.use_slurm_buildcache }}" = "true" ] && [ "${{ inputs.use_deps_buildcache }}" = "true" ]; then
             BUILDCACHE_OPT="--buildcache=all"
@@ -185,61 +176,178 @@ jobs:
           else
             echo "Not using buildcache (building from source)"
           fi
-          
+
+          # --publish=spack: push spack binary packages to buildcache but
+          # skip tarball signing/upload (handled by publish-slurm job after testing)
           uv run slurm-factory build-slurm \
             --slurm-version ${{ matrix.slurm_version }} \
             --toolchain ${{ matrix.toolchain }} \
             --gpu \
             --no-cache \
-            --publish=slurm \
+            --publish=spack \
             --signing-key "$GPG_KEY_ID" \
             --gpg-private-key "$GPG_PRIVATE_KEY" \
             --gpg-passphrase "$GPG_PASSPHRASE" \
             $BUILDCACHE_OPT
 
-          # Cleanup: Stop and remove all containers first, then remove images
+          # Cleanup Docker resources
           docker ps -aq | xargs -r docker stop || true
           docker ps -aq | xargs -r docker rm -f || true
-          for i in `docker image list --format json | jq -r .ID`; do docker rmi $i -f; done
+          for i in $(docker image list --format json | jq -r .ID); do docker rmi "$i" -f; done
           docker buildx prune -f
 
-      - name: Test Slurm Tarball
-        timeout-minutes: 360
+      - name: Locate tarball
+        id: tarball
         run: |
-          echo "🧪 Testing Slurm ${{ matrix.slurm_version }} tarball with GCC ${{ matrix.toolchain }}..."
-          SLURM_VERSION="${{ matrix.slurm_version }}" TOOLCHAIN="${{ matrix.toolchain }}" ./scripts/test-tarball.sh
+          TARBALL_DIR="$HOME/.slurm-factory/builds/${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          TARBALL_PATH="${TARBALL_DIR}/${TARBALL_NAME}"
+          if [ ! -f "$TARBALL_PATH" ]; then
+            echo "Error: tarball not found at $TARBALL_PATH"
+            ls -la "$TARBALL_DIR" || true
+            exit 1
+          fi
+          echo "tarball_path=${TARBALL_PATH}" >> $GITHUB_OUTPUT
+          echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT
+          echo "✓ Tarball found: $(du -h "$TARBALL_PATH" | cut -f1) at $TARBALL_PATH"
 
-      - name: Summary
-        timeout-minutes: 360
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}
+          path: ${{ steps.tarball.outputs.tarball_path }}
+          retention-days: 7
+          compression-level: 0  # tarball is already gzipped
+
+  # ── Job 2: Test ──────────────────────────────────────────────────────
+  # Downloads the tarball artifact and validates it in a Docker container
+  # (module load, sinfo -V). Runs BEFORE publish so a test failure does
+  # not leave a broken tarball in the production buildcache.
+  test-slurm:
+    needs: [prepare-matrix, build-slurm]
+    runs-on: self-hosted
+    timeout-minutes: 60
+
+    strategy:
+      fail-fast: false
+      matrix:
+        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
+        toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Download tarball artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}
+          path: /tmp/slurm-tarball
+
+      - name: Test Slurm tarball
+        run: |
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          TARBALL_PATH="/tmp/slurm-tarball/${TARBALL_NAME}"
+          echo "🧪 Testing Slurm ${{ matrix.slurm_version }} tarball with toolchain ${{ matrix.toolchain }}..."
+          echo "   Tarball: $(du -h "$TARBALL_PATH" | cut -f1)"
+          LOCAL_TARBALL_PATH="${TARBALL_PATH}" \
+            SLURM_VERSION="${{ matrix.slurm_version }}" \
+            TOOLCHAIN="${{ matrix.toolchain }}" \
+            ./scripts/test-tarball.sh
+
+      - name: Cleanup
         if: always()
         run: |
-          echo "## Slurm Dependencies Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Slurm Version:** ${{ matrix.slurm_version }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Toolchain:** ${{ matrix.toolchain }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
-          echo "- S3: \`s3://${{ env.S3_BUCKET }}/${{ matrix.toolchain}}/slurm/${{ matrix.slurm_version }}/\`" >> $GITHUB_STEP_SUMMARY
-          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/${{ matrix.slurm_version }}/" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** This buildcache contains only Slurm dependencies (excluding Slurm itself)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
-          echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "spack mirror add slurm-factory-deps-buildcache ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/deps/" >> $GITHUB_STEP_SUMMARY
-          echo "spack mirror add slurm-factory-slurm-buildcache ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/${{ matrix.slurm_version }}/" >> $GITHUB_STEP_SUMMARY
-          echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
-          echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
-          echo '```' >> $GITHUB_STEP_SUMMARY
+          docker rmi "slurm-tarball-test:${{ matrix.slurm_version }}-${{ matrix.toolchain }}" 2>/dev/null || true
+          rm -rf /tmp/slurm-tarball
 
-  summary:
-    needs: build-slurm
+  # ── Job 3: Publish ───────────────────────────────────────────────────
+  # GPG-signs the tarball and uploads tarball + detached signature to S3.
+  # Only runs after test-slurm succeeds.
+  publish-slurm:
+    needs: [prepare-matrix, test-slurm]
     runs-on: self-hosted
-    timeout-minutes: 3600
+    timeout-minutes: 60
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+
+    strategy:
+      fail-fast: false
+      matrix:
+        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
+        toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
+
+    steps:
+      - name: Download tarball artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}
+          path: /tmp/slurm-publish
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 3600
+
+      - name: Sign and publish tarball to S3
+        env:
+          GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: |
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          TARBALL_PATH="/tmp/slurm-publish/${TARBALL_NAME}"
+          S3_PATH="${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
+
+          echo "📦 Publishing ${TARBALL_NAME}..."
+          echo "   Size: $(du -h "$TARBALL_PATH" | cut -f1)"
+          echo "   Destination: s3://${{ env.S3_BUCKET }}/${S3_PATH}/"
+
+          # Import GPG key
+          echo "$GPG_PRIVATE_KEY" | base64 -d | \
+            gpg --batch --yes --passphrase "$GPG_PASSPHRASE" \
+                --pinentry-mode loopback --import
+
+          # Sign tarball
+          echo "🔐 Signing tarball with GPG key ${GPG_KEY_ID}..."
+          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+            --pinentry-mode loopback \
+            --local-user "$GPG_KEY_ID" \
+            --detach-sign \
+            --armor \
+            --output "${TARBALL_PATH}.asc" \
+            "$TARBALL_PATH"
+          echo "✓ Tarball signed"
+
+          # Upload tarball and signature to S3
+          echo "📤 Uploading tarball to S3..."
+          aws s3 cp "$TARBALL_PATH" \
+            "s3://${{ env.S3_BUCKET }}/${S3_PATH}/${TARBALL_NAME}"
+          echo "✓ Tarball uploaded"
+
+          echo "📤 Uploading signature to S3..."
+          aws s3 cp "${TARBALL_PATH}.asc" \
+            "s3://${{ env.S3_BUCKET }}/${S3_PATH}/${TARBALL_NAME}.asc"
+          echo "✓ Signature uploaded"
+
+          echo "✅ Published to s3://${{ env.S3_BUCKET }}/${S3_PATH}/"
+
+      - name: Cleanup
+        if: always()
+        run: rm -rf /tmp/slurm-publish
+
+  # ── Summary ──────────────────────────────────────────────────────────
+  summary:
+    needs: [prepare-matrix, build-slurm, test-slurm, publish-slurm]
+    runs-on: self-hosted
+    timeout-minutes: 5
     if: always()
     steps:
       - name: Build Summary
-        timeout-minutes: 360
         run: |
           echo "## Overall Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -252,3 +360,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
           echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/slurm/" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Pipeline" >> $GITHUB_STEP_SUMMARY
+          echo "1. **Build** — Compiled Slurm + pushed spack buildcache" >> $GITHUB_STEP_SUMMARY
+          echo "2. **Test** — Validated tarball (module load + sinfo)" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Publish** — GPG-signed + uploaded tarball to S3" >> $GITHUB_STEP_SUMMARY

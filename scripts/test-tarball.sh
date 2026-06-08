@@ -20,6 +20,7 @@ set -e
 SLURM_VERSION="${SLURM_VERSION:-25.11}"
 TOOLCHAIN="${TOOLCHAIN:-resolute}"
 BASE_URL="${BASE_URL:-https://slurm-factory-spack-binary-cache.vantagecompute.ai}"
+LOCAL_TARBALL_PATH="${LOCAL_TARBALL_PATH:-}"
 CLEANUP="${CLEANUP:-false}"
 VERBOSE="${VERBOSE:-false}"
 QUIET="${QUIET:-false}"
@@ -40,6 +41,7 @@ OPTIONS:
     -s, --slurm-version VERSION Set Slurm version (default: ${SLURM_VERSION})
     -t, --toolchain TOOLCHAIN   Set toolchain (default: ${TOOLCHAIN})
     -b, --base-url URL          Set base URL for tarball downloads (default: ${BASE_URL})
+    -l, --local-tarball PATH    Use a local tarball instead of downloading from remote
     -c, --cleanup               Remove Docker images after test completion
     -v, --verbose               Enable verbose output
     -q, --quiet                 Suppress non-error output
@@ -48,6 +50,7 @@ OPTIONS:
 ENVIRONMENT VARIABLES:
     SLURM_VERSION    Slurm version to test (can be overridden by --slurm-version)
     TOOLCHAIN        Toolchain to use (can be overridden by --toolchain)
+    LOCAL_TARBALL_PATH  Path to local tarball (can be overridden by --local-tarball)
     BASE_URL         Base URL for tarball downloads (can be overridden by --base-url)
     CLEANUP          Set to 'true' to enable cleanup (can be overridden by --cleanup)
     VERBOSE          Set to 'true' to enable verbose output (can be overridden by --verbose)
@@ -144,6 +147,10 @@ while [[ $# -gt 0 ]]; do
             BASE_URL="$2"
             shift 2
             ;;
+        -l|--local-tarball)
+            LOCAL_TARBALL_PATH="$2"
+            shift 2
+            ;;
         -c|--cleanup)
             CLEANUP="true"
             shift
@@ -216,7 +223,11 @@ log_info "Slurm Tarball Validation Test"
 log_info "========================================="
 log_info "Slurm Version: ${SLURM_VERSION}"
 log_info "Toolchain: ${TOOLCHAIN}"
-log_info "Base URL: ${BASE_URL}"
+if [ -n "${LOCAL_TARBALL_PATH}" ]; then
+    log_info "Source: local (${LOCAL_TARBALL_PATH})"
+else
+    log_info "Source: remote (${BASE_URL})"
+fi
 log_info "Cleanup: ${CLEANUP}"
 log_info "Verbose: ${VERBOSE}"
 log_info "Quiet: ${QUIET}"
@@ -248,13 +259,30 @@ log_verbose "Using base image: ${BASE_IMAGE}"
 log_info ""
 log_info "==> Building test Docker image..."
 
+if [ -n "${LOCAL_TARBALL_PATH}" ]; then
+    # Local tarball mode: create isolated build context with tarball
+    CONTEXT_DIR=$(mktemp -d)
+    LOCAL_CLEANUP_CONTEXT_DIR="${CONTEXT_DIR}"
+    mkdir -p "${CONTEXT_DIR}/tarball"
+    cp "${LOCAL_TARBALL_PATH}" "${CONTEXT_DIR}/tarball/"
+    cp "tests/dockerfiles/Dockerfile.tarball-${DOCKER_IMAGE_BASE}" "${CONTEXT_DIR}/"
+    TARBALL_SOURCE="local"
+    DOCKERFILE_PATH="${CONTEXT_DIR}/Dockerfile.tarball-${DOCKER_IMAGE_BASE}"
+    BUILD_CONTEXT="${CONTEXT_DIR}"
+else
+    TARBALL_SOURCE="remote"
+    DOCKERFILE_PATH="tests/dockerfiles/Dockerfile.tarball-${DOCKER_IMAGE_BASE}"
+    BUILD_CONTEXT="."
+fi
+
 BUILD_ARGS=(
     --build-arg "SLURM_VERSION=${SLURM_VERSION}"
     --build-arg "TOOLCHAIN=${TOOLCHAIN}"
     --build-arg "BASE_IMAGE=${BASE_IMAGE}"
-    -f "tests/dockerfiles/Dockerfile.tarball-${DOCKER_IMAGE_BASE}"
+    --build-arg "TARBALL_SOURCE=${TARBALL_SOURCE}"
+    -f "${DOCKERFILE_PATH}"
     -t "slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}"
-    .
+    "${BUILD_CONTEXT}"
 )
 
 log_verbose "Docker build command: docker build ${BUILD_ARGS[*]}"
@@ -266,6 +294,11 @@ if [[ "${VERBOSE}" == "true" ]]; then
 else
     timeout "${TIMEOUT}" docker build "${BUILD_ARGS[@]}" > /dev/null
     BUILD_EXIT_CODE=$?
+fi
+
+# Clean up local build context if created
+if [ -n "${LOCAL_CLEANUP_CONTEXT_DIR:-}" ]; then
+    rm -rf "${LOCAL_CLEANUP_CONTEXT_DIR}"
 fi
 
 if [[ $BUILD_EXIT_CODE -eq 124 ]]; then
