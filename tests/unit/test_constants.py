@@ -39,13 +39,14 @@ class TestSlurmVersions:
 
     def test_slurm_versions_available(self):
         """Test that all expected Slurm versions are available."""
-        expected_versions = ["25.11", "24.11", "23.11"]
+        expected_versions = ["26.05", "25.11", "24.11", "23.11"]
         for version in expected_versions:
             assert version in SLURM_VERSIONS
 
     def test_slurm_versions_mapping(self):
         """Test that version mappings are correct."""
         # Test known mappings (updated for actual format)
+        assert SLURM_VERSIONS["26.05"] == "26-05-0-1"
         assert SLURM_VERSIONS["25.11"] == "25-11-2-1"
         assert SLURM_VERSIONS["24.11"] == "24-11-6-1"
         assert SLURM_VERSIONS["23.11"] == "23-11-11-1"

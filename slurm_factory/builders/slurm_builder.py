@@ -32,6 +32,7 @@ from slurm_factory.constants import (
     CONTAINER_SPACK_TEMPLATES_DIR,
     DOCKER_COMMIT_TIMEOUT,
     S3_BUILDCACHE_BUCKET,
+    SLURM_VERSIONS,
     SPACK_SETUP_SCRIPT,
 )
 from slurm_factory.exceptions import SlurmFactoryError, SlurmFactoryStreamExecError
@@ -156,7 +157,7 @@ def get_modulerc_creation_script(module_dir: str, modulerc_path: str) -> str:
     )
 
 
-def get_slurm_build_script(toolchain: str) -> str:
+def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
     """
     Generate script to build Slurm with Spack using the OS-provided system compiler.
 
@@ -173,6 +174,7 @@ def get_slurm_build_script(toolchain: str) -> str:
     """
     # Get GCC version for this toolchain
     _, gcc_version, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
+    slurm_package_version = SLURM_VERSIONS[slurm_version]
 
     return textwrap.dedent(f"""\
         mkdir -p /opt/spack-stage/tmp
@@ -197,6 +199,11 @@ def get_slurm_build_script(toolchain: str) -> str:
             echo 'Will continue but may not be able to use binary packages'
         }}
         echo '==> Checking custom Spack repositories...'
+        spack repo update slurm_factory || {{
+            echo 'ERROR: Failed to update slurm_factory Spack repository'
+            spack repo list
+            exit 1
+        }}
         spack repo list || true
         spack env status
         echo '==> Verifying slurm_factory namespace is available...'
@@ -206,6 +213,13 @@ def get_slurm_build_script(toolchain: str) -> str:
             spack repo list
             exit 1
         }}
+        echo '==> Verifying slurm_factory.slurm@{slurm_package_version} is available...'
+        if ! spack versions -s slurm_factory.slurm | awk '{{print $1}}' | grep -Fxq '{slurm_package_version}'; then
+            echo 'ERROR: slurm_factory.slurm@{slurm_package_version} not found in custom Spack repo'
+            echo 'Available safe versions:'
+            spack versions -s slurm_factory.slurm || true
+            exit 1
+        fi
         echo '==> Detecting system compilers...'
         spack compiler find --scope site
         echo '==> Available compilers:'
@@ -1019,7 +1033,7 @@ def _run_spack_build_in_container(
 
     # Generate build scripts
     module_template_content = get_module_template_content()
-    slurm_build_script = get_slurm_build_script(toolchain)
+    slurm_build_script = get_slurm_build_script(toolchain, slurm_version)
     modulerc_script = get_modulerc_creation_script(
         module_dir=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm",
         modulerc_path=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm/.modulerc.lua",
