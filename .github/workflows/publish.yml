@@ -40,14 +40,12 @@ jobs:
       with:
         fetch-depth: 0  # Fetch full history for proper version detection
     
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version-file: ".python-version"
-
     - name: Install uv
       uses: astral-sh/setup-uv@v7
-    
+
+    - name: Set up Python
+      run: uv python install 3.12
+
     - name: Install git-cliff
       run: |
         curl -L https://github.com/orhun/git-cliff/releases/download/v2.10.0/git-cliff-2.10.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
@@ -83,15 +81,13 @@ jobs:
       with:
         fetch-depth: 0  # Fetch full history for proper version detection
 
-    - name: Set up Python
-      uses: actions/setup-python@v6
-      with:
-        python-version-file: ".python-version"
-
     - name: Install uv
       uses: astral-sh/setup-uv@v7
       with:
         enable-cache: true
+
+    - name: Set up Python
+      run: uv python install 3.12
    
     - name: Download build artifacts
       uses: actions/download-artifact@v6

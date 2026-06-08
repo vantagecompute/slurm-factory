@@ -166,7 +166,7 @@ Configures environment for GitHub Copilot coding agent.
 - Manual (`workflow_dispatch`)
 
 **Setup:**
-- Python 3.14
+- Python 3.12
 - uv package manager
 - just command runner
 

@@ -18,7 +18,8 @@ from enum import Enum
 
 # Mapping of user-facing version strings to Spack package versions
 SLURM_VERSIONS = {
-    "25.11": "25-11-2-1",
+    "26.05": "26-05-0-1",
+    "25.11": "25-11-6-1",
     "24.11": "24-11-6-1",
     "23.11": "23-11-11-1",
 }
@@ -198,7 +199,13 @@ apt-get install -y \
     diffutils \
     gnu-coreutils \
     libxml2-16 \
-    libnss-sss
+    libnss-sss \
+    software-properties-common
+
+# Install Python 3.12 for Spack compatibility (Spack v1.0.0 uses ast.Str, removed in Python 3.14)
+add-apt-repository -y ppa:deadsnakes/ppa
+apt-get update
+apt-get install -y python3.12 python3.12-venv
 
 # Replace uutils dd with GNU dd (required for CUDA installer compatibility)
 rm -f /usr/bin/dd && ln -s /usr/bin/gnudd /usr/bin/dd
@@ -264,6 +271,7 @@ COMPILER_TOOLCHAINS = {
 class SlurmVersion(str, Enum):
     """Available Slurm versions for building."""
 
+    v26_05 = "26.05"
     v25_11 = "25.11"
     v24_11 = "24.11"
     v23_11 = "23.11"

@@ -56,7 +56,7 @@ jobs:
         run: |
           # Prepare Slurm versions matrix
           if [ "${{ inputs.slurm_versions }}" = "all" ]; then
-            SLURM_VERSIONS='["25.11", "24.11", "23.11"]'
+            SLURM_VERSIONS='["26.05", "25.11", "24.11", "23.11"]'
           else
             IFS=',' read -ra VERS <<< "${{ inputs.slurm_versions }}"
             SLURM_VERSIONS="["
@@ -104,17 +104,15 @@ jobs:
         timeout-minutes: 360
         uses: actions/checkout@v5
 
-      - name: "Set up Python"
-        timeout-minutes: 360
-        uses: actions/setup-python@v6
-        with:
-          python-version-file: ".python-version"
-
       - name: Install uv
         timeout-minutes: 360
         run: |
           curl -LsSf https://astral.sh/uv/install.sh | sh
           echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: "Set up Python"
+        timeout-minutes: 360
+        run: uv python install 3.12
 
       - name: Clean previous builds
         timeout-minutes: 360
