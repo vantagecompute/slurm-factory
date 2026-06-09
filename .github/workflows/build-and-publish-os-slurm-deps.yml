@@ -29,7 +29,7 @@ env:
 
 jobs:
   prepare-matrix:
-    runs-on: self-hosted
+    runs-on: ubuntu-24.04
     timeout-minutes: 3600
     outputs:
       toolchain_matrix: ${{ steps.set-matrix.outputs.toolchain_matrix }}
@@ -55,7 +55,7 @@ jobs:
 
   build-and-publish-slurm-dependencies:
     needs: prepare-matrix
-    runs-on: self-hosted
+    runs-on: ubuntu-24.04
     timeout-minutes: 3600
     environment: release
     permissions:
@@ -178,7 +178,7 @@ jobs:
 
   summary:
     needs: build-and-publish-slurm-dependencies
-    runs-on: self-hosted
+    runs-on: ubuntu-24.04
     timeout-minutes: 3600
     if: always()
     steps:

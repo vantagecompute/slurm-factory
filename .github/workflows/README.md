@@ -195,8 +195,8 @@ Configures environment for GitHub Copilot coding agent.
 
 ## Build Infrastructure
 
-- **Runners:** `self-hosted` (for buildcache), `ubuntu-latest`/`ubuntu-24.04` (for CI)
-- **Timeouts:** 3600 minutes (60 hours) for builds, 360 minutes per step
+- **Runners:** `ubuntu-24.04`/`ubuntu-latest` (GitHub-hosted)
+- **Timeouts:** Buildcache workflows use explicit 2+ hour job and step timeouts (up to 3600 minutes for full build jobs)
 - **AWS Region:** `us-east-1`
 - **S3 Bucket:** `slurm-factory-spack-buildcache-4b670`
 - **CloudFront:** `https://slurm-factory-spack-binary-cache.vantagecompute.ai`
