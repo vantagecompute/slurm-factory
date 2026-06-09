@@ -17,14 +17,14 @@ Stick with the [buildcache workflow](./installing-slurm-from-buildcache.md) when
 Tarballs are published under the CloudFront distribution with the following URL pattern:
 
 ```
-https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/{slurm_version}/
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/{slurm_version}/{architecture}/
 ```
 
 Each directory contains:
 
 ```
-slurm-{slurm_version}-{toolchain}-software.tar.gz      # Tarball
-slurm-{slurm_version}-{toolchain}-software.tar.gz.asc  # Detached GPG signature
+slurm-{slurm_version}-{toolchain}-{architecture}-software.tar.gz      # Tarball
+slurm-{slurm_version}-{toolchain}-{architecture}-software.tar.gz.asc  # Detached GPG signature
 ```
 
 The tarball extracts to a self-contained layout:
@@ -35,6 +35,23 @@ assets/modules/                       # Lmod modulefiles
 ```
 
 Pick a tarball that matches your host distribution (see [Build Artifacts](./build-artifacts.md) for the compatibility matrix).
+
+### Architecture Compatibility Map
+
+The tarball publishing workflows support both `amd64` and `arm64`.
+
+| Toolchain | amd64 | arm64 | Guidance |
+|-----------|-------|-------|----------|
+| resolute | Supported | Supported | Recommended on both architectures |
+| noble | Supported | Supported | Recommended on both architectures |
+| jammy | Supported | Supported | Recommended on both architectures |
+| rockylinux10 | Supported | Supported | `arm64` is best-effort; validate first run |
+| rockylinux9 | Supported | Supported | `arm64` is best-effort; validate first run |
+| rockylinux8 | Supported | Supported | `arm64` is best-effort; validate first run |
+
+Notes:
+- `arm64` tarballs are built on the GitHub-hosted `ubuntu-24.04-arm` runner.
+- Success for a specific combo can still depend on upstream image/package availability.
 
 ## Prerequisites
 
@@ -49,19 +66,20 @@ Pick a tarball that matches your host distribution (see [Build Artifacts](./buil
 export CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 export SLURM_VERSION=25.11
 export TOOLCHAIN=noble  # or: jammy, resolute, rockylinux10, rockylinux9, rockylinux8
+export ARCHITECTURE=amd64  # or: arm64
 
 # Fetch tarball and signature
 mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball
-curl -O "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz"
-curl -O "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc"
+curl -O "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz"
+curl -O "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc"
 ```
 
 ### Verify the Tarball
 
 ```bash
 gpg --keyserver keyserver.ubuntu.com --auto-key-retrieve \
-        --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
-                         slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
+    --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz
 ```
 
 Verification succeeds when the output includes `gpg: Good signature from "slurm-factory"`.
@@ -70,7 +88,7 @@ Verification succeeds when the output includes `gpg: Good signature from "slurm-
 
 ```bash
 sudo mkdir -p /opt/slurm-factory
-sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory
+sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz -C /opt/slurm-factory
 sudo chown -R root:root /opt/slurm-factory
 ```
 

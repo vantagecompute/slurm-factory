@@ -22,6 +22,11 @@ on:
         required: true
         default: 'all'
         type: string
+      architectures:
+        description: 'CPU architectures to build (comma-separated, e.g., "amd64,arm64" or "all")'
+        required: true
+        default: 'all'
+        type: string
 
 env:
   S3_BUCKET: slurm-factory-spack-buildcache-4b670
@@ -33,6 +38,7 @@ jobs:
     timeout-minutes: 3600
     outputs:
       toolchain_matrix: ${{ steps.set-matrix.outputs.toolchain_matrix }}
+      architecture_matrix: ${{ steps.set-matrix.outputs.architecture_matrix }}
     steps:
       - name: Prepare version matrices
         timeout-minutes: 360
@@ -53,9 +59,28 @@ jobs:
           echo "toolchain_matrix=${TOOLCHAINS}" >> $GITHUB_OUTPUT
           echo "Building with toolchains: ${TOOLCHAINS}"
 
+          # Prepare architecture matrix
+          if [ "${{ inputs.architectures }}" = "all" ]; then
+            ARCHITECTURES='["amd64", "arm64"]'
+          else
+            IFS=',' read -ra ARCHS <<< "${{ inputs.architectures }}"
+            ARCHITECTURES="["
+            for a in "${ARCHS[@]}"; do
+              a=$(echo "$a" | xargs)
+              if [ "$a" != "amd64" ] && [ "$a" != "arm64" ]; then
+                echo "Error: unsupported architecture '$a'. Supported values: amd64, arm64"
+                exit 1
+              fi
+              ARCHITECTURES="${ARCHITECTURES}\"${a}\","
+            done
+            ARCHITECTURES="${ARCHITECTURES%,}]"
+          fi
+          echo "architecture_matrix=${ARCHITECTURES}" >> $GITHUB_OUTPUT
+          echo "Building for architectures: ${ARCHITECTURES}"
+
   build-and-publish-slurm-dependencies:
     needs: prepare-matrix
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 3600
     environment: release
     permissions:
@@ -66,6 +91,7 @@ jobs:
       fail-fast: false
       matrix:
         toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
+        architecture: ${{ fromJson(needs.prepare-matrix.outputs.architecture_matrix) }}
 
     steps:
       - name: Checkout
@@ -124,7 +150,7 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          echo "🔨 Building Slurm 25.11 dependencies with ${{ matrix.toolchain }}..."
+          echo "🔨 Building Slurm 25.11 dependencies with ${{ matrix.toolchain }} on architecture ${{ matrix.architecture }}..."
           if [ -z "$GPG_KEY_ID" ]; then
             echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
             exit 1
@@ -162,6 +188,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Slurm Version:** 25.11" >> $GITHUB_STEP_SUMMARY
           echo "**Toolchain:** ${{ matrix.toolchain }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Architecture:** ${{ matrix.architecture }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
           echo "- S3: \`s3://${{ env.S3_BUCKET }}/${{ matrix.toolchain }}/slurm/deps/\`" >> $GITHUB_STEP_SUMMARY
@@ -191,6 +218,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Slurm Versions:** 25.11" >> $GITHUB_STEP_SUMMARY
           echo "**Toolchain Versions:** ${{ inputs.toolchain_versions }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Architectures:** ${{ inputs.architectures }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/${{ inputs.toolchain_versions }}/slurm/deps/\`" >> $GITHUB_STEP_SUMMARY
           echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/${{ inputs.toolchain_versions }}/slurm/deps/" >> $GITHUB_STEP_SUMMARY

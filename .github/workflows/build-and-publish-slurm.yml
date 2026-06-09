@@ -27,6 +27,11 @@ on:
         required: true
         default: 'all'
         type: string
+      architectures:
+        description: 'CPU architectures to build (comma-separated, e.g., "amd64,arm64" or "all")'
+        required: true
+        default: 'all'
+        type: string
       use_slurm_buildcache:
         description: 'Use Slurm buildcache (download pre-built Slurm packages)'
         required: false
@@ -49,6 +54,7 @@ jobs:
     outputs:
       slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
       toolchain_matrix: ${{ steps.set-matrix.outputs.toolchain_matrix }}
+      architecture_matrix: ${{ steps.set-matrix.outputs.architecture_matrix }}
     steps:
       - name: Prepare version matrices
         timeout-minutes: 120
@@ -84,12 +90,31 @@ jobs:
           echo "toolchain_matrix=${TOOLCHAINS}" >> $GITHUB_OUTPUT
           echo "Building with toolchains: ${TOOLCHAINS}"
 
+          # Prepare architecture matrix
+          if [ "${{ inputs.architectures }}" = "all" ]; then
+            ARCHITECTURES='["amd64", "arm64"]'
+          else
+            IFS=',' read -ra ARCHS <<< "${{ inputs.architectures }}"
+            ARCHITECTURES="["
+            for a in "${ARCHS[@]}"; do
+              a=$(echo "$a" | xargs)
+              if [ "$a" != "amd64" ] && [ "$a" != "arm64" ]; then
+                echo "Error: unsupported architecture '$a'. Supported values: amd64, arm64"
+                exit 1
+              fi
+              ARCHITECTURES="${ARCHITECTURES}\"${a}\","
+            done
+            ARCHITECTURES="${ARCHITECTURES%,}]"
+          fi
+          echo "architecture_matrix=${ARCHITECTURES}" >> $GITHUB_OUTPUT
+          echo "Building for architectures: ${ARCHITECTURES}"
+
   # ── Job 1: Build ─────────────────────────────────────────────────────
   # Compiles Slurm via Spack, pushes spack binary packages to buildcache,
   # and stages the redistributable tarball in S3 for downstream jobs.
   build-slurm:
     needs: prepare-matrix
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 3600
     environment: release
     permissions:
@@ -101,6 +126,7 @@ jobs:
       matrix:
         slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
         toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
+        architecture: ${{ fromJson(needs.prepare-matrix.outputs.architecture_matrix) }}
 
     steps:
       - name: Checkout
@@ -155,7 +181,7 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          echo "🔨 Building Slurm ${{ matrix.slurm_version }} with toolchain ${{ matrix.toolchain }}..."
+          echo "🔨 Building Slurm ${{ matrix.slurm_version }} with toolchain ${{ matrix.toolchain }} on architecture ${{ matrix.architecture }}..."
           if [ -z "$GPG_KEY_ID" ]; then
             echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
             exit 1
@@ -208,21 +234,24 @@ jobs:
         id: tarball
         run: |
           TARBALL_DIR="$HOME/.slurm-factory/builds/${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
-          TARBALL_PATH="${TARBALL_DIR}/${TARBALL_NAME}"
+          BASE_TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          ARCH_TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
+          TARBALL_PATH="${TARBALL_DIR}/${BASE_TARBALL_NAME}"
+          ARCH_TARBALL_PATH="${TARBALL_DIR}/${ARCH_TARBALL_NAME}"
           if [ ! -f "$TARBALL_PATH" ]; then
             echo "Error: tarball not found at $TARBALL_PATH"
             ls -la "$TARBALL_DIR" || true
             exit 1
           fi
-          echo "tarball_path=${TARBALL_PATH}" >> $GITHUB_OUTPUT
-          echo "tarball_name=${TARBALL_NAME}" >> $GITHUB_OUTPUT
+          cp "$TARBALL_PATH" "$ARCH_TARBALL_PATH"
+          echo "tarball_path=${ARCH_TARBALL_PATH}" >> $GITHUB_OUTPUT
+          echo "tarball_name=${ARCH_TARBALL_NAME}" >> $GITHUB_OUTPUT
           echo "✓ Tarball found: $(du -h "$TARBALL_PATH" | cut -f1) at $TARBALL_PATH"
 
       - name: Stage tarball for downstream jobs
         timeout-minutes: 120
         run: |
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${{ steps.tarball.outputs.tarball_name }}"
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${{ steps.tarball.outputs.tarball_name }}"
           echo "📤 Staging tarball at s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
           aws s3 cp \
             "${{ steps.tarball.outputs.tarball_path }}" \
@@ -235,7 +264,7 @@ jobs:
   # not leave a broken tarball in the production buildcache.
   test-slurm:
     needs: [prepare-matrix, build-slurm]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 180
     environment: release
     permissions:
@@ -247,6 +276,7 @@ jobs:
       matrix:
         slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
         toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
+        architecture: ${{ fromJson(needs.prepare-matrix.outputs.architecture_matrix) }}
 
     steps:
       - name: Checkout
@@ -265,8 +295,8 @@ jobs:
         timeout-minutes: 120
         run: |
           mkdir -p /tmp/slurm-tarball
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${TARBALL_NAME}"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${TARBALL_NAME}"
           echo "📥 Downloading staged tarball from s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
           aws s3 cp \
             "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" \
@@ -275,9 +305,9 @@ jobs:
       - name: Test Slurm tarball
         timeout-minutes: 120
         run: |
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
           TARBALL_PATH="/tmp/slurm-tarball/${TARBALL_NAME}"
-          echo "🧪 Testing Slurm ${{ matrix.slurm_version }} tarball with toolchain ${{ matrix.toolchain }}..."
+          echo "🧪 Testing Slurm ${{ matrix.slurm_version }} tarball with toolchain ${{ matrix.toolchain }} on architecture ${{ matrix.architecture }}..."
           echo "   Tarball: $(du -h "$TARBALL_PATH" | cut -f1)"
           LOCAL_TARBALL_PATH="${TARBALL_PATH}" \
             SLURM_VERSION="${{ matrix.slurm_version }}" \
@@ -296,7 +326,7 @@ jobs:
   # Only runs after test-slurm succeeds.
   publish-slurm:
     needs: [prepare-matrix, test-slurm]
-    runs-on: ubuntu-24.04
+    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 180
     environment: release
     permissions:
@@ -308,6 +338,7 @@ jobs:
       matrix:
         slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
         toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
+        architecture: ${{ fromJson(needs.prepare-matrix.outputs.architecture_matrix) }}
 
     steps:
       - name: Configure AWS credentials
@@ -322,8 +353,8 @@ jobs:
         timeout-minutes: 120
         run: |
           mkdir -p /tmp/slurm-publish
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${TARBALL_NAME}"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${TARBALL_NAME}"
           echo "📥 Downloading staged tarball from s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
           aws s3 cp \
             "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" \
@@ -336,9 +367,9 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
           TARBALL_PATH="/tmp/slurm-publish/${TARBALL_NAME}"
-          S3_PATH="${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
+          S3_PATH="${{ matrix.toolchain }}/${{ matrix.slurm_version }}/${{ matrix.architecture }}"
 
           echo "📦 Publishing ${TARBALL_NAME}..."
           echo "   Size: $(du -h "$TARBALL_PATH" | cut -f1)"
@@ -377,8 +408,8 @@ jobs:
         timeout-minutes: 120
         if: always()
         run: |
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}/${TARBALL_NAME}"
+          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
+          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${TARBALL_NAME}"
           aws s3 rm "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" || true
           rm -rf /tmp/slurm-publish
 
@@ -398,6 +429,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Slurm Versions:** ${{ inputs.slurm_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "**Toolchains:** ${{ inputs.toolchains }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Architectures:** ${{ inputs.architectures }}" >> $GITHUB_STEP_SUMMARY
           echo "**Use Slurm Buildcache:** ${{ inputs.use_slurm_buildcache }}" >> $GITHUB_STEP_SUMMARY
           echo "**Use Deps Buildcache:** ${{ inputs.use_deps_buildcache }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY

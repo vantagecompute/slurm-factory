@@ -47,6 +47,7 @@ Builds and publishes **only Slurm dependencies** (excluding Slurm itself) to S3 
 | Input | Description | Default |
 |-------|-------------|---------|
 | `toolchain_versions` | Toolchains to build (comma-separated or "all") | `all` |
+| `architectures` | CPU architectures to build (comma-separated or "all") | `all` |
 
 **Supported Toolchains:**
 - `resolute` (Ubuntu 25.04)
@@ -88,6 +89,7 @@ Builds and publishes **complete Slurm packages** (Slurm + dependencies + tarball
 |-------|-------------|---------|
 | `slurm_versions` | Slurm versions to build (comma-separated or "all") | `all` |
 | `toolchains` | Toolchains to use (comma-separated or "all") | `all` |
+| `architectures` | CPU architectures to build (comma-separated or "all") | `all` |
 
 **Supported Slurm Versions:**
 - `25.11`, `24.11`, `23.11`
@@ -110,8 +112,8 @@ slurm-factory build-slurm \
 - CloudFront: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/<toolchain>/slurm/<slurm_version>/`
 
 **Tarballs:**
-- Location: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/builds/<slurm_version>/<toolchain>/`
-- Files: `slurm-<version>-<toolchain>-software.tar.gz` + `.asc` signature
+- Location: `https://slurm-factory-spack-binary-cache.vantagecompute.ai/<toolchain>/<slurm_version>/<architecture>/`
+- Files: `slurm-<version>-<toolchain>-<architecture>-software.tar.gz` + `.asc` signature
 
 ---
 
@@ -196,6 +198,7 @@ Configures environment for GitHub Copilot coding agent.
 ## Build Infrastructure
 
 - **Runners:** `ubuntu-24.04`/`ubuntu-latest` (GitHub-hosted)
+- **Architectures:** `amd64` and `arm64` (ARM builds run on `ubuntu-24.04-arm`)
 - **Timeouts:** Buildcache workflows use explicit 2+ hour job and step timeouts (up to 3600 minutes for full build jobs)
 - **AWS Region:** `us-east-1`
 - **S3 Bucket:** `slurm-factory-spack-buildcache-4b670`
@@ -214,6 +217,7 @@ just lint && just typecheck && just unit && just integration
 ```bash
 # Via GitHub UI: Actions → "Build and Publish Slurm Dependencies" → Run workflow
 # Input: toolchain_versions = "noble,rockylinux9"
+# Input: architectures = "amd64,arm64"
 ```
 
 ### Build complete Slurm packages
@@ -221,6 +225,7 @@ just lint && just typecheck && just unit && just integration
 # Via GitHub UI: Actions → "Build and Publish Slurm" → Run workflow
 # Input: slurm_versions = "25.11"
 # Input: toolchains = "noble,jammy"
+# Input: architectures = "amd64,arm64"
 ```
 
 ### Using published buildcaches

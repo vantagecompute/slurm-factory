@@ -39,7 +39,7 @@ Slurm Factory produces two types of artifacts: **relocatable tarballs** for dire
 Each build produces **one tarball** containing:
 
 ```text
-slurm-{version}-{toolchain}-software.tar.gz
+slurm-{version}-{toolchain}-{architecture}-software.tar.gz
 ├── view/                          # Slurm installation (unified prefix)
 │   ├── bin/                       # Slurm binaries (srun, sbatch, squeue, etc.)
 │   ├── sbin/                      # Daemons (slurmd, slurmctld, slurmdbd)
@@ -136,14 +136,14 @@ s3://slurm-factory-spack-buildcache-4b670/{toolchain}/slurm/{slurm_version}/buil
 Tarballs follow this naming pattern:
 
 ```text
-slurm-{slurm_version}-{toolchain}-software.tar.gz
+slurm-{slurm_version}-{toolchain}-{architecture}-software.tar.gz
 ```
 
 **Examples:**
 
-- `slurm-25.11-noble-software.tar.gz` - Slurm 25.11 for Ubuntu 24.04 (Noble)
-- `slurm-24.11-jammy-software.tar.gz` - Slurm 24.11 for Ubuntu 22.04 (Jammy)
-- `slurm-23.11-rockylinux9-software.tar.gz` - Slurm 23.11 for Rocky Linux 9
+- `slurm-25.11-noble-amd64-software.tar.gz` - Slurm 25.11 for Ubuntu 24.04 (Noble), AMD64
+- `slurm-24.11-jammy-arm64-software.tar.gz` - Slurm 24.11 for Ubuntu 22.04 (Jammy), ARM64
+- `slurm-23.11-rockylinux9-amd64-software.tar.gz` - Slurm 23.11 for Rocky Linux 9, AMD64
 
 ## Distribution
 
@@ -152,8 +152,8 @@ slurm-{slurm_version}-{toolchain}-software.tar.gz
 **Tarballs**: Stored in public S3 bucket for direct download
 
 ```text
-s3://vantage-public-assets/slurm-factory/{slurm_version}/{toolchain}/
-└── slurm-{version}-{toolchain}-software.tar.gz
+s3://vantage-public-assets/slurm-factory/{slurm_version}/{toolchain}/{architecture}/
+└── slurm-{version}-{toolchain}-{architecture}-software.tar.gz
 ```
 
 **Buildcache**: Stored in dedicated buildcache bucket organized by OS toolchain
@@ -189,6 +189,23 @@ https://vantage-public-assets.s3.amazonaws.com/slurm-factory/
 
 ## Available Builds
 
+### Architecture Compatibility Map
+
+The build and publish workflows support both `amd64` and `arm64`.
+
+| Toolchain | amd64 | arm64 | Guidance |
+|-----------|-------|-------|----------|
+| resolute | Supported | Supported | Recommended on both architectures |
+| noble | Supported | Supported | Recommended on both architectures |
+| jammy | Supported | Supported | Recommended on both architectures |
+| rockylinux10 | Supported | Supported | `arm64` is best-effort; validate first run |
+| rockylinux9 | Supported | Supported | `arm64` is best-effort; validate first run |
+| rockylinux8 | Supported | Supported | `arm64` is best-effort; validate first run |
+
+Notes:
+- `arm64` builds run on the GitHub-hosted `ubuntu-24.04-arm` runner.
+- Actual build success can depend on upstream container image/package availability for each toolchain.
+
 ### Tarballs
 
 All Slurm × Compiler combinations are pre-built and available:
@@ -197,12 +214,14 @@ All Slurm × Compiler combinations are pre-built and available:
 
 | Toolchain | Target OS | Public URL |
 |-----------|-----------|------------|
-| resolute | Ubuntu 26.04 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/resolute/25.11/slurm-25.11-resolute-software.tar.gz` |
-| noble | Ubuntu 24.04 **(recommended)** | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/slurm-25.11-noble-software.tar.gz` |
-| jammy | Ubuntu 22.04 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/jammy/25.11/slurm-25.11-jammy-software.tar.gz` |
-| rockylinux10 | Rocky Linux 10 / RHEL 10 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux10/25.11/slurm-25.11-rockylinux10-software.tar.gz` |
-| rockylinux9 | Rocky Linux 9 / RHEL 9 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux9/25.11/slurm-25.11-rockylinux9-software.tar.gz` |
-| rockylinux8 | Rocky Linux 8 / RHEL 8 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux8/25.11/slurm-25.11-rockylinux8-software.tar.gz` |
+| resolute | Ubuntu 26.04 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/resolute/25.11/amd64/slurm-25.11-resolute-amd64-software.tar.gz` |
+| noble | Ubuntu 24.04 **(recommended)** | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/amd64/slurm-25.11-noble-amd64-software.tar.gz` |
+| jammy | Ubuntu 22.04 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/jammy/25.11/amd64/slurm-25.11-jammy-amd64-software.tar.gz` |
+| rockylinux10 | Rocky Linux 10 / RHEL 10 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux10/25.11/amd64/slurm-25.11-rockylinux10-amd64-software.tar.gz` |
+| rockylinux9 | Rocky Linux 9 / RHEL 9 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux9/25.11/amd64/slurm-25.11-rockylinux9-amd64-software.tar.gz` |
+| rockylinux8 | Rocky Linux 8 / RHEL 8 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux8/25.11/amd64/slurm-25.11-rockylinux8-amd64-software.tar.gz` |
+
+For `arm64`, use the same path with `arm64` as the architecture segment and filename suffix.
 
 #### Slurm 24.11 (LTS)
 
@@ -236,7 +255,7 @@ See [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) for 
 
 ```bash
 # Download a specific build
-aws s3 cp s3://vantage-public-assets/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz .
+aws s3 cp s3://vantage-public-assets/slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz .
 
 # List all available builds
 aws s3 ls s3://vantage-public-assets/slurm-factory/ --recursive
@@ -249,14 +268,14 @@ aws s3 sync s3://vantage-public-assets/slurm-factory/25.11/ ./slurm-25.11/
 
 ```bash
 # Download via HTTPS
-wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz
+wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz
 ```
 
 #### curl
 
 ```bash
 # Download with curl
-curl -O https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz
+curl -O https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz
 ```
 
 ### Using Buildcache
