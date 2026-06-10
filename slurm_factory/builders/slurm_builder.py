@@ -263,8 +263,8 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
             exit 1
         }}
         echo '==> Verifying slurm_factory.slurm@{slurm_package_version} is available...'
-        if ! spack versions -s slurm_factory.slurm | awk '{{print $1}}' | \\
-            grep -Fxq '{slurm_package_version}'; then
+        AVAILABLE_SLURM_VERSIONS=$(spack versions -s slurm_factory.slurm | awk '{{print $1}}')
+        if ! printf '%s\n' "$AVAILABLE_SLURM_VERSIONS" | grep -Fxq '{slurm_package_version}'; then
             echo 'ERROR: slurm_factory.slurm@{slurm_package_version} not found in custom Spack repo'
             echo 'Available safe versions:'
             spack versions -s slurm_factory.slurm || true

@@ -231,7 +231,7 @@ jobs:
 
       - name: Summarize build diagnostics
         if: always()
-        timeout-minutes: 120
+        timeout-minutes: 5
         shell: bash
         run: |
           CACHE_ROOT="$HOME/.slurm-factory"
