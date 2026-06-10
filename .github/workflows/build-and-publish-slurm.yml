@@ -229,6 +229,57 @@ jobs:
           for i in $(docker image list --format json | jq -r .ID); do docker rmi "$i" -f; done
           docker buildx prune -f
 
+      - name: Summarize build diagnostics
+        if: always()
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          CACHE_ROOT="$HOME/.slurm-factory"
+          STAGE_DIR="$CACHE_ROOT/spack-stage/${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
+          BUILD_DIR="$CACHE_ROOT/builds/${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
+          DEBUG_DIR="$CACHE_ROOT/build-debug/${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
+
+          echo "== ~/.slurm-factory directories =="
+          find "$CACHE_ROOT" -maxdepth 4 -type d | sort || true
+          echo
+          echo "== Stage directory listing (${STAGE_DIR}) =="
+          ls -la "$STAGE_DIR" || true
+          echo
+          echo "== Build output listing (${BUILD_DIR}) =="
+          ls -la "$BUILD_DIR" || true
+          echo
+          echo "== Stable debug bundle listing (${DEBUG_DIR}) =="
+          find "$DEBUG_DIR" -maxdepth 5 -type f | sort || true
+          echo
+          echo "== Discovered Spack log files =="
+          find "$STAGE_DIR" -type f \( \
+            -name 'spack-build-out.txt' -o \
+            -name 'spack-build-env.txt' -o \
+            -name 'config.log' \
+          \) | sort || true
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-diagnostics-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: |
+            /home/runner/.slurm-factory/spack-stage/${{ matrix.toolchain }}/${{ matrix.slurm_version }}/**/spack-build-out.txt
+            /home/runner/.slurm-factory/spack-stage/${{ matrix.toolchain }}/${{ matrix.slurm_version }}/**/spack-build-env.txt
+            /home/runner/.slurm-factory/spack-stage/${{ matrix.toolchain }}/${{ matrix.slurm_version }}/**/config.log
+            /home/runner/.slurm-factory/builds/${{ matrix.toolchain }}/${{ matrix.slurm_version }}/**
+
+      - name: Upload stable debug bundle
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-debug-bundle-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}
+          if-no-files-found: warn
+          retention-days: 14
+          path: /home/runner/.slurm-factory/build-debug/${{ matrix.toolchain }}/${{ matrix.slurm_version }}/**
+
       - name: Locate tarball
         timeout-minutes: 120
         id: tarball
