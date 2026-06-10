@@ -49,6 +49,11 @@ class Settings:
         """Get the ~/.slurm-factory/spack-sourcecache directory."""
         return self.home_cache_dir / "spack-sourcecache"
 
+    @property
+    def build_debug_dir(self) -> Path:
+        """Get the ~/.slurm-factory/build-debug directory."""
+        return self.home_cache_dir / "build-debug"
+
     def ensure_cache_dirs(self) -> None:
         """
         Create all cache directories if they don't exist with proper permissions.
@@ -66,3 +71,4 @@ class Settings:
         self.builds_dir.mkdir(mode=0o777, exist_ok=True)
         self.spack_buildcache_dir.mkdir(mode=0o777, exist_ok=True)
         self.spack_sourcecache_dir.mkdir(mode=0o777, exist_ok=True)
+        self.build_debug_dir.mkdir(mode=0o777, exist_ok=True)

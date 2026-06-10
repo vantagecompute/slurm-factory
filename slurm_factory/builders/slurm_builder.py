@@ -14,6 +14,7 @@
 import base64
 import logging
 import os
+import shutil
 import subprocess
 import sys
 import textwrap
@@ -47,6 +48,53 @@ from slurm_factory.utils import (
 
 logger = logging.getLogger(__name__)
 console = Console()
+
+
+def _copy_debug_bundle_file(source: Path, destination: Path) -> bool:
+    """Copy a debug artifact if it exists."""
+    if not source.exists() or not source.is_file():
+        return False
+
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source, destination)
+    return True
+
+
+def _prepare_build_debug_bundle(
+    settings: Settings,
+    toolchain: str,
+    slurm_version: str,
+    spack_yaml: str,
+    build_script: str,
+) -> Path:
+    """Create a stable debug bundle directory with generated build inputs."""
+    debug_dir = settings.build_debug_dir / toolchain / slurm_version
+    shutil.rmtree(debug_dir, ignore_errors=True)
+    debug_dir.mkdir(parents=True, exist_ok=True)
+    (debug_dir / "spack.yaml").write_text(spack_yaml)
+    (debug_dir / "build-script.sh").write_text(build_script)
+    return debug_dir
+
+
+def _collect_spack_failure_debug_bundle(spack_stage_dir: Path, debug_dir: Path) -> int:
+    """Copy curated Spack failure logs into the stable debug bundle."""
+    copied_files = 0
+    log_names = {"spack-build-out.txt", "spack-build-env.txt", "config.log"}
+
+    if not spack_stage_dir.exists():
+        return copied_files
+
+    for log_path in sorted(spack_stage_dir.rglob("*")):
+        if not log_path.is_file() or log_path.name not in log_names:
+            continue
+
+        if _copy_debug_bundle_file(
+            log_path,
+            debug_dir / "spack-stage" / log_path.relative_to(spack_stage_dir),
+        ):
+            copied_files += 1
+
+    return copied_files
 
 
 def get_module_template_content() -> str:
@@ -167,6 +215,7 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
 
     Args:
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
+        slurm_version: Slurm version being built (e.g., "25.11")
 
     Returns:
         Complete bash script for Slurm build using system compiler
@@ -214,7 +263,8 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
             exit 1
         }}
         echo '==> Verifying slurm_factory.slurm@{slurm_package_version} is available...'
-        if ! spack versions -s slurm_factory.slurm | awk '{{print $1}}' | grep -Fxq '{slurm_package_version}'; then
+        if ! spack versions -s slurm_factory.slurm | awk '{{print $1}}' | \\
+            grep -Fxq '{slurm_package_version}'; then
             echo 'ERROR: slurm_factory.slurm@{slurm_package_version} not found in custom Spack repo'
             echo 'Available safe versions:'
             spack versions -s slurm_factory.slurm || true
@@ -1062,6 +1112,13 @@ def _run_spack_build_in_container(
         modulerc_script, slurm_version, toolchain, gpu_support
     )
     move_assets_script = get_move_slurm_assets_to_container_str()
+    debug_bundle_dir = _prepare_build_debug_bundle(
+        settings=settings,
+        toolchain=toolchain,
+        slurm_version=slurm_version,
+        spack_yaml=spack_yaml,
+        build_script=slurm_build_script,
+    )
 
     try:
         # Write spack.yaml to a temp file for mounting
@@ -1139,10 +1196,14 @@ def _run_spack_build_in_container(
         build_script_file.unlink()
 
         if result.returncode != 0:
+            copied_files = _collect_spack_failure_debug_bundle(spack_stage_dir, debug_bundle_dir)
             console.print("[bold red]Spack build failed![/bold red]")
             console.print(f"[yellow]Container {container_name} has exited with errors[/yellow]")
             console.print(
                 f"[dim]Check logs at: {spack_stage_dir}/root/spack-stage-*/spack-build-out.txt[/dim]"
+            )
+            console.print(
+                f"[dim]Saved debug bundle to: {debug_bundle_dir} ({copied_files} log file(s) copied)[/dim]"
             )
             raise SlurmFactoryError("Spack build failed")
 
@@ -1198,6 +1259,7 @@ def _run_spack_build_in_container(
             raise SlurmFactoryError("Failed to create tarball")
 
         console.print("[green]✓ Tarball created successfully[/green]")
+        shutil.rmtree(debug_bundle_dir, ignore_errors=True)
 
         # Clean up the build container (unless we need it for publishing)
         if not keep_container:
