@@ -13,9 +13,6 @@ INIT_ONLY=false
 START_SERVICES=false
 HEAD_NODE_INIT=false
 CLUSTER_NAME="cluster"
-ORG_ID=""
-SSSD_BINDER_PASSWORD=""
-LDAP_URI=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -39,18 +36,6 @@ while [[ $# -gt 0 ]]; do
             CLUSTER_NAME="$2"
             shift 2
             ;;
-        --org-id)
-            ORG_ID="$2"
-            shift 2
-            ;;
-        --sssd-binder-password)
-            SSSD_BINDER_PASSWORD="$2"
-            shift 2
-            ;;
-        --ldap-uri)
-            LDAP_URI="$2"
-            shift 2
-            ;;
         *)
             echo "Unknown option: $1"
             echo "Usage: $0 [--full-init|--init-only|--head-node-init] [OPTIONS]"
@@ -60,9 +45,6 @@ while [[ $# -gt 0 ]]; do
             echo "  --init-only                Only configure and start services (skip installation)"
             echo "  --head-node-init           Install head node dependencies (users, packages)"
             echo "  --cluster-name NAME        Set cluster name (default: cluster)"
-            echo "  --org-id ID                Organization ID for SSSD configuration"
-            echo "  --sssd-binder-password PW  SSSD binder password"
-            echo "  --ldap-uri URI             LDAP URI for SSSD"
             exit 1
             ;;
     esac
@@ -392,72 +374,6 @@ echo "=== Reloading systemd daemon ==="
 systemctl daemon-reload
 
 fi  # End of installation section
-
-# SSSD configuration - runs before Slurm initialization if parameters provided
-if [[ -n "$ORG_ID" ]] && [[ -n "$SSSD_BINDER_PASSWORD" ]] && [[ -n "$LDAP_URI" ]]; then
-    echo
-    echo "=== Configuring SSSD ==="
-    apt update && apt install -y libsss-sudo
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cp "$SCRIPT_DIR/nsswitch/nsswitch.conf" /etc/nsswitch.conf
-    cp "$SCRIPT_DIR/sssd/sssd.conf" /etc/sssd/sssd.conf
-    chmod 600 /etc/sssd/sssd.conf
-    chown root:root /etc/sssd/sssd.conf
-    echo "  Org ID: $ORG_ID"
-    echo "  LDAP URI: $LDAP_URI"
-    echo "  Setting binder password..."
-
-    sed -i "s|@ORG_ID@|$ORG_ID|g" /etc/sssd/sssd.conf
-    sed -i "s|@SSSD_BINDER_PASSWORD@|$SSSD_BINDER_PASSWORD|g" /etc/sssd/sssd.conf
-    sed -i "s|@LDAP_URI@|$LDAP_URI|g" /etc/sssd/sssd.conf
-
-    echo "  ✓ SSSD configuration updated"
-
-    echo "  Enabling SSSD PAM profile..."
-    pam-auth-update --enable sss
-    echo "  ✓ SSSD PAM profile enabled"
-
-    echo "  Enabling mkhomedir PAM profile..."
-    pam-auth-update --enable mkhomedir
-    echo "  ✓ mkhomedir PAM profile enabled"
-
-    if systemctl is-active --quiet sssd; then
-        echo "  Restarting SSSD service..."
-        systemctl restart sssd
-        echo "  ✓ SSSD restarted"
-    elif systemctl is-enabled --quiet sssd; then
-        echo "  Starting SSSD service..."
-        systemctl start sssd
-        echo "  ✓ SSSD started"
-    else
-        echo "  Enabling and starting SSSD service..."
-        systemctl enable --now sssd
-        echo "  ✓ SSSD enabled and started"
-    fi
-
-    echo
-    echo "=== Configuring SSHD ==="
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    cp "$SCRIPT_DIR/ssh/vantage_sshd.conf" /etc/ssh/sshd_config.d/
-    chmod 600 /etc/ssh/sshd_config.d/vantage_sshd.conf
-    chown root:root /etc/ssh/sshd_config.d/vantage_sshd.conf
-
-    if systemctl is-active --quiet ssh; then
-        echo "  Restarting SSH service..."
-        systemctl restart ssh
-        echo "  ✓ SSH restarted"
-    elif systemctl is-enabled --quiet ssh; then
-        echo "  Starting SSH service..."
-        systemctl start ssh
-        echo "  ✓ SSH started"
-    fi
-
-elif [[ -n "$ORG_ID" ]] || [[ -n "$SSSD_BINDER_PASSWORD" ]] || [[ -n "$LDAP_URI" ]]; then
-    echo
-    echo "Warning: Partial SSSD configuration provided. All three parameters are required:"
-    echo "  --org-id, --sssd-binder-password, --ldap-uri"
-    echo "Skipping SSSD configuration."
-fi
 
 # Initialization section - runs for both --full-init and --init-only
 if [[ "$FULL_INIT" == "true" ]] || [[ "$INIT_ONLY" == "true" ]]; then

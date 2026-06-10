@@ -1,2 +1,2 @@
-SLURMRESTD_OPTIONS=""
+SLURMRESTD_OPTIONS="-s openapi/slurmctld,openapi/slurmdbd"
 SLURM_CONF=/etc/slurm/slurm.conf
