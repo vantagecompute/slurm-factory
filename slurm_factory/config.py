@@ -15,6 +15,7 @@
 """Main config module for slurm-builder."""
 
 from dataclasses import dataclass
+import os
 from pathlib import Path
 
 
@@ -26,7 +27,10 @@ class Settings:
 
     @property
     def home_cache_dir(self) -> Path:
-        """Get the ~/.slurm-factory directory."""
+        """Get the slurm-factory cache root directory."""
+        cache_dir = os.environ.get("SLURM_FACTORY_CACHE_DIR")
+        if cache_dir:
+            return Path(cache_dir).expanduser()
         return Path.home() / ".slurm-factory"
 
     @property
@@ -69,6 +73,7 @@ class Settings:
         # Create directories with proper permissions (777)
         self.home_cache_dir.mkdir(mode=0o777, exist_ok=True)
         self.builds_dir.mkdir(mode=0o777, exist_ok=True)
+        self.spack_stage_dir.mkdir(mode=0o777, exist_ok=True)
         self.spack_buildcache_dir.mkdir(mode=0o777, exist_ok=True)
         self.spack_sourcecache_dir.mkdir(mode=0o777, exist_ok=True)
         self.build_debug_dir.mkdir(mode=0o777, exist_ok=True)

@@ -22,6 +22,7 @@ TOOLCHAIN="${TOOLCHAIN:-resolute}"
 ARCHITECTURE="${ARCHITECTURE:-amd64}"
 BASE_URL="${BASE_URL:-https://slurm-factory-spack-binary-cache.vantagecompute.ai}"
 LOCAL_TARBALL_PATH="${LOCAL_TARBALL_PATH:-}"
+TEST_IMAGE_TAG="${TEST_IMAGE_TAG:-slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}}"
 CLEANUP="${CLEANUP:-false}"
 VERBOSE="${VERBOSE:-false}"
 QUIET="${QUIET:-false}"
@@ -114,7 +115,7 @@ cleanup_on_error() {
 
 # Cleanup Docker images
 cleanup_docker_images() {
-    local image_name="slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}"
+    local image_name="${TEST_IMAGE_TAG}"
     
     if docker images -q "${image_name}" 2>/dev/null | grep -q .; then
         log_verbose "Removing Docker image: ${image_name}"
@@ -235,6 +236,7 @@ if [ -n "${LOCAL_TARBALL_PATH}" ]; then
 else
     log_info "Source: remote (${BASE_URL})"
 fi
+    log_info "Test Image Tag: ${TEST_IMAGE_TAG}"
 log_info "Cleanup: ${CLEANUP}"
 log_info "Verbose: ${VERBOSE}"
 log_info "Quiet: ${QUIET}"
@@ -289,7 +291,7 @@ BUILD_ARGS=(
     --build-arg "BASE_IMAGE=${BASE_IMAGE}"
     --build-arg "TARBALL_SOURCE=${TARBALL_SOURCE}"
     -f "${DOCKERFILE_PATH}"
-    -t "slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}"
+    -t "${TEST_IMAGE_TAG}"
     "${BUILD_CONTEXT}"
 )
 
@@ -323,14 +325,14 @@ log_info "✓ Docker image built successfully"
 log_info ""
 log_info "==> Running tarball validation test..."
 
-log_verbose "Docker run command: docker run --rm slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}"
+log_verbose "Docker run command: docker run --rm ${TEST_IMAGE_TAG}"
 
 # Run docker container with timeout
 if [[ "${VERBOSE}" == "true" ]]; then
-    timeout "${TIMEOUT}" docker run --rm "slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}"
+    timeout "${TIMEOUT}" docker run --rm "${TEST_IMAGE_TAG}"
     RUN_EXIT_CODE=$?
 else
-    timeout "${TIMEOUT}" docker run --rm "slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}" > /dev/null
+    timeout "${TIMEOUT}" docker run --rm "${TEST_IMAGE_TAG}" > /dev/null
     RUN_EXIT_CODE=$?
 fi
 
