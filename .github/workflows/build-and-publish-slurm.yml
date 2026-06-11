@@ -49,7 +49,7 @@ env:
 
 jobs:
   prepare-matrix:
-    runs-on: ubuntu-24.04
+    runs-on: self-hosted
     timeout-minutes: 120
     outputs:
       slurm_matrix: ${{ steps.set-matrix.outputs.slurm_matrix }}
@@ -114,7 +114,7 @@ jobs:
   # and stages the redistributable tarball in S3 for downstream jobs.
   build-slurm:
     needs: prepare-matrix
-    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
     timeout-minutes: 3600
     environment: release
     permissions:
@@ -312,7 +312,7 @@ jobs:
   # not leave a broken tarball in the production buildcache.
   test-slurm:
     needs: [prepare-matrix, build-slurm]
-    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
     timeout-minutes: 180
     environment: release
     permissions:
@@ -375,7 +375,7 @@ jobs:
   # Only runs after test-slurm succeeds.
   publish-slurm:
     needs: [prepare-matrix, test-slurm]
-    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
     timeout-minutes: 180
     environment: release
     permissions:

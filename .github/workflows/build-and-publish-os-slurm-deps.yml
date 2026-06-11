@@ -80,7 +80,7 @@ jobs:
 
   build-and-publish-slurm-dependencies:
     needs: prepare-matrix
-    runs-on: ${{ matrix.architecture == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
     timeout-minutes: 3600
     environment: release
     permissions:
