@@ -71,18 +71,18 @@ slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9 --gpu
 
 ```bash
 # Standard deployment for Ubuntu 24.04
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-noble-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/noble/25.11/slurm-25.11-noble-amd64-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 module load slurm/25.11-noble
 
 # Deploy Rocky Linux 9 compatible build
-sudo tar -xzf ~/.slurm-factory/builds/slurm-24.11-rockylinux9-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/rockylinux9/24.11/slurm-24.11-rockylinux9-amd64-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 module load slurm/24.11-rockylinux9
 
 # Download from CDN
-wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz
-sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/amd64/slurm-25.11-noble-amd64-software.tar.gz
+sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 module load slurm/25.11-noble
 
@@ -91,8 +91,8 @@ export SLURM_INSTALL_PREFIX=/shared/apps/slurm
 module load slurm/25.11-noble
 
 # Multi-version deployment
-sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/slurm-25.11/
-sudo tar -xzf slurm-24.11-jammy-software.tar.gz -C /opt/slurm-24.11/
+sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/slurm-25.11/
+sudo tar -xzf slurm-24.11-jammy-amd64-software.tar.gz -C /opt/slurm-24.11/
 cd /opt/slurm-25.11 && sudo ./data/slurm_assets/slurm_install.sh
 cd /opt/slurm-24.11 && sudo ./data/slurm_assets/slurm_install.sh
 module load slurm/25.11-noble  # or slurm/24.11-jammy

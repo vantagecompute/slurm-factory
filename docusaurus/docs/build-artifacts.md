@@ -203,7 +203,8 @@ The build and publish workflows support both `amd64` and `arm64`.
 | rockylinux8 | Supported | Supported | `arm64` is best-effort; validate first run |
 
 Notes:
-- `arm64` builds run on the GitHub-hosted `ubuntu-24.04-arm` runner.
+- `arm64` builds run on self-hosted runners labeled `ARM64`.
+- `amd64` builds run on self-hosted runners labeled `X64`.
 - Actual build success can depend on upstream container image/package availability for each toolchain.
 
 ### Tarballs
@@ -321,10 +322,10 @@ Each tarball includes verification information:
 
 ```bash
 # Extract and verify contents
-tar -tzf slurm-25.11-noble-software.tar.gz | head -20
+tar -tzf slurm-25.11-noble-amd64-software.tar.gz | head -20
 
 # Check modulefile
-tar -xzf slurm-25.11-noble-software.tar.gz modules/slurm/25.11-noble.lua
+tar -xzf slurm-25.11-noble-amd64-software.tar.gz modules/slurm/25.11-noble.lua
 cat modules/slurm/25.11-noble.lua
 ```
 
@@ -336,11 +337,11 @@ Complete installation example:
 
 ```bash
 # 1. Download the tarball
-wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/amd64/slurm-25.11-noble-amd64-software.tar.gz
 
 # 2. Extract to target location
 sudo mkdir -p /opt
-sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/
+sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/
 
 # 3. Run installation script
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
@@ -409,7 +410,7 @@ Each build is tagged with metadata:
     - name: Download Slurm tarball
       aws_s3:
         bucket: vantagecompute-slurm-builds
-        object: slurm-25.11-noble-software.tar.gz
+        object: slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz
         dest: /tmp/slurm.tar.gz
         mode: get
 
@@ -432,9 +433,9 @@ Each build is tagged with metadata:
 resource "null_resource" "deploy_slurm" {
   provisioner "remote-exec" {
     inline = [
-      "aws s3 cp s3://vantagecompute-slurm-builds/slurm-25.11-noble-software.tar.gz /tmp/",
+      "aws s3 cp s3://vantagecompute-slurm-builds/slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz /tmp/",
       "sudo mkdir -p /opt/slurm",
-      "sudo tar -xzf /tmp/slurm-25.11-noble-software.tar.gz -C /opt/slurm",
+      "sudo tar -xzf /tmp/slurm-25.11-noble-amd64-software.tar.gz -C /opt/slurm",
       "sudo cp -r /opt/slurm/modules/slurm /opt/modulefiles/"
     ]
   }

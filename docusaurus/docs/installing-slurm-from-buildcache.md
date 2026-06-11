@@ -223,14 +223,16 @@ Pre-packaged tarballs for offline installation:
 https://slurm-factory-spack-binary-cache.vantagecompute.ai/
 ├── noble/
 │   ├── 25.11/
-│   │   ├── slurm-25.11-noble-software.tar.gz      # Complete tarball
-│   │   └── slurm-25.11-noble-software.tar.gz.asc  # GPG signature
+│   │   ├── amd64/
+│   │   │   ├── slurm-25.11-noble-amd64-software.tar.gz      # Complete tarball
+│   │   │   └── slurm-25.11-noble-amd64-software.tar.gz.asc  # GPG signature
 │   ├── 24.11/
 │   └── 23.11/
 ├── jammy/
 │   ├── 25.11/
-│   │   ├── slurm-25.11-jammy-software.tar.gz
-│   │   └── slurm-25.11-jammy-software.tar.gz.asc
+│   │   ├── amd64/
+│   │   │   ├── slurm-25.11-jammy-amd64-software.tar.gz
+│   │   │   └── slurm-25.11-jammy-amd64-software.tar.gz.asc
 │   └── ...
 └── {other toolchains}/
     └── {versions}/
@@ -256,13 +258,14 @@ Instead of using Spack buildcache, you can download a complete Slurm installatio
 # Set versions
 SLURM_VERSION=25.11
 TOOLCHAIN=noble
+ARCHITECTURE=amd64
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
 # Download tarball
-wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz"
 
 # Download signature
-wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc"
 ```
 
 ### 2. Verify GPG Signature
@@ -272,8 +275,8 @@ wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${T
 gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
 
 # Verify the tarball signature
-gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
-             slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
+gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz
 ```
 
 **Expected output:**
@@ -304,7 +307,7 @@ quit
 
 ```bash
 # Extract to /opt (or your preferred location)
-sudo tar -xzf slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz -C /opt/
+sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz -C /opt/
 
 # Run the installation script
 cd /opt
@@ -320,7 +323,7 @@ sinfo --version
 Each tarball contains:
 
 ```text
-slurm-25.11-noble-software.tar.gz
+slurm-25.11-noble-amd64-software.tar.gz
 ├── view/                          # Slurm binaries & libraries
 ├── modules/slurm/25.11-noble.lua  # Lmod module (relocatable)
 └── data/slurm_assets/             # Config templates & install script

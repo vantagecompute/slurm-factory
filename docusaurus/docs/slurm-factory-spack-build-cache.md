@@ -62,11 +62,13 @@ slurm-factory-spack-binary-cache.vantagecompute.ai/
 └── builds/
     ├── 25.11/
     │   ├── noble/
-    │   │   ├── slurm-25.11-noble-software.tar.gz      # Complete tarball
-    │   │   └── slurm-25.11-noble-software.tar.gz.asc  # GPG signature
+  │   │   ├── amd64/
+  │   │   │   ├── slurm-25.11-noble-amd64-software.tar.gz      # Complete tarball
+  │   │   │   └── slurm-25.11-noble-amd64-software.tar.gz.asc  # GPG signature
     │   ├── jammy/
-    │   │   ├── slurm-25.11-jammy-software.tar.gz
-    │   │   └── slurm-25.11-jammy-software.tar.gz.asc
+  │   │   ├── amd64/
+  │   │   │   ├── slurm-25.11-jammy-amd64-software.tar.gz
+  │   │   │   └── slurm-25.11-jammy-amd64-software.tar.gz.asc
     │   └── ...                  # All OS toolchains
     ├── 24.11/
     │   └── ...                  # All toolchains with tarballs + signatures
@@ -194,24 +196,25 @@ Alternatively, download a complete Slurm installation as a signed tarball:
 # Set versions
 SLURM_VERSION=25.11
 TOOLCHAIN=noble  # or: jammy, resolute, rockylinux9, rockylinux10, rockylinux8
+ARCHITECTURE=amd64  # or: arm64
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
 # Download tarball and GPG signature
-wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz"
-wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc"
 
 # Import GPG key
 gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
 
 # Verify signature (REQUIRED - do not skip!)
-gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
-             slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
+gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz
 
 # Expected output:
 # gpg: Good signature from "Vantage Compute Corporation (Slurm Factory Spack Cache Signing Key) <info@vantagecompute.ai>"
 
 # Extract and install
-sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/
+sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 ```
 

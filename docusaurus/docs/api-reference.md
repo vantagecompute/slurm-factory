@@ -213,11 +213,18 @@ Build outputs are stored in `~/.slurm-factory/builds/`:
 
 ```
 ~/.slurm-factory/builds/
-├── slurm-25.11-noble-software.tar.gz          # Ubuntu 24.04 build
-├── slurm-25.11-noble-gpu-software.tar.gz      # GPU build
-├── slurm-25.11-jammy-software.tar.gz          # Ubuntu 22.04 build
-├── slurm-25.11-rockylinux9-software.tar.gz    # Rocky Linux 9 / RHEL 9
-└── slurm-24.11-rockylinux8-software.tar.gz    # Rocky Linux 8 / RHEL 8
+├── noble/
+│   └── 25.11/
+│       └── slurm-25.11-noble-amd64-software.tar.gz       # Ubuntu 24.04 build
+├── jammy/
+│   └── 25.11/
+│       └── slurm-25.11-jammy-amd64-software.tar.gz       # Ubuntu 22.04 build
+├── rockylinux9/
+│   └── 25.11/
+│       └── slurm-25.11-rockylinux9-amd64-software.tar.gz # Rocky Linux 9 / RHEL 9
+└── rockylinux8/
+  └── 24.11/
+    └── slurm-24.11-rockylinux8-amd64-software.tar.gz # Rocky Linux 8 / RHEL 8
 ```
 
 ---

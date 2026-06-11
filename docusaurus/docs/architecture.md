@@ -166,7 +166,7 @@ flowchart TB
 **Outputs**:
 - Docker image: `slurm-factory:{slurm_version}-gcc{compiler_version}`
 - Buildcache: `~/.slurm-factory/buildcache/` (local) or S3 (published)
-- Tarball: `~/.slurm-factory/builds/slurm-{version}-gcc{compiler}-software.tar.gz`
+- Tarball: `~/.slurm-factory/builds/{toolchain}/{version}/slurm-{version}-{toolchain}-{architecture}-software.tar.gz`
 
 **Time**: 
 - From buildcache: 5-15 minutes
@@ -233,7 +233,7 @@ graph TB
 │   ├── slurm-*.tar.bz2
 │   └── ...
 ├── builds/                  # Final tarballs (Layer 4)
-│   └── slurm-*-software.tar.gz
+│   └── {toolchain}/{version}/slurm-*-{architecture}-software.tar.gz
 └── compilers/               # Compiler tarballs (Layer 4)
     └── {version}/
         └── gcc-*-compiler.tar.gz
@@ -319,7 +319,7 @@ module load slurm/25.11-noble
 Single tarball output containing everything needed:
 
 ```text
-slurm-{version}-{toolchain}-software.tar.gz (2-25GB depending on options)
+slurm-{version}-{toolchain}-{architecture}-software.tar.gz (2-25GB depending on options)
 ├── view/                                  # Slurm installation
 │   ├── bin/                               # Slurm binaries (srun, sbatch, etc.)
 │   ├── sbin/                              # Daemons (slurmd, slurmctld, slurmdbd)
@@ -350,9 +350,9 @@ slurm-{version}-{toolchain}-software.tar.gz (2-25GB depending on options)
 
 **Package naming examples:**
 
-- `slurm-25.11-noble-software.tar.gz` - Slurm 25.11 for Ubuntu 24.04
-- `slurm-24.11-jammy-software.tar.gz` - Slurm 24.11 for Ubuntu 22.04
-- `slurm-23.11-rockylinux9-software.tar.gz` - Slurm 23.11 for Rocky Linux 9
+- `slurm-25.11-noble-amd64-software.tar.gz` - Slurm 25.11 for Ubuntu 24.04 on AMD64
+- `slurm-24.11-jammy-arm64-software.tar.gz` - Slurm 24.11 for Ubuntu 22.04 on ARM64
+- `slurm-23.11-rockylinux9-amd64-software.tar.gz` - Slurm 23.11 for Rocky Linux 9 on AMD64
 
 ## Toolchain Support
 

@@ -17,7 +17,7 @@ slurm-factory build-slurm --slurm-version 25.11 --toolchain jammy
 slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9
 
 # Deploy
-sudo tar -xzf ~/.slurm-factory/builds/slurm-25.11-noble-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/noble/25.11/slurm-25.11-noble-amd64-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
@@ -28,10 +28,10 @@ module load slurm/25.11-noble
 
 ```bash
 # Download from S3 (Ubuntu 24.04)
-wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/amd64/slurm-25.11-noble-amd64-software.tar.gz
 
 # Deploy
-sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/
+sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
@@ -83,7 +83,7 @@ sudo ./slurm_install.sh --full-init --org-id myorg --ldap-uri ldap://ldap.exampl
 Each tarball contains:
 
 ```text
-slurm-{version}-{toolchain}-software.tar.gz
+slurm-{version}-{toolchain}-{architecture}-software.tar.gz
 ├── data/slurm_assets/          # Configuration templates & install script
 ├── modules/slurm/              # Lmod modulefiles
 │   └── {version}-{toolchain}.lua
@@ -109,8 +109,8 @@ echo $SLURM_ROOT
 
 ```bash
 # Deploy multiple versions
-sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/slurm-25.11/
-sudo tar -xzf slurm-24.11-jammy-software.tar.gz -C /opt/slurm-24.11/
+sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/slurm-25.11/
+sudo tar -xzf slurm-24.11-jammy-amd64-software.tar.gz -C /opt/slurm-24.11/
 
 cd /opt/slurm-25.11 && sudo ./data/slurm_assets/slurm_install.sh
 cd /opt/slurm-24.11 && sudo ./data/slurm_assets/slurm_install.sh

@@ -14,6 +14,7 @@
 import base64
 import logging
 import os
+import platform
 import shutil
 import subprocess
 import sys
@@ -48,6 +49,24 @@ from slurm_factory.utils import (
 
 logger = logging.getLogger(__name__)
 console = Console()
+
+
+def _get_normalized_architecture() -> str:
+    """Return the host architecture normalized to artifact naming conventions."""
+    machine = platform.machine().lower()
+    architecture_aliases = {
+        "x86_64": "amd64",
+        "amd64": "amd64",
+        "aarch64": "arm64",
+        "arm64": "arm64",
+    }
+    return architecture_aliases.get(machine, machine)
+
+
+def _get_slurm_tarball_name(slurm_version: str, toolchain: str, architecture: str | None = None) -> str:
+    """Build the redistributable tarball filename."""
+    tarball_architecture = architecture or _get_normalized_architecture()
+    return f"slurm-{slurm_version}-{toolchain}-{tarball_architecture}-software.tar.gz"
 
 
 def _copy_debug_bundle_file(source: Path, destination: Path) -> bool:
@@ -339,6 +358,7 @@ def get_create_slurm_tarball_script(
     modulerc_script: str,
     version: str,
     toolchain: str = "noble",
+    architecture: str | None = None,
     gpu_support: bool = False,
 ) -> str:
     """
@@ -348,10 +368,11 @@ def get_create_slurm_tarball_script(
         modulerc_script: The script to create .modulerc.lua file
         version: Slurm version (e.g., "25.11") for the tarball filename
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
+        architecture: CPU architecture label used in the output tarball name
         gpu_support: Whether GPU support is enabled (affects CUDA/ROCm handling)
 
     """
-    tarball_base = f"slurm-{version}-{toolchain}-software"
+    tarball_base = _get_slurm_tarball_name(version, toolchain, architecture).removesuffix(".tar.gz")
 
     # When GPU support is enabled, we need to copy specific GPU .so files from install tree
     # since CUDA and ROCm packages are excluded from the view
@@ -542,8 +563,7 @@ def _extract_slurm_tarball_from_image(
 
     container_name = f"slurm-factory-extract-{slurm_version.replace('.', '-')}"
 
-    # Get GCC version from toolchain for tarball naming
-    tarball_name = f"slurm-{slurm_version}-{toolchain}-software.tar.gz"
+    tarball_name = _get_slurm_tarball_name(slurm_version, toolchain)
 
     container_tarball_path = f"/opt/slurm/build_output/{tarball_name}"
 
@@ -665,7 +685,8 @@ def sign_and_push_tarball_to_buildcache(
     # S3_BUILDCACHE_BUCKET already includes s3:// prefix
     # Extract just the bucket name for AWS CLI
     s3_bucket_name = S3_BUILDCACHE_BUCKET.replace("s3://", "")
-    s3_base_path = f"{toolchain}/{slurm_version}"
+    architecture = _get_normalized_architecture()
+    s3_base_path = f"{toolchain}/{slurm_version}/{architecture}"
 
     try:
         # Create temporary directory for Dockerfile
@@ -1109,7 +1130,11 @@ def _run_spack_build_in_container(
         modulerc_path=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm/.modulerc.lua",
     )
     create_slurm_tarball_script = get_create_slurm_tarball_script(
-        modulerc_script, slurm_version, toolchain, gpu_support
+        modulerc_script,
+        slurm_version,
+        toolchain,
+        _get_normalized_architecture(),
+        gpu_support,
     )
     move_assets_script = get_move_slurm_assets_to_container_str()
     debug_bundle_dir = _prepare_build_debug_bundle(
@@ -1273,7 +1298,7 @@ def _run_spack_build_in_container(
             console.print(f"[dim]Keeping container {container_name} for publishing...[/dim]")
 
         # Tarball is already in the mounted directory, no need to copy
-        tarball_name = f"slurm-{slurm_version}-{toolchain}-software.tar.gz"
+        tarball_name = _get_slurm_tarball_name(slurm_version, toolchain)
         console.print(
             f"[bold green]✓ Tarball {tarball_name} available at {tarball_build_output_dir}[/bold green]"
         )
@@ -1425,7 +1450,7 @@ def create_slurm_package(
                 # Sign and upload the tarball if publishing slurm (skip for spack-only mode)
                 if publish == "slurm":
                     console.print("[bold cyan]Signing and uploading tarball...[/bold cyan]")
-                    tarball_name = f"slurm-{slurm_version}-{toolchain}-software.tar.gz"
+                    tarball_name = _get_slurm_tarball_name(slurm_version, toolchain)
                     tarball_path = tarball_build_output_dir / tarball_name
                     sign_and_push_tarball_to_buildcache(
                         tarball_path=tarball_path,

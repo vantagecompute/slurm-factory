@@ -177,21 +177,22 @@ Download complete Slurm installation as a tarball with GPG signature verificatio
 # Set versions
 SLURM_VERSION=25.11
 TOOLCHAIN=noble  # or: jammy, rockylinux9, etc.
+ARCHITECTURE=amd64  # or: arm64
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
 # Download tarball and signature
-wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz"
-wget "${CLOUDFRONT_URL}/builds/${SLURM_VERSION}/${TOOLCHAIN}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc"
 
 # Import GPG key
 gpg --keyserver keyserver.ubuntu.com --recv-keys DFB92630BCA5AB71
 
 # Verify signature
-gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
-             slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz
+gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz
 
 # Extract and install
-sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/
+sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 ```
 
@@ -200,7 +201,7 @@ cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init
 All builds produce GPG-signed relocatable tarballs:
 
 ```text
-slurm-25.11-noble-software.tar.gz
+slurm-25.11-noble-amd64-software.tar.gz
 ├── view/                    # Slurm binaries & libraries
 ├── modules/slurm/25.11.lua  # Lmod module (relocatable)
 └── data/slurm_assets/       # Config templates & install script
@@ -210,7 +211,7 @@ slurm-25.11-noble-software.tar.gz
 
 ```bash
 # Extract (from tarball build)
-sudo tar -xzf slurm-25.11-noble-software.tar.gz -C /opt/
+sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/
 
 # Install (creates users, configs, services)
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init

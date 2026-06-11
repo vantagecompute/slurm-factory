@@ -33,13 +33,14 @@ All Slurm Factory packages are GPG-signed with key `DFB92630BCA5AB71` for securi
 # Set versions
 SLURM_VERSION=25.11
 TOOLCHAIN=noble
+ARCHITECTURE=amd64
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
 # Download tarball
-wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz"
 
 # Download GPG signature (.asc file)
-wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc"
+wget "${CLOUDFRONT_URL}/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc"
 ```
 
 ### Step 2: Import the Public GPG Key
@@ -65,8 +66,8 @@ sub   rsa4096 2025-XX-XX [E]
 
 ```bash
 # Verify tarball signature
-gpg --verify slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc \
-             slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz
+gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz
 ```
 
 **Expected output for valid signature:**
@@ -109,8 +110,8 @@ trust
 After trusting the key, re-verify:
 
 ```bash
-gpg --verify slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz.asc \
-             slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz
+gpg --verify slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc \
+             slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz
 ```
 
 Now the output should show:
@@ -125,7 +126,7 @@ gpg: Good signature from "Vantage Compute Corporation (Slurm Factory Spack Cache
 
 ```bash
 # Extract tarball
-sudo tar -xzf slurm-${SLURM_VERSION}-gcc${COMPILER_VERSION}-software.tar.gz -C /opt/
+sudo tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz -C /opt/
 
 # Install
 cd /opt
@@ -254,10 +255,10 @@ Extract the signature and tarball from the container:
 
 ```bash
 # Extract the tarball
-docker run --rm slurm-factory-gpg-test:latest cat /root/.slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz > test.tar.gz
+docker run --rm slurm-factory-gpg-test:latest cat /root/.slurm-factory/builds/noble/25.11/slurm-25.11-noble-amd64-software.tar.gz > test.tar.gz
 
 # Extract the signature
-docker run --rm slurm-factory-gpg-test:latest cat /root/.slurm-factory/25.11/noble/slurm-25.11-noble-software.tar.gz.asc > test.tar.gz.asc
+docker run --rm slurm-factory-gpg-test:latest cat /root/.slurm-factory/builds/noble/25.11/slurm-25.11-noble-amd64-software.tar.gz.asc > test.tar.gz.asc
 
 # Export public key from the container (or use the one you already have)
 echo "$GPG_PRIVATE_KEY" | base64 -d | gpg --import
