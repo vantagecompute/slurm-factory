@@ -1,2 +1,0 @@
-SLURMD_OPTIONS="-d /opt/slurm/view/sbin/slurmstepd"
-SLURM_CONF=/etc/slurm/slurm.conf
