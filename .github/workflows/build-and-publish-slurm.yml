@@ -157,6 +157,24 @@ jobs:
           aws-region: us-east-1
           role-duration-seconds: 14400
 
+      - name: Install AWS CLI
+        timeout-minutes: 10
+        run: |
+          if ! command -v aws &>/dev/null; then
+            echo "Installing AWS CLI..."
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "aarch64" ]; then
+              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
+            else
+              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+            fi
+            curl -fsSL "$AWS_URL" -o "/tmp/awscliv2.zip"
+            unzip -q /tmp/awscliv2.zip -d /tmp/
+            sudo /tmp/aws/install
+            rm -rf /tmp/aws /tmp/awscliv2.zip
+          fi
+          echo "✓ AWS CLI: $(aws --version)"
+
       - name: Validate GPG secrets
         timeout-minutes: 120
         env:
@@ -339,6 +357,24 @@ jobs:
           aws-region: us-east-1
           role-duration-seconds: 3600
 
+      - name: Install AWS CLI
+        timeout-minutes: 10
+        run: |
+          if ! command -v aws &>/dev/null; then
+            echo "Installing AWS CLI..."
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "aarch64" ]; then
+              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
+            else
+              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+            fi
+            curl -fsSL "$AWS_URL" -o "/tmp/awscliv2.zip"
+            unzip -q /tmp/awscliv2.zip -d /tmp/
+            sudo /tmp/aws/install
+            rm -rf /tmp/aws /tmp/awscliv2.zip
+          fi
+          echo "✓ AWS CLI: $(aws --version)"
+
       - name: Download staged tarball
         timeout-minutes: 120
         run: |
@@ -397,6 +433,24 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
           role-duration-seconds: 3600
+
+      - name: Install AWS CLI
+        timeout-minutes: 10
+        run: |
+          if ! command -v aws &>/dev/null; then
+            echo "Installing AWS CLI..."
+            ARCH=$(uname -m)
+            if [ "$ARCH" = "aarch64" ]; then
+              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
+            else
+              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
+            fi
+            curl -fsSL "$AWS_URL" -o "/tmp/awscliv2.zip"
+            unzip -q /tmp/awscliv2.zip -d /tmp/
+            sudo /tmp/aws/install
+            rm -rf /tmp/aws /tmp/awscliv2.zip
+          fi
+          echo "✓ AWS CLI: $(aws --version)"
 
       - name: Download staged tarball
         timeout-minutes: 120
