@@ -285,19 +285,16 @@ jobs:
         id: tarball
         run: |
           TARBALL_DIR="$HOME/.slurm-factory/builds/${{ matrix.toolchain }}/${{ matrix.slurm_version }}"
-          BASE_TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-software.tar.gz"
           ARCH_TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
-          TARBALL_PATH="${TARBALL_DIR}/${BASE_TARBALL_NAME}"
           ARCH_TARBALL_PATH="${TARBALL_DIR}/${ARCH_TARBALL_NAME}"
-          if [ ! -f "$TARBALL_PATH" ]; then
-            echo "Error: tarball not found at $TARBALL_PATH"
+          if [ ! -f "$ARCH_TARBALL_PATH" ]; then
+            echo "Error: tarball not found at $ARCH_TARBALL_PATH"
             ls -la "$TARBALL_DIR" || true
             exit 1
           fi
-          cp "$TARBALL_PATH" "$ARCH_TARBALL_PATH"
           echo "tarball_path=${ARCH_TARBALL_PATH}" >> $GITHUB_OUTPUT
           echo "tarball_name=${ARCH_TARBALL_NAME}" >> $GITHUB_OUTPUT
-          echo "✓ Tarball found: $(du -h "$TARBALL_PATH" | cut -f1) at $TARBALL_PATH"
+          echo "✓ Tarball found: $(du -h "$ARCH_TARBALL_PATH" | cut -f1) at $ARCH_TARBALL_PATH"
 
       - name: Stage tarball for downstream jobs
         timeout-minutes: 120
@@ -363,6 +360,7 @@ jobs:
           LOCAL_TARBALL_PATH="${TARBALL_PATH}" \
             SLURM_VERSION="${{ matrix.slurm_version }}" \
             TOOLCHAIN="${{ matrix.toolchain }}" \
+            ARCHITECTURE="${{ matrix.architecture }}" \
             ./scripts/test-tarball.sh
 
       - name: Cleanup

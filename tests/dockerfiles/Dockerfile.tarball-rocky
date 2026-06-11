@@ -1,6 +1,7 @@
 ARG SLURM_VERSION=25.11
 ARG TOOLCHAIN=rockylinux10
-ARG BASE_IMAGE=rockylinux/rockylinux:10
+ARG ARCHITECTURE=amd64
+ARG BASE_IMAGE=rockylinux/rockylinux:9
 ARG TARBALL_SOURCE=remote
 
 FROM ${BASE_IMAGE} AS base
@@ -8,6 +9,7 @@ FROM ${BASE_IMAGE} AS base
 # Re-declare ARGs after FROM to make them available in subsequent instructions
 ARG SLURM_VERSION
 ARG TOOLCHAIN
+ARG ARCHITECTURE
 
 # Rocky 8 uses 'powertools', Rocky 9+ uses 'crb' for CodeReady Builder repository
 RUN dnf -y install epel-release && \
@@ -18,22 +20,24 @@ RUN dnf -y install epel-release && \
 FROM base AS remote-tarball
 ARG SLURM_VERSION
 ARG TOOLCHAIN
-RUN TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOOLCHAIN}/${SLURM_VERSION}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
+ARG ARCHITECTURE
+RUN TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz && \
     mkdir -p /tmp/slurm-tarball && cd /tmp/slurm-tarball && \
     curl -fsSLO "${TARBALL_URL}.asc" && \
     curl -fsSLO "${TARBALL_URL}" && \
     gpg --batch --keyserver hkps://keyserver.ubuntu.com --recv-keys FDEA90667641505264EFD114DFB92630BCA5AB71 && \
     gpg --batch --verify \
-        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz.asc \
-        slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz && \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz.asc \
+        slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz && \
     mkdir -p /opt/slurm-factory && \
-    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz -C /opt/slurm-factory && \
+    tar -xzf slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz -C /opt/slurm-factory && \
     rm -rf /tmp/slurm-tarball
 
 FROM base AS local-tarball
 ARG SLURM_VERSION
 ARG TOOLCHAIN
-COPY tarball/slurm-${SLURM_VERSION}-${TOOLCHAIN}-software.tar.gz /tmp/
+ARG ARCHITECTURE
+COPY tarball/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz /tmp/
 RUN mkdir -p /opt/slurm-factory && \
     tar -xzf /tmp/slurm-*.tar.gz -C /opt/slurm-factory && \
     rm -f /tmp/slurm-*.tar.gz

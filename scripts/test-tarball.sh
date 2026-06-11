@@ -19,6 +19,7 @@ set -e
 # Default values
 SLURM_VERSION="${SLURM_VERSION:-25.11}"
 TOOLCHAIN="${TOOLCHAIN:-resolute}"
+ARCHITECTURE="${ARCHITECTURE:-amd64}"
 BASE_URL="${BASE_URL:-https://slurm-factory-spack-binary-cache.vantagecompute.ai}"
 LOCAL_TARBALL_PATH="${LOCAL_TARBALL_PATH:-}"
 CLEANUP="${CLEANUP:-false}"
@@ -40,6 +41,7 @@ OPTIONS:
     -h, --help                  Show this help message and exit
     -s, --slurm-version VERSION Set Slurm version (default: ${SLURM_VERSION})
     -t, --toolchain TOOLCHAIN   Set toolchain (default: ${TOOLCHAIN})
+    -a, --architecture ARCH     Set CPU architecture (default: ${ARCHITECTURE})
     -b, --base-url URL          Set base URL for tarball downloads (default: ${BASE_URL})
     -l, --local-tarball PATH    Use a local tarball instead of downloading from remote
     -c, --cleanup               Remove Docker images after test completion
@@ -50,6 +52,7 @@ OPTIONS:
 ENVIRONMENT VARIABLES:
     SLURM_VERSION    Slurm version to test (can be overridden by --slurm-version)
     TOOLCHAIN        Toolchain to use (can be overridden by --toolchain)
+    ARCHITECTURE     CPU architecture (can be overridden by --architecture)
     LOCAL_TARBALL_PATH  Path to local tarball (can be overridden by --local-tarball)
     BASE_URL         Base URL for tarball downloads (can be overridden by --base-url)
     CLEANUP          Set to 'true' to enable cleanup (can be overridden by --cleanup)
@@ -141,6 +144,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -t|--toolchain)
             TOOLCHAIN="$2"
+            shift 2
+            ;;
+        -a|--architecture)
+            ARCHITECTURE="$2"
             shift 2
             ;;
         -b|--base-url)
@@ -278,6 +285,7 @@ fi
 BUILD_ARGS=(
     --build-arg "SLURM_VERSION=${SLURM_VERSION}"
     --build-arg "TOOLCHAIN=${TOOLCHAIN}"
+    --build-arg "ARCHITECTURE=${ARCHITECTURE}"
     --build-arg "BASE_IMAGE=${BASE_IMAGE}"
     --build-arg "TARBALL_SOURCE=${TARBALL_SOURCE}"
     -f "${DOCKERFILE_PATH}"
