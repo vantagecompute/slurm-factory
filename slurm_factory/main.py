@@ -21,7 +21,7 @@ import sys
 import typer
 from rich.console import Console
 from rich.markup import escape
-from typing_extensions import Annotated
+from typing import Annotated
 
 from slurm_factory.commands.build_slurm import build_slurm_app
 from slurm_factory.config import Settings

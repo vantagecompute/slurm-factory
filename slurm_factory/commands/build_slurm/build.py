@@ -21,7 +21,7 @@ import uuid
 import typer
 from rich.console import Console
 from rich.markup import escape
-from typing_extensions import Annotated
+from typing import Annotated
 
 from slurm_factory.builders.slurm_builder import create_slurm_package
 from slurm_factory.constants import COMPILER_TOOLCHAINS, INSTANCE_NAME_PREFIX, SlurmVersion
