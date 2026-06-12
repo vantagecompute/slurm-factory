@@ -31,14 +31,14 @@ class TestModuleHierarchy:
         """Test that flat hierarchy is the default for backward compatibility."""
         module_config = generate_module_config()
         lmod_config = module_config["default"]["lmod"]
-        
+
         assert lmod_config["hierarchy"] == []
 
     def test_hierarchical_mode_enabled(self):
         """Test hierarchical mode when explicitly enabled."""
         module_config = generate_module_config(enable_hierarchy=True)
         lmod_config = module_config["default"]["lmod"]
-        
+
         # Should enable MPI hierarchy
         assert lmod_config["hierarchy"] == ["mpi"]
 
@@ -46,7 +46,7 @@ class TestModuleHierarchy:
         """Test that OpenMPI is included in hierarchical mode."""
         module_config = generate_module_config(enable_hierarchy=True)
         lmod_config = module_config["default"]["lmod"]
-        
+
         # OpenMPI should be in the include list
         assert "openmpi" in lmod_config["include"]
         # Hierarchy should be enabled
@@ -56,11 +56,18 @@ class TestModuleHierarchy:
         """Test that OpenMPI is included in flat mode."""
         module_config = generate_module_config(enable_hierarchy=False)
         lmod_config = module_config["default"]["lmod"]
-        
+
         # OpenMPI should be in the include list in flat mode too
         assert "openmpi" in lmod_config["include"]
         # Hierarchy should be empty in flat mode
         assert lmod_config["hierarchy"] == []
+
+    def test_slurm_no_autoload_for_relocatable_tarball(self):
+        """Slurm module should not autoload Spack dependency modules absent from tarballs."""
+        module_config = generate_module_config()
+        slurm_config = module_config["default"]["lmod"]["slurm"]
+
+        assert "autoload" not in slurm_config
 
 
 class TestBuildcacheSupport:
@@ -70,7 +77,7 @@ class TestBuildcacheSupport:
         """Test that buildcache is disabled by default."""
         config = generate_spack_config()
         mirrors = config["spack"]["mirrors"]
-        
+
         # Should only have spack-public mirror
         assert "spack-public" in mirrors
         assert "buildcache" not in mirrors
@@ -83,7 +90,7 @@ class TestEnhancedRPATH:
         """Test that RPATH configuration is present."""
         config = generate_spack_config()
         shared_linking = config["spack"]["config"]["shared_linking"]
-        
+
         assert "type" in shared_linking
         assert shared_linking["type"] == "rpath"
 
@@ -91,7 +98,7 @@ class TestEnhancedRPATH:
         """Test that RPATH is not bound to absolute paths."""
         config = generate_spack_config()
         shared_linking = config["spack"]["config"]["shared_linking"]
-        
+
         # bind should be False for relocatability
         assert shared_linking["bind"] is False
 
@@ -99,7 +106,7 @@ class TestEnhancedRPATH:
         """Test missing library policy configuration."""
         config = generate_spack_config()
         shared_linking = config["spack"]["config"]["shared_linking"]
-        
+
         # Should warn on missing libraries
         assert shared_linking["missing_library_policy"] == "warn"
 
@@ -107,7 +114,7 @@ class TestEnhancedRPATH:
         """Test that ccache is disabled (incompatible with Spack-built compilers)."""
         config = generate_spack_config()
         spack_config = config["spack"]["config"]
-        
+
         # ccache is disabled because system ccache is incompatible with Spack-built compilers
         assert spack_config["ccache"] is False
 
@@ -115,7 +122,7 @@ class TestEnhancedRPATH:
         """Test additional Spack 1.x config options."""
         config = generate_spack_config()
         spack_config = config["spack"]["config"]
-        
+
         # Note: install_missing_compilers was removed as it's deprecated
         # Should have db_lock_timeout configured
         assert "db_lock_timeout" in spack_config
@@ -129,7 +136,7 @@ class TestGCCRuntimeIntegration:
         """Test that gcc-runtime is not in specs (it's built separately after compiler bootstrap)."""
         config = generate_spack_config()
         specs = config["spack"]["specs"]
-        
+
         # gcc-runtime is built separately after the compiler is registered,
         # not included in main specs
         gcc_runtime_specs = [spec for spec in specs if "gcc-runtime@" in spec]
@@ -171,11 +178,11 @@ class TestYAMLGenerationWithNewFeatures:
     def test_yaml_generation_with_hierarchy(self):
         """Test YAML generation with hierarchy enabled."""
         yaml_string = generate_yaml_string(enable_hierarchy=True)
-        
+
         assert isinstance(yaml_string, str)
         parsed = yaml.safe_load(yaml_string)
         assert "spack" in parsed
-        
+
         # Should have hierarchy configured
         modules = parsed["spack"]["modules"]["default"]["lmod"]
         assert "hierarchy" in modules
@@ -184,9 +191,9 @@ class TestYAMLGenerationWithNewFeatures:
     def test_yaml_generation_with_all_features(self):
         """Test YAML generation with all features enabled."""
         yaml_string = generate_yaml_string(enable_hierarchy=True)
-        
+
         parsed = yaml.safe_load(yaml_string)
-        
+
         # Should have all features configured
         assert parsed["spack"]["modules"]["default"]["lmod"]["hierarchy"] == ["mpi"]
         assert "verify" in parsed["spack"]["config"]
@@ -218,7 +225,14 @@ class TestBackwardCompatibility:
 
     def test_all_supported_os_versions_work(self):
         """Test that all compiler versions work with new features."""
-        supported_operating_systems = ["resolute", "noble", "jammy", "rockylinux10", "rockylinux9", "rockylinux8"]
+        supported_operating_systems = [
+            "resolute",
+            "noble",
+            "jammy",
+            "rockylinux10",
+            "rockylinux9",
+            "rockylinux8",
+        ]
         for supported_os in supported_operating_systems:
             config = generate_spack_config(
                 toolchain=supported_os,
