@@ -118,7 +118,7 @@ jobs:
     timeout-minutes: 3600
     environment: release
     env:
-      SLURM_FACTORY_CACHE_DIR: ${{ format('{0}/slurm-factory-{1}-{2}-{3}-{4}-{5}', runner.temp, github.run_id, github.run_attempt, matrix.architecture, matrix.toolchain, matrix.slurm_version) }}
+      SLURM_FACTORY_CACHE_DIR: ${{ format('/tmp/slurm-factory-{0}-{1}-{2}-{3}-{4}', github.run_id, github.run_attempt, matrix.architecture, matrix.toolchain, matrix.slurm_version) }}
     permissions:
       contents: read
       id-token: write

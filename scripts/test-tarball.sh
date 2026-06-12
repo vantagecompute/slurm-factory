@@ -236,7 +236,7 @@ if [ -n "${LOCAL_TARBALL_PATH}" ]; then
 else
     log_info "Source: remote (${BASE_URL})"
 fi
-    log_info "Test Image Tag: ${TEST_IMAGE_TAG}"
+log_info "Test Image Tag: ${TEST_IMAGE_TAG}"
 log_info "Cleanup: ${CLEANUP}"
 log_info "Verbose: ${VERBOSE}"
 log_info "Quiet: ${QUIET}"
