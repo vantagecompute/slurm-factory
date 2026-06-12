@@ -1420,6 +1420,7 @@ def create_slurm_package(
     container_install_tree_root = f"{container_build_root}/software"
     container_view_root = f"{container_build_root}/view"
     container_spack_stage_root = f"{CONTAINER_SPACK_STAGE_DIR}/{build_namespace}"
+    container_source_cache_root = f"{CONTAINER_CACHE_DIR}/source/downloads/{build_namespace}"
     container_misc_cache_root = f"{CONTAINER_CACHE_DIR}/source/misc/{build_namespace}"
 
     try:
@@ -1449,6 +1450,7 @@ def create_slurm_package(
             install_tree_root=container_install_tree_root,
             view_root=container_view_root,
             build_stage_root=container_spack_stage_root,
+            source_cache_root=container_source_cache_root,
             misc_cache_root=container_misc_cache_root,
         )
         logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")

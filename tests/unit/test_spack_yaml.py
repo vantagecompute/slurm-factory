@@ -148,6 +148,7 @@ class TestSpackConfigGeneration:
             install_tree_root="/opt/slurm/builds/build-123/software",
             view_root="/opt/slurm/builds/build-123/view",
             build_stage_root="/opt/spack-stage/build-123",
+            source_cache_root="/opt/slurm-factory-cache/source/downloads/build-123",
             misc_cache_root="/opt/slurm-factory-cache/source/misc/build-123",
         )
 
@@ -155,6 +156,7 @@ class TestSpackConfigGeneration:
 
         assert spack_config["config"]["install_tree"]["root"] == "/opt/slurm/builds/build-123/software"
         assert spack_config["config"]["build_stage"] == "/opt/spack-stage/build-123"
+        assert spack_config["config"]["source_cache"] == "/opt/slurm-factory-cache/source/downloads/build-123"
         assert spack_config["config"]["misc_cache"] == "/opt/slurm-factory-cache/source/misc/build-123"
         assert spack_config["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 
@@ -258,12 +260,14 @@ class TestYAMLGeneration:
             install_tree_root="/opt/slurm/builds/build-123/software",
             view_root="/opt/slurm/builds/build-123/view",
             build_stage_root="/opt/spack-stage/build-123",
+            source_cache_root="/opt/slurm-factory-cache/source/downloads/build-123",
             misc_cache_root="/opt/slurm-factory-cache/source/misc/build-123",
         )
         parsed = yaml.safe_load(yaml_string)
 
         assert parsed["spack"]["config"]["install_tree"]["root"] == "/opt/slurm/builds/build-123/software"
         assert parsed["spack"]["config"]["build_stage"] == "/opt/spack-stage/build-123"
+        assert parsed["spack"]["config"]["source_cache"] == "/opt/slurm-factory-cache/source/downloads/build-123"
         assert parsed["spack"]["config"]["misc_cache"] == "/opt/slurm-factory-cache/source/misc/build-123"
         assert parsed["spack"]["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 

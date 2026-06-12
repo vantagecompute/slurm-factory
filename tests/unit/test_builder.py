@@ -93,6 +93,7 @@ class TestSlurmBuilderModule:
         assert yaml_kwargs["install_tree_root"] == f"{expected_build_root}/software"
         assert yaml_kwargs["view_root"] == f"{expected_build_root}/view"
         assert yaml_kwargs["build_stage_root"] == f"/opt/spack-stage/{expected_namespace}"
+        assert yaml_kwargs["source_cache_root"] == f"/opt/slurm-factory-cache/source/downloads/{expected_namespace}"
         assert yaml_kwargs["misc_cache_root"] == f"/opt/slurm-factory-cache/source/misc/{expected_namespace}"
 
         mock_build_docker_image.assert_called_once()
