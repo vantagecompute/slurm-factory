@@ -178,6 +178,7 @@ def generate_spack_config(
     install_tree_root: str = "/opt/slurm/software",
     view_root: str = "/opt/slurm/view",  # Use separate view directory
     build_stage_root: str = "/opt/spack-stage",
+    misc_cache_root: str | None = None,
     toolchain: str = "noble",
     buildcache: str = "none",
     enable_hierarchy: bool = False,
@@ -191,6 +192,7 @@ def generate_spack_config(
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view
         build_stage_root: Root directory for Spack build stages
+        misc_cache_root: Root directory for Spack's misc cache
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         buildcache: Buildcache source ("none", "s3", "oci")
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
@@ -213,6 +215,7 @@ def generate_spack_config(
         )
 
     _, gcc_version, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
+    misc_cache_path = misc_cache_root or f"{build_stage_root}/cache"
 
     # Always use system compiler from toolchain
     compiler_spec = f"%gcc@{gcc_version}"
@@ -303,7 +306,7 @@ def generate_spack_config(
                     },
                 },
                 "build_stage": build_stage_root,
-                # "misc_cache": sourcecache_root,
+                "misc_cache": misc_cache_path,
                 # "binary_index_root": binary_index_root,
                 "checksum": True,
                 "deprecated": False,
@@ -520,6 +523,7 @@ def generate_yaml_string(
     install_tree_root: str = "/opt/slurm/software",
     view_root: str = "/opt/slurm/view",
     build_stage_root: str = "/opt/spack-stage",
+    misc_cache_root: str | None = None,
 ) -> str:
     """
     Generate a YAML string representation of the Spack environment configuration.
@@ -533,6 +537,7 @@ def generate_yaml_string(
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view
         build_stage_root: Root directory for Spack build stages
+        misc_cache_root: Root directory for Spack's misc cache
 
     Returns:
         YAML string representation of the configuration
@@ -547,6 +552,7 @@ def generate_yaml_string(
         install_tree_root=install_tree_root,
         view_root=view_root,
         build_stage_root=build_stage_root,
+        misc_cache_root=misc_cache_root,
     )
     header = get_comment_header(slurm_version, gpu_support)
 
