@@ -310,7 +310,7 @@ def get_slurm_build_script(
             exit 1
         fi
         echo '==> Detecting system compilers...'
-        spack compiler find --scope site
+        spack compiler find --scope user
         echo '==> Available compilers:'
         spack compiler list
         echo '==> Verifying gcc@{gcc_version} is available...'
