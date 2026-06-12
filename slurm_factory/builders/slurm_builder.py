@@ -1149,6 +1149,7 @@ def _run_spack_build_in_container(
     container_tmp_root = f"{container_spack_stage_root}/tmp"
     host_uid = os.getuid()
     host_gid = os.getgid()
+    container_user = "slurm-builder"
 
     # Prepare directories for mounting
     spack_stage_mount_dir: Path = settings.spack_stage_dir / toolchain / slurm_version
@@ -1217,8 +1218,6 @@ def _run_spack_build_in_container(
             "-dt",  # Detached mode with TTY for CUDA installer
             "--name",
             container_name,
-            "--user",
-            f"{host_uid}:{host_gid}",
             "-v",
             f"{spack_stage_mount_dir}:{CONTAINER_SPACK_STAGE_DIR}",
             "-v",
@@ -1246,8 +1245,19 @@ def _run_spack_build_in_container(
             "-e",
             f"TEMP={container_tmp_root}",
             base_image,
-            "sleep",
-            "infinity",
+            "/bin/bash",
+            "-lc",
+            (
+                f"if ! getent group {host_gid} >/dev/null; then "
+                f"groupadd -g {host_gid} {container_user} || "
+                f"echo '{container_user}:x:{host_gid}:' >> /etc/group; fi; "
+                f"if ! getent passwd {host_uid} >/dev/null; then "
+                f"useradd -u {host_uid} -g {host_gid} -d {container_spack_user_cache_root} "
+                f"-M -s /bin/bash {container_user} || "
+                f"echo '{container_user}:x:{host_uid}:{host_gid}::"
+                f"{container_spack_user_cache_root}:/bin/bash' >> /etc/passwd; fi; "
+                "sleep infinity"
+            ),
         ]
 
         logger.debug(f"Starting container: {' '.join(build_script_cmd)}")
@@ -1258,6 +1268,8 @@ def _run_spack_build_in_container(
         exec_build_cmd = [
             "docker",
             "exec",
+            "--user",
+            f"{host_uid}:{host_gid}",
             container_name,
             "/bin/bash",
             "/tmp/build-script.sh",
@@ -1295,6 +1307,8 @@ def _run_spack_build_in_container(
             "docker",
             "exec",
             "-i",
+            "--user",
+            f"{host_uid}:{host_gid}",
             container_name,
             "/bin/bash",
         ]
@@ -1318,6 +1332,8 @@ def _run_spack_build_in_container(
             "docker",
             "exec",
             "-i",
+            "--user",
+            f"{host_uid}:{host_gid}",
             container_name,
             "/bin/bash",
         ]
