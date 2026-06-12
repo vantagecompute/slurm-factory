@@ -58,6 +58,17 @@ class TestSlurmBuilderModule:
 
         assert namespace == "registry.local-slurm-factory-build-26.05"
 
+    def test_build_script_uses_configured_lmod_root(self):
+        """Generated build script should read modules from the configured writable Lmod root."""
+        script = slurm_builder.get_slurm_build_script(
+            "noble",
+            "26.05",
+            lmod_root="/opt/slurm/builds/build-123/lmod",
+        )
+
+        assert "find /opt/slurm/builds/build-123/lmod -type f -name '*.lua'" in script
+        assert "share/spack/lmod" not in script
+
     @patch("slurm_factory.builders.slurm_builder.subprocess.run")
     @patch("slurm_factory.builders.slurm_builder.remove_old_docker_image")
     @patch("slurm_factory.builders.slurm_builder.build_docker_image")
@@ -95,6 +106,7 @@ class TestSlurmBuilderModule:
         assert yaml_kwargs["build_stage_root"] == f"/opt/spack-stage/{expected_namespace}"
         assert yaml_kwargs["source_cache_root"] == f"/opt/slurm-factory-cache/source/downloads/{expected_namespace}"
         assert yaml_kwargs["misc_cache_root"] == f"/opt/slurm-factory-cache/source/misc/{expected_namespace}"
+        assert yaml_kwargs["lmod_root"] == f"{expected_build_root}/lmod"
 
         mock_build_docker_image.assert_called_once()
         mock_run_spack_build.assert_called_once()

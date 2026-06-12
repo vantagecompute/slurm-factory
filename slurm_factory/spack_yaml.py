@@ -64,6 +64,7 @@ def generate_module_config(
     gpu_support: bool = False,
     toolchain: str = "noble",
     enable_hierarchy: bool = False,
+    lmod_root: str | None = None,
 ) -> Dict[str, Any]:
     """
     Generate the Lmod module configuration section for Spack.
@@ -74,6 +75,7 @@ def generate_module_config(
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
             (default: False for backward compatibility)
+        lmod_root: Root directory for generated Lmod module files
 
     Returns:
         Dictionary representing the modules configuration section
@@ -119,6 +121,7 @@ def generate_module_config(
     modules_config: Dict[str, Any] = {
         "default": {
             "enable": ["lmod"],
+            "roots": {"lmod": lmod_root or "/opt/slurm/modules"},
             "lmod": {
                 "core_compilers": [f"gcc@{gcc_version}"],  # Mark gcc as core for relocatable binaries
                 "hierarchy": hierarchy,
@@ -180,6 +183,7 @@ def generate_spack_config(
     build_stage_root: str = "/opt/spack-stage",
     source_cache_root: str | None = None,
     misc_cache_root: str | None = None,
+    lmod_root: str | None = None,
     toolchain: str = "noble",
     buildcache: str = "none",
     enable_hierarchy: bool = False,
@@ -195,6 +199,7 @@ def generate_spack_config(
         build_stage_root: Root directory for Spack build stages
         source_cache_root: Root directory for Spack's downloaded source cache
         misc_cache_root: Root directory for Spack's misc cache
+        lmod_root: Root directory for generated Lmod module files
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         buildcache: Buildcache source ("none", "s3", "oci")
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
@@ -502,7 +507,13 @@ def generate_spack_config(
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
             # via spack compiler find (system compiler detection is disabled)
             "compilers": [],
-            "modules": generate_module_config(slurm_version, gpu_support, toolchain, enable_hierarchy),
+            "modules": generate_module_config(
+                slurm_version,
+                gpu_support,
+                toolchain,
+                enable_hierarchy,
+                lmod_root=lmod_root,
+            ),
         }
     }
 
@@ -529,6 +540,7 @@ def generate_yaml_string(
     build_stage_root: str = "/opt/spack-stage",
     source_cache_root: str | None = None,
     misc_cache_root: str | None = None,
+    lmod_root: str | None = None,
 ) -> str:
     """
     Generate a YAML string representation of the Spack environment configuration.
@@ -544,6 +556,7 @@ def generate_yaml_string(
         build_stage_root: Root directory for Spack build stages
         source_cache_root: Root directory for Spack's downloaded source cache
         misc_cache_root: Root directory for Spack's misc cache
+        lmod_root: Root directory for generated Lmod module files
 
     Returns:
         YAML string representation of the configuration
@@ -560,6 +573,7 @@ def generate_yaml_string(
         build_stage_root=build_stage_root,
         source_cache_root=source_cache_root,
         misc_cache_root=misc_cache_root,
+        lmod_root=lmod_root,
     )
     header = get_comment_header(slurm_version, gpu_support)
 

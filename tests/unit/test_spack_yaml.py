@@ -150,6 +150,7 @@ class TestSpackConfigGeneration:
             build_stage_root="/opt/spack-stage/build-123",
             source_cache_root="/opt/slurm-factory-cache/source/downloads/build-123",
             misc_cache_root="/opt/slurm-factory-cache/source/misc/build-123",
+            lmod_root="/opt/slurm/builds/build-123/lmod",
         )
 
         spack_config = config["spack"]
@@ -158,6 +159,7 @@ class TestSpackConfigGeneration:
         assert spack_config["config"]["build_stage"] == "/opt/spack-stage/build-123"
         assert spack_config["config"]["source_cache"] == "/opt/slurm-factory-cache/source/downloads/build-123"
         assert spack_config["config"]["misc_cache"] == "/opt/slurm-factory-cache/source/misc/build-123"
+        assert spack_config["modules"]["default"]["roots"]["lmod"] == "/opt/slurm/builds/build-123/lmod"
         assert spack_config["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 
 
@@ -171,6 +173,7 @@ class TestModuleConfiguration:
         assert "default" in module_config
         default_config = module_config["default"]
         assert "enable" in default_config
+        assert default_config["roots"]["lmod"] == "/opt/slurm/modules"
         assert "lmod" in default_config
         # Test Lmod configuration (using default noble toolchain: gcc@13.3.0)
         lmod_config = default_config["lmod"]
@@ -262,6 +265,7 @@ class TestYAMLGeneration:
             build_stage_root="/opt/spack-stage/build-123",
             source_cache_root="/opt/slurm-factory-cache/source/downloads/build-123",
             misc_cache_root="/opt/slurm-factory-cache/source/misc/build-123",
+            lmod_root="/opt/slurm/builds/build-123/lmod",
         )
         parsed = yaml.safe_load(yaml_string)
 
@@ -269,6 +273,7 @@ class TestYAMLGeneration:
         assert parsed["spack"]["config"]["build_stage"] == "/opt/spack-stage/build-123"
         assert parsed["spack"]["config"]["source_cache"] == "/opt/slurm-factory-cache/source/downloads/build-123"
         assert parsed["spack"]["config"]["misc_cache"] == "/opt/slurm-factory-cache/source/misc/build-123"
+        assert parsed["spack"]["modules"]["default"]["roots"]["lmod"] == "/opt/slurm/builds/build-123/lmod"
         assert parsed["spack"]["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 
     def test_generate_yaml_string_versions(self):

@@ -240,6 +240,7 @@ def get_slurm_build_script(
     slurm_version: str,
     view_root: str = f"{CONTAINER_SLURM_DIR}/view",
     spack_stage_root: str = CONTAINER_SPACK_STAGE_DIR,
+    lmod_root: str = f"{CONTAINER_SLURM_DIR}/modules-generated",
 ) -> str:
     """
     Generate script to build Slurm with Spack using the OS-provided system compiler.
@@ -253,6 +254,7 @@ def get_slurm_build_script(
         slurm_version: Slurm version being built (e.g., "25.11")
         view_root: Root directory for the Spack view created by this build
         spack_stage_root: Root directory for this build's Spack stage and temp files
+        lmod_root: Root directory where Spack writes generated Lmod module files
 
     Returns:
         Complete bash script for Slurm build using system compiler
@@ -367,8 +369,7 @@ def get_slurm_build_script(
         spack module lmod refresh --delete-tree -y
         spack module lmod refresh -y
         mkdir -p {CONTAINER_SLURM_DIR}/modules
-        SPACK_ROOT_PATH=$(spack location -r)
-        for f in $(find $SPACK_ROOT_PATH/share/spack/lmod -type f -name '*.lua'); do
+        for f in $(find {lmod_root} -type f -name '*.lua'); do
             case $f in *slurm*) cp "$f" {CONTAINER_SLURM_DIR}/modules/;; esac
         done
     """).strip()
@@ -1147,6 +1148,7 @@ def _run_spack_build_in_container(
     container_spack_user_cache_root = f"{container_spack_stage_root}/user-cache"
     container_gnupg_root = f"{container_spack_user_cache_root}/gnupg"
     container_tmp_root = f"{container_spack_stage_root}/tmp"
+    container_lmod_root = f"{container_build_root}/lmod"
     host_uid = os.getuid()
     host_gid = os.getgid()
     container_user = "slurm-builder"
@@ -1169,6 +1171,7 @@ def _run_spack_build_in_container(
         slurm_version,
         view_root=container_view_root,
         spack_stage_root=container_spack_stage_root,
+        lmod_root=container_lmod_root,
     )
     modulerc_script = get_modulerc_creation_script(
         module_dir=f"{container_view_root}/assets/modules/slurm",
@@ -1422,6 +1425,7 @@ def create_slurm_package(
     container_spack_stage_root = f"{CONTAINER_SPACK_STAGE_DIR}/{build_namespace}"
     container_source_cache_root = f"{CONTAINER_CACHE_DIR}/source/downloads/{build_namespace}"
     container_misc_cache_root = f"{CONTAINER_CACHE_DIR}/source/misc/{build_namespace}"
+    container_lmod_root = f"{container_build_root}/lmod"
 
     try:
         console.print(
@@ -1452,6 +1456,7 @@ def create_slurm_package(
             build_stage_root=container_spack_stage_root,
             source_cache_root=container_source_cache_root,
             misc_cache_root=container_misc_cache_root,
+            lmod_root=container_lmod_root,
         )
         logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
 
