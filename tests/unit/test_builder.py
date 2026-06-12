@@ -47,11 +47,6 @@ class TestSlurmBuilderModule:
         assert hasattr(slurm_builder, 'get_module_template_content')
         assert callable(slurm_builder.get_module_template_content)
 
-    def test_get_move_slurm_assets_to_container_str_exists(self):
-        """Test that get_move_slurm_assets_to_container_str function exists."""
-        assert hasattr(slurm_builder, 'get_move_slurm_assets_to_container_str')
-        assert callable(slurm_builder.get_move_slurm_assets_to_container_str)
-
     def test_sanitize_build_namespace(self):
         """Build namespaces should be safe for filesystem and container paths."""
         namespace = slurm_builder._sanitize_build_namespace("registry.local/slurm-factory:build 26.05")
@@ -128,15 +123,10 @@ class TestSlurmBuilderModule:
         mock_remove_old_docker_image.assert_any_call("slurm-factory:build-26-05-abc12345-base")
 
     @patch("slurm_factory.builders.slurm_builder.get_module_template_content", return_value="template")
-    @patch(
-        "slurm_factory.builders.slurm_builder.get_move_slurm_assets_to_container_str",
-        return_value="echo assets",
-    )
     @patch("slurm_factory.builders.slurm_builder.subprocess.run")
     def test_run_spack_build_mounts_namespaced_stage_and_cache_env(
         self,
         mock_subprocess_run,
-        mock_get_move_assets,
         mock_get_module_template,
         tmp_path: Path,
     ):

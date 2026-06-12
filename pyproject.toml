@@ -73,7 +73,6 @@ packages = ["slurm_factory"]
 
 [tool.hatch.build.targets.wheel.shared-data]
 "data/templates" = "share/slurm-factory/templates"
-"data/slurm_assets" = "share/slurm-factory/slurm_assets"
 
 
 [tool.hatch.build.targets.sdist]

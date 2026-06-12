@@ -11,7 +11,6 @@
 # limitations under the License.
 """Slurm build process management."""
 
-import base64
 import logging
 import os
 import platform
@@ -44,7 +43,6 @@ from slurm_factory.spack_yaml import generate_yaml_string
 from slurm_factory.utils import (
     build_docker_image,
     get_create_spack_profile_script,
-    get_data_dir,
     get_install_spack_script,
     remove_old_docker_image,
 )
@@ -154,74 +152,6 @@ def get_module_template_content() -> str:
         f"Could not find relocatable_modulefile.lua in installed location ({installed_path}) "
         f"or development location ({dev_path})"
     )
-
-
-def get_move_slurm_assets_to_container_str() -> str:
-    """
-    Generate Dockerfile commands to add slurm_assets files by embedding their content.
-
-    Iterates over all files and directories in slurm_assets and generates shell commands
-    that create the files in the container using base64 encoding to avoid escaping issues.
-
-    Returns
-    -------
-        Multi-line string with shell commands to create directories and files
-
-    """
-    data_dir = get_data_dir()
-    slurm_assets_dir = data_dir / "slurm_assets"
-
-    if not slurm_assets_dir.exists():
-        raise FileNotFoundError(f"slurm_assets directory not found at {slurm_assets_dir}")
-
-    commands = []
-
-    # Base directory to copy assets into
-    container_base_dir = f"{CONTAINER_SLURM_DIR}/slurm_assets"
-
-    # First, create the base directory
-    commands.append(f"mkdir -p {container_base_dir}")
-
-    # Walk through all files and directories
-    for root, dirs, files in os.walk(slurm_assets_dir):
-        root_path = Path(root)
-        # Get relative path from slurm_assets_dir
-        rel_path = root_path.relative_to(slurm_assets_dir)
-
-        # Create subdirectories in container
-        for dir_name in sorted(dirs):
-            if rel_path != Path("."):
-                container_dir = f"{container_base_dir}/{rel_path}/{dir_name}"
-            else:
-                container_dir = f"{container_base_dir}/{dir_name}"
-            commands.append(f"mkdir -p {container_dir}")
-
-        # Create files in container using base64 encoding
-        for file_name in sorted(files):
-            source_file = root_path / file_name
-            if rel_path != Path("."):
-                container_file = f"{container_base_dir}/{rel_path}/{file_name}"
-            else:
-                container_file = f"{container_base_dir}/{file_name}"
-
-            # Read file content and base64 encode it
-            try:
-                content_bytes = source_file.read_bytes()
-                encoded_content = base64.b64encode(content_bytes).decode("ascii")
-
-                # Use base64 decode to recreate the file
-                commands.append(f"echo '{encoded_content}' | base64 -d > {container_file}")
-
-                # Make scripts executable if they have .sh extension
-                if file_name.endswith(".sh"):
-                    commands.append(f"chmod +x {container_file}")
-
-            except Exception as e:
-                logger.warning(f"Failed to read {source_file}: {e}")
-                continue
-
-    # Join all commands with && for a single RUN statement
-    return " && \\\n    ".join(commands)
 
 
 def get_modulerc_creation_script(module_dir: str, modulerc_path: str) -> str:
@@ -472,8 +402,6 @@ def get_create_slurm_tarball_script(
         find . -name "__pycache__" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -name "*.pyc" -delete 2>/dev/null || true && \\
         find . -name "*.a" -delete 2>/dev/null || true && \\
-        mkdir -p assets && \\
-        cp -r {CONTAINER_SLURM_DIR}/slurm_assets assets/ && \\
         mkdir -p assets/modules/slurm && \\
         cp {CONTAINER_SLURM_DIR}/modules/*.lua assets/modules/slurm/ && \\
         {modulerc_script} && \\
@@ -1199,7 +1127,6 @@ def _run_spack_build_in_container(
         install_tree_root=container_install_tree_root,
         view_root=container_view_root,
     )
-    move_assets_script = get_move_slurm_assets_to_container_str()
     debug_bundle_dir = _prepare_build_debug_bundle(
         settings=settings,
         toolchain=toolchain,
@@ -1319,35 +1246,8 @@ def _run_spack_build_in_container(
 
         console.print("[green]✓ Spack build completed successfully[/green]")
 
-        # Copy assets and create tarball in the build container
+        # Create tarball in the build container
         console.print("[bold cyan]Creating tarball package...[/bold cyan]")
-
-        # Execute asset moving script in the build container
-        asset_exec_cmd = [
-            "docker",
-            "exec",
-            "-i",
-            "--user",
-            f"{host_uid}:{host_gid}",
-            container_name,
-            "/bin/bash",
-        ]
-
-        process = subprocess.Popen(
-            asset_exec_cmd,
-            stdin=subprocess.PIPE,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-        )
-
-        stdout, _ = process.communicate(input=move_assets_script)
-        console.print(escape(stdout), end="")
-
-        if process.returncode != 0:
-            raise SlurmFactoryError("Failed to move assets")
-
-        # Execute tarball creation script in the build container
         tarball_exec_cmd = [
             "docker",
             "exec",
