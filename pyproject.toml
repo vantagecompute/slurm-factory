@@ -41,7 +41,7 @@ dev = [
     "black>=25.9.0",
     "codespell>=2.4.0",
     "types-pyyaml>=6.0.12.20250915",
-    "pyright>=1.1.406",
+    "pyright>=1.1.410",
     "pytest>=8.4.2",
     "pytest-cov>=7.0.0",
 ]

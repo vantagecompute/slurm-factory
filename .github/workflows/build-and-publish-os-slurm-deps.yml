@@ -203,8 +203,49 @@ jobs:
           echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
+  # ── Consolidate buildcache indexes ──────────────────────────────────
+  # After all architecture matrix jobs complete, rebuild the spack
+  # buildcache index for each toolchain's deps mirror to guarantee it
+  # includes packages from all architectures.
+  consolidate-buildcache-index:
+    needs: [prepare-matrix, build-and-publish-slurm-dependencies]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    environment: release
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - name: Install Spack
+        run: |
+          git clone --depth=1 --branch=v1.0.0 https://github.com/spack/spack.git ~/spack
+          pip install --break-system-packages boto3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          role-duration-seconds: 3600
+
+      - name: Rebuild buildcache indexes
+        run: |
+          . ~/spack/share/spack/setup-env.sh
+          TOOLCHAINS='${{ needs.prepare-matrix.outputs.toolchain_matrix }}'
+
+          for toolchain in $(echo "$TOOLCHAINS" | jq -r '.[]'); do
+            MIRROR_URL="s3://${{ env.S3_BUCKET }}/${toolchain}/slurm/deps"
+            MIRROR_NAME="idx-${toolchain}-deps"
+            echo "==> Rebuilding index for ${MIRROR_URL}..."
+            spack mirror add "${MIRROR_NAME}" "${MIRROR_URL}"
+            spack buildcache update-index "${MIRROR_NAME}"
+            spack mirror rm "${MIRROR_NAME}"
+          done
+          echo "✓ All buildcache indexes consolidated"
+
   summary:
-    needs: build-and-publish-slurm-dependencies
+    needs: [build-and-publish-slurm-dependencies, consolidate-buildcache-index]
     runs-on: ubuntu-24.04
     timeout-minutes: 3600
     if: always()

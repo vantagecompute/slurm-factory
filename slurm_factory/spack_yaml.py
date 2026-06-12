@@ -285,9 +285,7 @@ def generate_spack_config(
     # (1.6.9 has implicit function declaration errors)
     specs.append(f"slurm_factory.freeipmi@1.6.16 {compiler_spec}")
     # OpenMPI with slurm scheduler support - explicitly depend on our slurm_factory.slurm
-    specs.append(
-        f"openmpi@5.0.8 schedulers=slurm fabrics=auto {compiler_spec}"
-    )
+    specs.append(f"openmpi@5.0.8 schedulers=slurm fabrics=auto {compiler_spec}")
     specs.append(f"pmix@5.0.5 ~munge ~python {compiler_spec}")
     # Use custom MySQL from slurm_factory repo with ABI check disabled
     specs.append(f"mysql@8.0.35 +client_only {compiler_spec}")

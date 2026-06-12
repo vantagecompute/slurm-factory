@@ -95,7 +95,7 @@ class TestSettings:
         settings.ensure_cache_dirs()
 
         # Should call mkdir for each directory
-        assert mock_mkdir.call_count == 5
+        assert mock_mkdir.call_count == 6
 
         # Check that all calls used the correct parameters
         for call in mock_mkdir.call_args_list:

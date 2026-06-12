@@ -1500,8 +1500,10 @@ def create_slurm_package(
 
         # Check if we need to keep the container for publishing
         needs_publish = bool(
-            gpg_private_key and gpg_passphrase and signing_key
-            and publish in ("slurm", "spack", "deps")
+            gpg_private_key
+            and gpg_passphrase
+            and signing_key
+            and publish in ("slurm", "spack", "deps", "all")
         )
 
         # Run the Spack build inside a container with mounted volumes
@@ -1520,7 +1522,12 @@ def create_slurm_package(
         tarball_build_output_dir = settings.builds_dir / toolchain / slurm_version
 
         # If publish is enabled, push to buildcache
-        if (gpg_private_key and gpg_passphrase and signing_key) and publish in ("slurm", "spack", "deps"):
+        if (gpg_private_key and gpg_passphrase and signing_key) and publish in (
+            "slurm",
+            "spack",
+            "deps",
+            "all",
+        ):
             console.print(f"[bold cyan]Publishing to buildcache ({publish})...[/bold cyan]")
 
             # Commit the container to an image so we can use it with _push_slurm_to_buildcache
