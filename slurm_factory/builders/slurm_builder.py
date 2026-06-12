@@ -77,6 +77,17 @@ def _sanitize_build_namespace(value: str) -> str:
     return namespace.strip("._-") or "build"
 
 
+def _get_sanitize_redistributable_module_script(module_dir: str) -> str:
+    """Return shell script that removes dependency module loads from tarball modules."""
+    return textwrap.dedent(f"""\
+        for module_file in {module_dir}/*.lua; do
+            [ -f "$module_file" ] || continue
+            sed -i.bak -E '/^[[:space:]]*(depends_on|prereq|always_load|load)[[:space:]]*\\(/d' "$module_file"
+            rm -f "$module_file.bak"
+        done
+    """).strip()
+
+
 def _copy_debug_bundle_file(source: Path, destination: Path) -> bool:
     """Copy a debug artifact if it exists."""
     if not source.exists() or not source.is_file():
@@ -263,6 +274,7 @@ def get_slurm_build_script(
     # Get GCC version for this toolchain
     _, gcc_version, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
     slurm_package_version = SLURM_VERSIONS[slurm_version]
+    sanitize_modules_script = _get_sanitize_redistributable_module_script(f"{CONTAINER_SLURM_DIR}/modules")
 
     return textwrap.dedent(f"""\
         mkdir -p {spack_stage_root}/tmp
@@ -372,6 +384,7 @@ def get_slurm_build_script(
         for f in $(find {lmod_root} -type f -name '*.lua'); do
             case $f in *slurm*) cp "$f" {CONTAINER_SLURM_DIR}/modules/;; esac
         done
+        {sanitize_modules_script}
     """).strip()
 
 

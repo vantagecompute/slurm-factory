@@ -71,6 +71,14 @@ class TestSlurmBuilderModule:
         assert "spack -e . install -j $(nproc)" not in script
         assert "share/spack/lmod" not in script
 
+    def test_build_script_removes_dependency_loads_from_redistributable_modules(self):
+        """Tarball modulefiles should not require dependency modulefiles absent from the tarball."""
+        script = slurm_builder.get_slurm_build_script("noble", "26.05")
+
+        assert "depends_on|prereq|always_load|load" in script
+        assert "sed -i.bak -E" in script
+        assert 'rm -f "$module_file.bak"' in script
+
     @patch("slurm_factory.builders.slurm_builder.subprocess.run")
     @patch("slurm_factory.builders.slurm_builder.remove_old_docker_image")
     @patch("slurm_factory.builders.slurm_builder.build_docker_image")
