@@ -67,6 +67,9 @@ class TestSlurmBuilderModule:
         )
 
         assert "find /opt/slurm/builds/build-123/lmod -type f -name '*.lua'" in script
+        assert 'basename "$(dirname "$f")"' in script
+        assert '" = "slurm"' in script
+        assert "case $f in *slurm*)" not in script
         assert 'spack -e . install -j "$JOBS" --reuse-deps --verbose' in script
         assert "spack -e . install -j $(nproc)" not in script
         assert "share/spack/lmod" not in script

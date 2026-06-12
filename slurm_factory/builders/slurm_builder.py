@@ -382,7 +382,7 @@ def get_slurm_build_script(
         spack module lmod refresh -y
         mkdir -p {CONTAINER_SLURM_DIR}/modules
         for f in $(find {lmod_root} -type f -name '*.lua'); do
-            case $f in *slurm*) cp "$f" {CONTAINER_SLURM_DIR}/modules/;; esac
+            [ "$(basename "$(dirname "$f")")" = "slurm" ] && cp "$f" {CONTAINER_SLURM_DIR}/modules/
         done
         {sanitize_modules_script}
     """).strip()
