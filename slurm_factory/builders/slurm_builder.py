@@ -267,6 +267,8 @@ def get_slurm_build_script(
         export TMPDIR={spack_stage_root}/tmp
         export TMP={spack_stage_root}/tmp
         export TEMP={spack_stage_root}/tmp
+        mkdir -p "$HOME" "$GNUPGHOME"
+        chmod 700 "$GNUPGHOME"
         # Copy spack.yaml from mount point to spack project (so it's in container filesystem)
         mkdir -p {CONTAINER_SPACK_PROJECT_DIR}
         cp /tmp/spack.yaml.mount {CONTAINER_SPACK_PROJECT_DIR}/spack.yaml
@@ -549,9 +551,10 @@ RUN {create_spack_profile_script}
 RUN mkdir -p \
     {CONTAINER_SPACK_PROJECT_DIR} \
     {CONTAINER_SPACK_TEMPLATES_DIR}/modules \
-    {CONTAINER_SLURM_DIR} && \
+    {CONTAINER_SLURM_DIR} \
+    /opt/spack/opt/spack/gpg && \
     mkdir -p {CONTAINER_CACHE_DIR}/buildcache {CONTAINER_CACHE_DIR}/source && \
-    chmod -R a+rwX {CONTAINER_ROOT_DIR} {CONTAINER_SLURM_DIR} {CONTAINER_CACHE_DIR}
+    chmod -R a+rwX {CONTAINER_ROOT_DIR} {CONTAINER_SLURM_DIR} {CONTAINER_CACHE_DIR} /opt/spack/opt
 
 WORKDIR {CONTAINER_SPACK_PROJECT_DIR}
 
@@ -1142,6 +1145,7 @@ def _run_spack_build_in_container(
     container_view_root = f"{container_build_root}/view"
     container_spack_stage_root = f"{CONTAINER_SPACK_STAGE_DIR}/{build_namespace}"
     container_spack_user_cache_root = f"{container_spack_stage_root}/user-cache"
+    container_gnupg_root = f"{container_spack_user_cache_root}/gnupg"
     container_tmp_root = f"{container_spack_stage_root}/tmp"
     host_uid = os.getuid()
     host_gid = os.getgid()
@@ -1231,6 +1235,10 @@ def _run_spack_build_in_container(
             f"{build_script_file}:/tmp/build-script.sh:ro",
             "-e",
             f"SPACK_USER_CACHE_PATH={container_spack_user_cache_root}",
+            "-e",
+            f"HOME={container_spack_user_cache_root}",
+            "-e",
+            f"GNUPGHOME={container_gnupg_root}",
             "-e",
             f"TMPDIR={container_tmp_root}",
             "-e",
