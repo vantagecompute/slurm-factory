@@ -23,7 +23,12 @@ from typing import Any, Dict
 
 import yaml
 
-from slurm_factory.constants import COMPILER_TOOLCHAINS, SLURM_FACTORY_SPACK_CACHE_BASE_URL, SLURM_VERSIONS
+from slurm_factory.constants import (
+    COMPILER_TOOLCHAINS,
+    SLURM_FACTORY_SPACK_CACHE_BASE_URL,
+    SLURM_FACTORY_SPACK_SOURCE_CACHE_URL,
+    SLURM_VERSIONS,
+)
 
 # Template name for relocatable module files (relative to Spack templates directory)
 TEMPLATE_NAME = "modules/relocatable_modulefile.lua"
@@ -44,6 +49,12 @@ def normalize_spack_target(architecture: str) -> str:
 def get_mirrors(buildcache: str, toolchain: str, slurm_version: str) -> Dict[str, Dict[str, bool | str]]:
     """Return the mirrors dictionary based on buildcache."""
     mirrors: Dict[str, Dict[str, bool | str]] = {
+        "slurm-factory-source-cache": {
+            "url": SLURM_FACTORY_SPACK_SOURCE_CACHE_URL,
+            "signed": False,
+            "binary": False,
+            "source": True,
+        },
         "spack-public": {
             "url": "https://mirror.spack.io",
             "signed": False,

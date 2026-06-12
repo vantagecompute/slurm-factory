@@ -294,6 +294,7 @@ DOCKER_COMMIT_TIMEOUT = 1800  # 30 minutes for container commit (large GPU image
 
 # Spack buildcache configuration
 SLURM_FACTORY_SPACK_CACHE_BASE_URL = "https://slurm-factory-spack-binary-cache.vantagecompute.ai"
+SLURM_FACTORY_SPACK_SOURCE_CACHE_URL = f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/source"
 
 # S3 bucket for Spack buildcache
 S3_BUILDCACHE_BUCKET = "s3://slurm-factory-spack-buildcache-4b670"

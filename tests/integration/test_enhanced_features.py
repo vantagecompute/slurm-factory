@@ -78,9 +78,10 @@ class TestBuildcacheSupport:
         config = generate_spack_config()
         mirrors = config["spack"]["mirrors"]
 
-        # Should only have spack-public mirror
+        # Source mirrors are configured even when binary buildcache is disabled.
+        assert "slurm-factory-source-cache" in mirrors
         assert "spack-public" in mirrors
-        assert "buildcache" not in mirrors
+        assert not any(mirror["binary"] for mirror in mirrors.values())
 
 
 class TestEnhancedRPATH:

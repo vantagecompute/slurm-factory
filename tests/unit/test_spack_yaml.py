@@ -367,9 +367,15 @@ class TestConfigurationValidation:
         """Test mirror configuration."""
         config = generate_spack_config()
         mirrors = config["spack"]["mirrors"]
-        # Should have spack-public mirror for source downloads
+        # Prefer the slurm-factory source cache before falling back to Spack's public mirror.
+        assert list(mirrors)[:2] == ["slurm-factory-source-cache", "spack-public"]
+        assert mirrors["slurm-factory-source-cache"]["url"] == (
+            "https://slurm-factory-spack-binary-cache.vantagecompute.ai/source"
+        )
+        assert mirrors["slurm-factory-source-cache"]["signed"] is False
+        assert mirrors["slurm-factory-source-cache"]["binary"] is False
+        assert mirrors["slurm-factory-source-cache"]["source"] is True
         assert "spack-public" in mirrors
-        # Test mirror properties
         assert mirrors["spack-public"]["url"] == "https://mirror.spack.io"
         assert mirrors["spack-public"]["signed"] is False
 
