@@ -128,6 +128,7 @@ def generate_module_config(
                 "include": (["slurm", "openmpi", "mysql"]),
                 "slurm": {
                     "template": TEMPLATE_NAME,  # Apply our custom template only to Slurm
+                    "autoload": "none",
                     "conflict": ["{name}"],
                     "environment": {
                         "set": {

@@ -184,12 +184,12 @@ class TestModuleConfiguration:
         assert "slurm" in lmod_config["include"]
         assert "openmpi" in lmod_config["include"]
 
-    def test_slurm_module_does_not_autoload_spack_dependencies(self):
-        """Tarball Slurm module should not depend on unshipped Spack dependency modules."""
+    def test_slurm_module_disables_dependency_autoload(self):
+        """Tarball Slurm module should not load unshipped Spack dependency modules."""
         module_config = generate_module_config()
         slurm_config = module_config["default"]["lmod"]["slurm"]
 
-        assert "autoload" not in slurm_config
+        assert slurm_config["autoload"] == "none"
 
     def test_slurm_module_configuration(self):
         """Test Slurm-specific module configuration."""
@@ -284,6 +284,7 @@ class TestYAMLGeneration:
         )
         assert parsed["spack"]["config"]["misc_cache"] == "/opt/slurm-factory-cache/source/misc/build-123"
         assert parsed["spack"]["modules"]["default"]["roots"]["lmod"] == "/opt/slurm/builds/build-123/lmod"
+        assert parsed["spack"]["modules"]["default"]["lmod"]["slurm"]["autoload"] == "none"
         assert parsed["spack"]["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 
     def test_generate_yaml_string_versions(self):

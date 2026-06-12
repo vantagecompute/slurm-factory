@@ -62,12 +62,12 @@ class TestModuleHierarchy:
         # Hierarchy should be empty in flat mode
         assert lmod_config["hierarchy"] == []
 
-    def test_slurm_no_autoload_for_relocatable_tarball(self):
-        """Slurm module should not autoload Spack dependency modules absent from tarballs."""
+    def test_slurm_disables_autoload_for_relocatable_tarball(self):
+        """Slurm module should not load Spack dependency modules absent from tarballs."""
         module_config = generate_module_config()
         slurm_config = module_config["default"]["lmod"]["slurm"]
 
-        assert "autoload" not in slurm_config
+        assert slurm_config["autoload"] == "none"
 
 
 class TestBuildcacheSupport:
