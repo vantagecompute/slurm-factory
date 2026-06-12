@@ -14,10 +14,14 @@
 
 """Unit tests for slurm_factory.builders module."""
 
+from pathlib import Path
+from unittest.mock import Mock, patch
+
 import pytest
 
 from slurm_factory.builders import slurm_builder
-from slurm_factory.constants import SlurmVersion
+from slurm_factory.config import Settings
+from slurm_factory.exceptions import SlurmFactoryError
 
 
 class TestSlurmBuilderModule:
@@ -42,8 +46,98 @@ class TestSlurmBuilderModule:
         """Test that helper functions exist."""
         assert hasattr(slurm_builder, 'get_module_template_content')
         assert callable(slurm_builder.get_module_template_content)
-        
+
     def test_get_move_slurm_assets_to_container_str_exists(self):
         """Test that get_move_slurm_assets_to_container_str function exists."""
         assert hasattr(slurm_builder, 'get_move_slurm_assets_to_container_str')
         assert callable(slurm_builder.get_move_slurm_assets_to_container_str)
+
+    def test_sanitize_build_namespace(self):
+        """Build namespaces should be safe for filesystem and container paths."""
+        namespace = slurm_builder._sanitize_build_namespace("registry.local/slurm-factory:build 26.05")
+
+        assert namespace == "registry.local-slurm-factory-build-26.05"
+
+    @patch("slurm_factory.builders.slurm_builder.subprocess.run")
+    @patch("slurm_factory.builders.slurm_builder.remove_old_docker_image")
+    @patch("slurm_factory.builders.slurm_builder.build_docker_image")
+    @patch("slurm_factory.builders.slurm_builder._run_spack_build_in_container")
+    @patch("slurm_factory.builders.slurm_builder.generate_yaml_string", return_value="spack:\n  specs: []\n")
+    def test_create_slurm_package_generates_namespaced_spack_roots(
+        self,
+        mock_generate_yaml_string,
+        mock_run_spack_build,
+        mock_build_docker_image,
+        mock_remove_old_docker_image,
+        mock_subprocess_run,
+        tmp_path: Path,
+    ):
+        """The mounted spack.yaml should use paths unique to the generated container name."""
+        mock_subprocess_run.return_value = Mock(returncode=0, stdout="", stderr="")
+
+        with patch.dict("os.environ", {"SLURM_FACTORY_CACHE_DIR": str(tmp_path)}):
+            settings = Settings(project_name="test")
+            slurm_builder.create_slurm_package(
+                image_tag="slurm-factory:build-26-05-abc12345",
+                settings=settings,
+                slurm_version="26.05",
+                toolchain="noble",
+            )
+
+        expected_namespace = "slurm-factory-build-26-05-abc12345"
+        expected_build_root = f"/opt/slurm/builds/{expected_namespace}"
+
+        mock_generate_yaml_string.assert_called_once()
+        yaml_kwargs = mock_generate_yaml_string.call_args.kwargs
+
+        assert yaml_kwargs["install_tree_root"] == f"{expected_build_root}/software"
+        assert yaml_kwargs["view_root"] == f"{expected_build_root}/view"
+        assert yaml_kwargs["build_stage_root"] == f"/opt/spack-stage/{expected_namespace}"
+
+        mock_build_docker_image.assert_called_once()
+        mock_run_spack_build.assert_called_once()
+        mock_remove_old_docker_image.assert_any_call("slurm-factory:build-26-05-abc12345")
+        mock_remove_old_docker_image.assert_any_call("slurm-factory:build-26-05-abc12345-base")
+
+    @patch("slurm_factory.builders.slurm_builder.get_module_template_content", return_value="template")
+    @patch(
+        "slurm_factory.builders.slurm_builder.get_move_slurm_assets_to_container_str",
+        return_value="echo assets",
+    )
+    @patch("slurm_factory.builders.slurm_builder.subprocess.run")
+    def test_run_spack_build_mounts_namespaced_stage_and_cache_env(
+        self,
+        mock_subprocess_run,
+        mock_get_move_assets,
+        mock_get_module_template,
+        tmp_path: Path,
+    ):
+        """The live Docker container should receive per-build Spack stage/cache paths."""
+        mock_subprocess_run.side_effect = [
+            Mock(returncode=0, stdout="", stderr=""),
+            Mock(returncode=1, stdout="", stderr=""),
+        ]
+
+        with patch.dict("os.environ", {"SLURM_FACTORY_CACHE_DIR": str(tmp_path)}):
+            settings = Settings(project_name="test")
+
+            with pytest.raises(SlurmFactoryError):
+                slurm_builder._run_spack_build_in_container(
+                    container_name="slurm-factory-build-26-05-abc12345",
+                    base_image="slurm-factory:build-26-05-abc12345-base",
+                    settings=settings,
+                    spack_yaml="spack:\n  specs: []\n",
+                    toolchain="noble",
+                    slurm_version="26.05",
+                    gpu_support=False,
+                )
+
+        docker_run_cmd = mock_subprocess_run.call_args_list[0].args[0]
+        expected_namespace = "slurm-factory-build-26-05-abc12345"
+        expected_stage_mount = f"{tmp_path}/spack-stage/noble/26.05:/opt/spack-stage"
+
+        assert expected_stage_mount in docker_run_cmd
+        assert f"SPACK_USER_CACHE_PATH=/opt/spack-stage/{expected_namespace}/user-cache" in docker_run_cmd
+        assert f"TMPDIR=/opt/spack-stage/{expected_namespace}/tmp" in docker_run_cmd
+        assert f"TMP=/opt/spack-stage/{expected_namespace}/tmp" in docker_run_cmd
+        assert f"TEMP=/opt/spack-stage/{expected_namespace}/tmp" in docker_run_cmd

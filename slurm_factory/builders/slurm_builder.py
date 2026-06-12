@@ -31,6 +31,7 @@ from slurm_factory.constants import (
     CONTAINER_CACHE_DIR,
     CONTAINER_SLURM_DIR,
     CONTAINER_SPACK_PROJECT_DIR,
+    CONTAINER_SPACK_STAGE_DIR,
     CONTAINER_SPACK_TEMPLATES_DIR,
     DOCKER_COMMIT_TIMEOUT,
     S3_BUILDCACHE_BUCKET,
@@ -69,6 +70,12 @@ def _get_slurm_tarball_name(slurm_version: str, toolchain: str, architecture: st
     return f"slurm-{slurm_version}-{toolchain}-{tarball_architecture}-software.tar.gz"
 
 
+def _sanitize_build_namespace(value: str) -> str:
+    """Return a filesystem-safe namespace for per-build container paths."""
+    namespace = "".join(char if char.isalnum() or char in "._-" else "-" for char in value)
+    return namespace.strip("._-") or "build"
+
+
 def _copy_debug_bundle_file(source: Path, destination: Path) -> bool:
     """Copy a debug artifact if it exists."""
     if not source.exists() or not source.is_file():
@@ -85,9 +92,12 @@ def _prepare_build_debug_bundle(
     slurm_version: str,
     spack_yaml: str,
     build_script: str,
+    build_namespace: str | None = None,
 ) -> Path:
     """Create a stable debug bundle directory with generated build inputs."""
     debug_dir = settings.build_debug_dir / toolchain / slurm_version
+    if build_namespace:
+        debug_dir = debug_dir / build_namespace
     shutil.rmtree(debug_dir, ignore_errors=True)
     debug_dir.mkdir(parents=True, exist_ok=True)
     (debug_dir / "spack.yaml").write_text(spack_yaml)
@@ -224,7 +234,12 @@ def get_modulerc_creation_script(module_dir: str, modulerc_path: str) -> str:
     )
 
 
-def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
+def get_slurm_build_script(
+    toolchain: str,
+    slurm_version: str,
+    view_root: str = f"{CONTAINER_SLURM_DIR}/view",
+    spack_stage_root: str = CONTAINER_SPACK_STAGE_DIR,
+) -> str:
     """
     Generate script to build Slurm with Spack using the OS-provided system compiler.
 
@@ -235,6 +250,8 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
     Args:
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         slurm_version: Slurm version being built (e.g., "25.11")
+        view_root: Root directory for the Spack view created by this build
+        spack_stage_root: Root directory for this build's Spack stage and temp files
 
     Returns:
         Complete bash script for Slurm build using system compiler
@@ -245,10 +262,10 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
     slurm_package_version = SLURM_VERSIONS[slurm_version]
 
     return textwrap.dedent(f"""\
-        mkdir -p /opt/spack-stage/tmp
-        export TMPDIR=/opt/spack-stage/tmp
-        export TMP=/opt/spack-stage/tmp
-        export TEMP=/opt/spack-stage/tmp
+        mkdir -p {spack_stage_root}/tmp
+        export TMPDIR={spack_stage_root}/tmp
+        export TMP={spack_stage_root}/tmp
+        export TEMP={spack_stage_root}/tmp
         # Copy spack.yaml from mount point to spack project (so it's in container filesystem)
         mkdir -p {CONTAINER_SPACK_PROJECT_DIR}
         cp /tmp/spack.yaml.mount {CONTAINER_SPACK_PROJECT_DIR}/spack.yaml
@@ -312,7 +329,7 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
 
         # Clean up any stale locks before installation
         echo '==> Cleaning stale locks...'
-        find /opt/spack-stage -name "*.lock" -mmin +60 -delete 2>/dev/null || true
+        find {spack_stage_root} -name "*.lock" -mmin +60 -delete 2>/dev/null || true
 
         # Use limited parallelism to avoid lock contention (max 8 jobs)
         JOBS=$(( $(nproc) < 8 ? $(nproc) : 8 ))
@@ -320,7 +337,7 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
         spack -e . install -j $(nproc) --reuse-deps --verbose || {{
             echo 'ERROR: spack install failed'
             echo 'Checking view status:'
-            ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'
+            ls -la {view_root} 2>&1 || echo 'View directory does not exist'
             echo 'Installed specs:'
             spack find -v 2>&1 || true
             exit 1
@@ -330,14 +347,14 @@ def get_slurm_build_script(toolchain: str, slurm_version: str) -> str:
             echo 'ERROR: Failed to regenerate environment view'
             echo 'Last error output should be above'
             echo 'Checking view status:'
-            ls -la {CONTAINER_SLURM_DIR}/view 2>&1 || echo 'View directory does not exist'
+            ls -la {view_root} 2>&1 || echo 'View directory does not exist'
             echo 'Checking for conflicting files:'
             spack -e . env status -v
             exit 1
         }}
         echo 'Verifying view was created...'
-        ls -la {CONTAINER_SLURM_DIR}/view || {{
-            echo 'ERROR: View was not created at {CONTAINER_SLURM_DIR}/view'
+        ls -la {view_root} || {{
+            echo 'ERROR: View was not created at {view_root}'
             echo 'Environment status:'
             spack env status
             echo 'spack.yaml content:'
@@ -360,6 +377,8 @@ def get_create_slurm_tarball_script(
     toolchain: str = "noble",
     architecture: str | None = None,
     gpu_support: bool = False,
+    install_tree_root: str = f"{CONTAINER_SLURM_DIR}/software",
+    view_root: str = f"{CONTAINER_SLURM_DIR}/view",
 ) -> str:
     """
     Generate script to package everything into a tarball.
@@ -370,9 +389,12 @@ def get_create_slurm_tarball_script(
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         architecture: CPU architecture label used in the output tarball name
         gpu_support: Whether GPU support is enabled (affects CUDA/ROCm handling)
+        install_tree_root: Root directory for Spack installations
+        view_root: Root directory for the Spack view to package
 
     """
     tarball_base = _get_slurm_tarball_name(version, toolchain, architecture).removesuffix(".tar.gz")
+    view_parent, view_name = view_root.rsplit("/", 1)
 
     # When GPU support is enabled, we need to copy specific GPU .so files from install tree
     # since CUDA and ROCm packages are excluded from the view
@@ -380,12 +402,12 @@ def get_create_slurm_tarball_script(
     if gpu_support:
         gpu_handling_script = textwrap.dedent(f"""\
             echo "DEBUG: Copying GPU libraries from Spack install tree..." && \\
-            mkdir -p {CONTAINER_SLURM_DIR}/view/lib/gpu && \\
+            mkdir -p {view_root}/lib/gpu && \\
             for lib in libnvidia-ml.so librocm_smi64.so librocm-core.so; do \\
-                find /opt/slurm/software -name "$lib*" \\
+                find {install_tree_root} -name "$lib*" \\
                     \\( -type f -o -type l \\) 2>/dev/null | while read -r libfile; do \\
                     echo "DEBUG: Copying GPU library: $libfile" && \\
-                    cp -P "$libfile" {CONTAINER_SLURM_DIR}/view/lib/gpu/ || true; \\
+                    cp -P "$libfile" {view_root}/lib/gpu/ || true; \\
                 done; \\
             done && \\
         """).strip()
@@ -393,25 +415,25 @@ def get_create_slurm_tarball_script(
     # Copy SSSD NSS module from system to view for LDAP/AD user lookups
     sssd_nss_script = textwrap.dedent(f"""\
         echo "DEBUG: Copying SSSD NSS libraries from system..." && \\
-        mkdir -p {CONTAINER_SLURM_DIR}/view/lib/sssd && \\
+        mkdir -p {view_root}/lib/sssd && \\
         for lib in libnss_sss.so; do \\
             find /usr/lib /usr/lib64 /lib /lib64 -name "$lib*" \\
                 \\( -type f -o -type l \\) 2>/dev/null | while read -r libfile; do \\
                 echo "DEBUG: Copying SSSD library: $libfile" && \\
-                cp -P "$libfile" {CONTAINER_SLURM_DIR}/view/lib/sssd/ || true; \\
+                cp -P "$libfile" {view_root}/lib/sssd/ || true; \\
             done; \\
         done && \\
     """).strip()
 
     return textwrap.dedent(f"""\
         set -e && \\
-        [ -d "{CONTAINER_SLURM_DIR}/view" ] || {{ \\
-            echo "ERROR: Spack view was not created at {CONTAINER_SLURM_DIR}/view"; \\
+        [ -d "{view_root}" ] || {{ \\
+            echo "ERROR: Spack view was not created at {view_root}"; \\
             exit 1; \\
         }} && \\
         MISSING_LIBS="" && \\
         for lib in libmunge.so libjwt.so libjansson.so; do \\
-            if ! find {CONTAINER_SLURM_DIR}/view/lib* -name "$lib*" 2>/dev/null | grep -q .; then \\
+            if ! find {view_root}/lib* -name "$lib*" 2>/dev/null | grep -q .; then \\
                 echo "WARNING: $lib not found in view" && \\
                 MISSING_LIBS="$MISSING_LIBS $lib"; \\
             fi; \\
@@ -423,7 +445,7 @@ def get_create_slurm_tarball_script(
             echo "DEBUG: All critical libraries verified in view"; \\
         fi && \\
         echo "DEBUG: Packaging view directly (projections create FHS layout)..." && \\
-        cd {CONTAINER_SLURM_DIR}/view && \\
+        cd {view_root} && \\
         {gpu_handling_script if gpu_handling_script else ""}{sssd_nss_script}find . -name "include" -type d \\
             -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -path "*/lib/pkgconfig" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
@@ -438,9 +460,9 @@ def get_create_slurm_tarball_script(
         mkdir -p assets/modules/slurm && \\
         cp {CONTAINER_SLURM_DIR}/modules/*.lua assets/modules/slurm/ && \\
         {modulerc_script} && \\
-        cd {CONTAINER_SLURM_DIR} && \\
+        cd {view_parent} && \\
         mkdir -p {CONTAINER_SLURM_DIR}/redistributable && \\
-        tar -chzf {CONTAINER_SLURM_DIR}/redistributable/{tarball_base}.tar.gz view && \\
+        tar -chzf {CONTAINER_SLURM_DIR}/redistributable/{tarball_base}.tar.gz {view_name} && \\
         mkdir -p {CONTAINER_BUILD_OUTPUT_DIR} && \\
         cp {CONTAINER_SLURM_DIR}/redistributable/{tarball_base}.tar.gz {CONTAINER_BUILD_OUTPUT_DIR}/
     """).strip()
@@ -1112,8 +1134,17 @@ def _run_spack_build_in_container(
     console.print(f"[bold cyan]Running Spack build in container {container_name}...[/bold cyan]")
     logger.debug(f"Starting build container: {container_name}")
 
+    build_namespace = _sanitize_build_namespace(container_name)
+    container_build_root = f"{CONTAINER_SLURM_DIR}/builds/{build_namespace}"
+    container_install_tree_root = f"{container_build_root}/software"
+    container_view_root = f"{container_build_root}/view"
+    container_spack_stage_root = f"{CONTAINER_SPACK_STAGE_DIR}/{build_namespace}"
+    container_spack_user_cache_root = f"{container_spack_stage_root}/user-cache"
+    container_tmp_root = f"{container_spack_stage_root}/tmp"
+
     # Prepare directories for mounting
-    spack_stage_dir: Path = settings.spack_stage_dir / toolchain / slurm_version
+    spack_stage_mount_dir: Path = settings.spack_stage_dir / toolchain / slurm_version
+    spack_stage_dir: Path = spack_stage_mount_dir / build_namespace
     spack_buildcache_dir: Path = settings.spack_buildcache_dir
     spack_sourcecache_dir: Path = settings.spack_sourcecache_dir
     tarball_build_output_dir: Path = settings.builds_dir / toolchain / slurm_version
@@ -1124,10 +1155,15 @@ def _run_spack_build_in_container(
 
     # Generate build scripts
     module_template_content = get_module_template_content()
-    slurm_build_script = get_slurm_build_script(toolchain, slurm_version)
+    slurm_build_script = get_slurm_build_script(
+        toolchain,
+        slurm_version,
+        view_root=container_view_root,
+        spack_stage_root=container_spack_stage_root,
+    )
     modulerc_script = get_modulerc_creation_script(
-        module_dir=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm",
-        modulerc_path=f"{CONTAINER_SLURM_DIR}/view/assets/modules/slurm/.modulerc.lua",
+        module_dir=f"{container_view_root}/assets/modules/slurm",
+        modulerc_path=f"{container_view_root}/assets/modules/slurm/.modulerc.lua",
     )
     create_slurm_tarball_script = get_create_slurm_tarball_script(
         modulerc_script,
@@ -1135,6 +1171,8 @@ def _run_spack_build_in_container(
         toolchain,
         _get_normalized_architecture(),
         gpu_support,
+        install_tree_root=container_install_tree_root,
+        view_root=container_view_root,
     )
     move_assets_script = get_move_slurm_assets_to_container_str()
     debug_bundle_dir = _prepare_build_debug_bundle(
@@ -1143,6 +1181,7 @@ def _run_spack_build_in_container(
         slurm_version=slurm_version,
         spack_yaml=spack_yaml,
         build_script=slurm_build_script,
+        build_namespace=build_namespace,
     )
 
     try:
@@ -1171,7 +1210,7 @@ def _run_spack_build_in_container(
             "--name",
             container_name,
             "-v",
-            f"{spack_stage_dir}:/opt/spack-stage",
+            f"{spack_stage_mount_dir}:{CONTAINER_SPACK_STAGE_DIR}",
             "-v",
             f"{spack_buildcache_dir}:{CONTAINER_CACHE_DIR}/buildcache",
             "-v",
@@ -1185,13 +1224,13 @@ def _run_spack_build_in_container(
             "-v",
             f"{build_script_file}:/tmp/build-script.sh:ro",
             "-e",
-            "SPACK_USER_CACHE_PATH=/opt/spack-stage",
+            f"SPACK_USER_CACHE_PATH={container_spack_user_cache_root}",
             "-e",
-            "TMPDIR=/opt/spack-stage/tmp",
+            f"TMPDIR={container_tmp_root}",
             "-e",
-            "TMP=/opt/spack-stage/tmp",
+            f"TMP={container_tmp_root}",
             "-e",
-            "TEMP=/opt/spack-stage/tmp",
+            f"TEMP={container_tmp_root}",
             base_image,
             "sleep",
             "infinity",
@@ -1346,6 +1385,11 @@ def create_slurm_package(
     # Generate container and image names
     container_name = image_tag.replace(":", "-")  # Docker container names can't have ':'
     base_image_tag = f"{image_tag}-base"
+    build_namespace = _sanitize_build_namespace(container_name)
+    container_build_root = f"{CONTAINER_SLURM_DIR}/builds/{build_namespace}"
+    container_install_tree_root = f"{container_build_root}/software"
+    container_view_root = f"{container_build_root}/view"
+    container_spack_stage_root = f"{CONTAINER_SPACK_STAGE_DIR}/{build_namespace}"
 
     try:
         console.print(
@@ -1371,6 +1415,9 @@ def create_slurm_package(
             buildcache=buildcache,
             gpu_support=gpu_support,
             enable_hierarchy=enable_hierarchy,
+            install_tree_root=container_install_tree_root,
+            view_root=container_view_root,
+            build_stage_root=container_spack_stage_root,
         )
         logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
 
@@ -1480,8 +1527,11 @@ def create_slurm_package(
         console.print("[dim]  # Access the build container:[/dim]")
         console.print(f"[dim]  docker exec -it {container_name} bash[/dim]")
         console.print("\n[dim]  # Inside container:[/dim]")
-        console.print("[dim]  ls -la /opt/spack-stage  # Spack build logs and stage directory[/dim]")
-        console.print(f"[dim]  ls -la {escape(CONTAINER_SLURM_DIR)}/view  # Built Slurm installation[/dim]")
+        console.print(
+            f"[dim]  ls -la {escape(container_spack_stage_root)}  "
+            "# Spack build logs and stage directory[/dim]"
+        )
+        console.print(f"[dim]  ls -la {escape(container_view_root)}  # Built Slurm installation[/dim]")
         console.print("\n[dim]  # Stop and remove container when done:[/dim]")
         console.print(f"[dim]  docker stop {container_name} && docker rm {container_name}[/dim]")
 

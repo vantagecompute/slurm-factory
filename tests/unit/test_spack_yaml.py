@@ -35,20 +35,29 @@ class TestSpackConfigGeneration:
     def test_generate_spack_config_default(self):
         """Test default Spack configuration generation."""
         config = generate_spack_config()
-        
+
         # Test top-level structure
         assert "spack" in config
         spack_config = config["spack"]
-        
+
         # Test required sections
-        required_sections = ["specs", "concretizer", "view", "config", "mirrors", "compilers", "packages", "modules"]
+        required_sections = [
+            "specs",
+            "concretizer",
+            "view",
+            "config",
+            "mirrors",
+            "compilers",
+            "packages",
+            "modules",
+        ]
         for section in required_sections:
             assert section in spack_config, f"Missing section: {section}"
-        
+
         # Test default specs
         assert isinstance(spack_config["specs"], list)
         assert len(spack_config["specs"]) > 0
-        
+
         # Test that all specs have compiler constraints (using default noble toolchain: gcc@13.3.0)
         # EXCEPT gcc itself which should not have a compiler spec (it's built with system compiler)
         for spec in spack_config["specs"]:
@@ -132,6 +141,20 @@ class TestSpackConfigGeneration:
         libjwt_config = packages["libjwt"]
         assert libjwt_config["buildable"] is True
         # Dependencies are specified in specs list instead of require section
+
+    def test_custom_spack_roots(self):
+        """Custom roots should be reflected in the generated Spack configuration."""
+        config = generate_spack_config(
+            install_tree_root="/opt/slurm/builds/build-123/software",
+            view_root="/opt/slurm/builds/build-123/view",
+            build_stage_root="/opt/spack-stage/build-123",
+        )
+
+        spack_config = config["spack"]
+
+        assert spack_config["config"]["install_tree"]["root"] == "/opt/slurm/builds/build-123/software"
+        assert spack_config["config"]["build_stage"] == "/opt/spack-stage/build-123"
+        assert spack_config["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 
 
 class TestModuleConfiguration:
@@ -226,6 +249,19 @@ class TestYAMLGeneration:
         # Test that it has a comment header
         lines = yaml_string.split('\n')
         assert lines[0].startswith("#")
+
+    def test_generate_yaml_string_custom_roots(self):
+        """YAML generation should preserve caller-provided build roots."""
+        yaml_string = generate_yaml_string(
+            install_tree_root="/opt/slurm/builds/build-123/software",
+            view_root="/opt/slurm/builds/build-123/view",
+            build_stage_root="/opt/spack-stage/build-123",
+        )
+        parsed = yaml.safe_load(yaml_string)
+
+        assert parsed["spack"]["config"]["install_tree"]["root"] == "/opt/slurm/builds/build-123/software"
+        assert parsed["spack"]["config"]["build_stage"] == "/opt/spack-stage/build-123"
+        assert parsed["spack"]["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 
     def test_generate_yaml_string_versions(self):
         """Test YAML generation for different versions."""
