@@ -273,7 +273,7 @@ def get_slurm_build_script(
         chmod 700 "$GNUPGHOME"
         # Copy spack.yaml from mount point to spack project (so it's in container filesystem)
         mkdir -p {CONTAINER_SPACK_PROJECT_DIR}
-        cp /tmp/spack.yaml.mount {CONTAINER_SPACK_PROJECT_DIR}/spack.yaml
+        cp {CONTAINER_SPACK_PROJECT_DIR}/spack.yaml.mount {CONTAINER_SPACK_PROJECT_DIR}/spack.yaml
         source {SPACK_SETUP_SCRIPT}
         cd {CONTAINER_SPACK_PROJECT_DIR}
         spack env activate .
@@ -339,7 +339,7 @@ def get_slurm_build_script(
         # Use limited parallelism to avoid lock contention (max 8 jobs)
         JOBS=$(( $(nproc) < 8 ? $(nproc) : 8 ))
         echo "==> Installing Slurm and all dependencies with $JOBS parallel jobs..."
-        spack -e . install -j $(nproc) --reuse-deps --verbose || {{
+        spack -e . install -j "$JOBS" --reuse-deps --verbose || {{
             echo 'ERROR: spack install failed'
             echo 'Checking view status:'
             ls -la {view_root} 2>&1 || echo 'View directory does not exist'
@@ -1197,17 +1197,21 @@ def _run_spack_build_in_container(
     )
 
     try:
-        # Write spack.yaml to a temp file for mounting
+        # Write generated container inputs under the build cache root so large builds
+        # avoid /tmp-backed storage.
         console.print("[dim]Preparing configuration files...[/dim]")
-        spack_yaml_file = Path(f"/tmp/spack-{container_name}.yaml")
+        container_inputs_dir = settings.home_cache_dir / "container-inputs" / build_namespace
+        container_inputs_dir.mkdir(parents=True, exist_ok=True)
+
+        spack_yaml_file = container_inputs_dir / "spack.yaml"
         spack_yaml_file.write_text(spack_yaml)
 
-        # Write module template to a temp file for mounting
-        module_template_file = Path(f"/tmp/module-{container_name}.lua")
+        # Write module template to a cache-rooted file for mounting
+        module_template_file = container_inputs_dir / "relocatable_modulefile.lua"
         module_template_file.write_text(module_template_content)
 
-        # Write build script to a temp file for mounting
-        build_script_file = Path(f"/tmp/build-script-{container_name}.sh")
+        # Write build script to a cache-rooted file for mounting
+        build_script_file = container_inputs_dir / "build-script.sh"
         build_script_file.write_text(slurm_build_script)
 
         # Execute the Spack build script using docker run
@@ -1230,11 +1234,11 @@ def _run_spack_build_in_container(
             "-v",
             f"{tarball_build_output_dir}:{CONTAINER_BUILD_OUTPUT_DIR}",
             "-v",
-            f"{spack_yaml_file}:/tmp/spack.yaml.mount:ro",
+            f"{spack_yaml_file}:{CONTAINER_SPACK_PROJECT_DIR}/spack.yaml.mount:ro",
             "-v",
             f"{module_template_file}:{CONTAINER_SPACK_TEMPLATES_DIR}/modules/relocatable_modulefile.lua",
             "-v",
-            f"{build_script_file}:/tmp/build-script.sh:ro",
+            f"{build_script_file}:{CONTAINER_SPACK_PROJECT_DIR}/build-script.sh:ro",
             "-e",
             f"SPACK_USER_CACHE_PATH={container_spack_user_cache_root}",
             "-e",
@@ -1275,7 +1279,7 @@ def _run_spack_build_in_container(
             f"{host_uid}:{host_gid}",
             container_name,
             "/bin/bash",
-            "/tmp/build-script.sh",
+            f"{CONTAINER_SPACK_PROJECT_DIR}/build-script.sh",
         ]
 
         result = subprocess.run(
@@ -1423,7 +1427,7 @@ def create_slurm_package(
     container_install_tree_root = f"{container_build_root}/software"
     container_view_root = f"{container_build_root}/view"
     container_spack_stage_root = f"{CONTAINER_SPACK_STAGE_DIR}/{build_namespace}"
-    container_source_cache_root = f"{CONTAINER_CACHE_DIR}/source/downloads/{build_namespace}"
+    container_source_cache_root = f"{container_spack_stage_root}/source-cache"
     container_misc_cache_root = f"{CONTAINER_CACHE_DIR}/source/misc/{build_namespace}"
     container_lmod_root = f"{container_build_root}/lmod"
 

@@ -67,6 +67,8 @@ class TestSlurmBuilderModule:
         )
 
         assert "find /opt/slurm/builds/build-123/lmod -type f -name '*.lua'" in script
+        assert 'spack -e . install -j "$JOBS" --reuse-deps --verbose' in script
+        assert "spack -e . install -j $(nproc)" not in script
         assert "share/spack/lmod" not in script
 
     @patch("slurm_factory.builders.slurm_builder.subprocess.run")
@@ -104,7 +106,7 @@ class TestSlurmBuilderModule:
         assert yaml_kwargs["install_tree_root"] == f"{expected_build_root}/software"
         assert yaml_kwargs["view_root"] == f"{expected_build_root}/view"
         assert yaml_kwargs["build_stage_root"] == f"/opt/spack-stage/{expected_namespace}"
-        assert yaml_kwargs["source_cache_root"] == f"/opt/slurm-factory-cache/source/downloads/{expected_namespace}"
+        assert yaml_kwargs["source_cache_root"] == f"/opt/spack-stage/{expected_namespace}/source-cache"
         assert yaml_kwargs["misc_cache_root"] == f"/opt/slurm-factory-cache/source/misc/{expected_namespace}"
         assert yaml_kwargs["lmod_root"] == f"{expected_build_root}/lmod"
 
@@ -147,10 +149,18 @@ class TestSlurmBuilderModule:
                 )
 
         docker_run_cmd = mock_subprocess_run.call_args_list[0].args[0]
+        exec_build_cmd = mock_subprocess_run.call_args_list[1].args[0]
         expected_namespace = "slurm-factory-build-26-05-abc12345"
         expected_stage_mount = f"{tmp_path}/spack-stage/noble/26.05:/opt/spack-stage"
+        expected_inputs_dir = f"{tmp_path}/container-inputs/{expected_namespace}"
 
         assert expected_stage_mount in docker_run_cmd
+        assert f"{expected_inputs_dir}/spack.yaml:/root/spack-project/spack.yaml.mount:ro" in docker_run_cmd
+        assert (
+            f"{expected_inputs_dir}/build-script.sh:/root/spack-project/build-script.sh:ro"
+            in docker_run_cmd
+        )
+        assert "/root/spack-project/build-script.sh" in exec_build_cmd
         assert f"SPACK_USER_CACHE_PATH=/opt/spack-stage/{expected_namespace}/user-cache" in docker_run_cmd
         assert f"TMPDIR=/opt/spack-stage/{expected_namespace}/tmp" in docker_run_cmd
         assert f"TMP=/opt/spack-stage/{expected_namespace}/tmp" in docker_run_cmd
