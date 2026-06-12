@@ -549,7 +549,8 @@ RUN mkdir -p \
     {CONTAINER_SPACK_PROJECT_DIR} \
     {CONTAINER_SPACK_TEMPLATES_DIR}/modules \
     {CONTAINER_SLURM_DIR} && \
-        mkdir -p {CONTAINER_CACHE_DIR}/buildcache {CONTAINER_CACHE_DIR}/source
+    mkdir -p {CONTAINER_CACHE_DIR}/buildcache {CONTAINER_CACHE_DIR}/source && \
+    chmod -R a+rwX {CONTAINER_ROOT_DIR} {CONTAINER_SLURM_DIR} {CONTAINER_CACHE_DIR}
 
 WORKDIR {CONTAINER_SPACK_PROJECT_DIR}
 
@@ -1141,6 +1142,8 @@ def _run_spack_build_in_container(
     container_spack_stage_root = f"{CONTAINER_SPACK_STAGE_DIR}/{build_namespace}"
     container_spack_user_cache_root = f"{container_spack_stage_root}/user-cache"
     container_tmp_root = f"{container_spack_stage_root}/tmp"
+    host_uid = os.getuid()
+    host_gid = os.getgid()
 
     # Prepare directories for mounting
     spack_stage_mount_dir: Path = settings.spack_stage_dir / toolchain / slurm_version
@@ -1209,6 +1212,8 @@ def _run_spack_build_in_container(
             "-dt",  # Detached mode with TTY for CUDA installer
             "--name",
             container_name,
+            "--user",
+            f"{host_uid}:{host_gid}",
             "-v",
             f"{spack_stage_mount_dir}:{CONTAINER_SPACK_STAGE_DIR}",
             "-v",
