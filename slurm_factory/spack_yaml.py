@@ -29,6 +29,18 @@ from slurm_factory.constants import COMPILER_TOOLCHAINS, SLURM_FACTORY_SPACK_CAC
 TEMPLATE_NAME = "modules/relocatable_modulefile.lua"
 
 
+def normalize_spack_target(architecture: str) -> str:
+    """Return a Spack target name for an artifact architecture label."""
+    architecture_aliases = {
+        "amd64": "x86_64",
+        "x86_64": "x86_64",
+        "arm64": "aarch64",
+        "aarch64": "aarch64",
+    }
+
+    return architecture_aliases.get(architecture.lower(), architecture.lower())
+
+
 def get_mirrors(buildcache: str, toolchain: str, slurm_version: str) -> Dict[str, Dict[str, bool | str]]:
     """Return the mirrors dictionary based on buildcache."""
     mirrors: Dict[str, Dict[str, bool | str]] = {
@@ -178,6 +190,7 @@ def generate_module_config(
 def generate_spack_config(
     slurm_version: str = "25.11",
     gpu_support: bool = False,
+    architecture: str = "x86_64",
     install_tree_root: str = "/opt/slurm/software",
     view_root: str = "/opt/slurm/view",  # Use separate view directory
     build_stage_root: str = "/opt/spack-stage",
@@ -194,6 +207,7 @@ def generate_spack_config(
     Args:
         slurm_version: Slurm version to build (25.11, 24.11, 23.11)
         gpu_support: Whether to include GPU support (NVML, RSMI)
+        architecture: CPU architecture target for Spack packages
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view
         build_stage_root: Root directory for Spack build stages
@@ -222,6 +236,7 @@ def generate_spack_config(
         )
 
     _, gcc_version, _, _, _ = COMPILER_TOOLCHAINS[toolchain]
+    spack_target = normalize_spack_target(architecture)
     source_cache_path = source_cache_root or f"{build_stage_root}/source-cache"
     misc_cache_path = misc_cache_root or f"{build_stage_root}/cache"
 
@@ -339,7 +354,7 @@ def generate_spack_config(
             # Libraries are runtime deps - must be built for self-contained Slurm
             "packages": {
                 "all": {
-                    "target": ["x86_64"],
+                    "target": [spack_target],
                     "buildable": True,
                     "providers": {"mpi": ["openmpi"]},
                 },
@@ -534,6 +549,7 @@ def generate_yaml_string(
     toolchain: str = "noble",
     buildcache: str = "none",
     gpu_support: bool = False,
+    architecture: str = "x86_64",
     enable_hierarchy: bool = False,
     install_tree_root: str = "/opt/slurm/software",
     view_root: str = "/opt/slurm/view",
@@ -550,6 +566,7 @@ def generate_yaml_string(
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         buildcache: "none", "all", "deps"
         gpu_support: Whether to include GPU support
+        architecture: CPU architecture target for Spack packages
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
         install_tree_root: Root directory for Spack installations
         view_root: Root directory for Spack view
@@ -567,6 +584,7 @@ def generate_yaml_string(
         toolchain=toolchain,
         buildcache=buildcache,
         gpu_support=gpu_support,
+        architecture=architecture,
         enable_hierarchy=enable_hierarchy,
         install_tree_root=install_tree_root,
         view_root=view_root,

@@ -109,9 +109,9 @@ jobs:
           echo "architecture_matrix=${ARCHITECTURES}" >> $GITHUB_OUTPUT
           echo "Building for architectures: ${ARCHITECTURES}"
 
-  # ── Job 1: Build ─────────────────────────────────────────────────────
+  # ── Job 1: Build, test, publish ──────────────────────────────────────
   # Compiles Slurm via Spack, pushes spack binary packages to buildcache,
-  # and stages the redistributable tarball in S3 for downstream jobs.
+  # validates the redistributable tarball locally, then signs and publishes it.
   build-slurm:
     needs: prepare-matrix
     runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
@@ -236,7 +236,7 @@ jobs:
           fi
 
           # --publish=spack: push spack binary packages to buildcache but
-          # skip tarball signing/upload (handled by publish-slurm job after testing)
+          # skip tarball signing/upload until the local tarball test passes
           uv run slurm-factory build-slurm \
             --slurm-version ${{ matrix.slurm_version }} \
             --toolchain ${{ matrix.toolchain }} \
@@ -321,174 +321,26 @@ jobs:
           echo "tarball_name=${ARCH_TARBALL_NAME}" >> $GITHUB_OUTPUT
           echo "✓ Tarball found: $(du -h "$ARCH_TARBALL_PATH" | cut -f1) at $ARCH_TARBALL_PATH"
 
-      - name: Stage tarball for downstream jobs
-        timeout-minutes: 120
-        run: |
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${{ steps.tarball.outputs.tarball_name }}"
-          echo "📤 Staging tarball at s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
-          aws s3 cp \
-            "${{ steps.tarball.outputs.tarball_path }}" \
-            "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
-          echo "✓ Tarball staged for downstream jobs"
-
-      - name: Cleanup build namespace
-        timeout-minutes: 30
-        if: always()
-        run: |
-          rm -rf "$SLURM_FACTORY_CACHE_DIR" || true
-
-  # ── Job 2: Test ──────────────────────────────────────────────────────
-  # Downloads the staged tarball and validates it in a Docker container
-  # (module load, sinfo -V). Runs BEFORE publish so a test failure does
-  # not leave a broken tarball in the production buildcache.
-  test-slurm:
-    needs: [prepare-matrix, build-slurm]
-    runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
-    timeout-minutes: 180
-    environment: release
-    permissions:
-      contents: read
-      id-token: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
-        toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
-        architecture: ${{ fromJson(needs.prepare-matrix.outputs.architecture_matrix) }}
-
-    steps:
-      - name: Checkout
-        timeout-minutes: 120
-        uses: actions/checkout@v5
-
-      - name: Configure AWS credentials
-        timeout-minutes: 120
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
-          role-duration-seconds: 3600
-
-      - name: Install AWS CLI
-        timeout-minutes: 10
-        run: |
-          if ! command -v aws &>/dev/null; then
-            echo "Installing AWS CLI..."
-            ARCH=$(uname -m)
-            if [ "$ARCH" = "aarch64" ]; then
-              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
-            else
-              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-            fi
-            AWS_INSTALL_WORKDIR="$GITHUB_WORKSPACE/.aws-cli-install"
-            rm -rf "$AWS_INSTALL_WORKDIR"
-            mkdir -p "$AWS_INSTALL_WORKDIR"
-            curl -fsSL "$AWS_URL" -o "$AWS_INSTALL_WORKDIR/awscliv2.zip"
-            unzip -q "$AWS_INSTALL_WORKDIR/awscliv2.zip" -d "$AWS_INSTALL_WORKDIR"
-            sudo "$AWS_INSTALL_WORKDIR/aws/install"
-            rm -rf "$AWS_INSTALL_WORKDIR"
-          fi
-          echo "✓ AWS CLI: $(aws --version)"
-
-      - name: Download staged tarball
-        timeout-minutes: 120
-        run: |
-          TARBALL_DIR="$GITHUB_WORKSPACE/.slurm-factory/tarball-test/${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
-          rm -rf "$TARBALL_DIR"
-          mkdir -p "$TARBALL_DIR"
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${TARBALL_NAME}"
-          echo "📥 Downloading staged tarball from s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
-          aws s3 cp \
-            "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" \
-            "$TARBALL_DIR/${TARBALL_NAME}"
-
       - name: Test Slurm tarball
         timeout-minutes: 120
         run: |
-          TARBALL_DIR="$GITHUB_WORKSPACE/.slurm-factory/tarball-test/${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
-          TARBALL_PATH="$TARBALL_DIR/${TARBALL_NAME}"
           TEST_IMAGE_TAG="slurm-tarball-test:${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
           echo "🧪 Testing Slurm ${{ matrix.slurm_version }} tarball with toolchain ${{ matrix.toolchain }} on architecture ${{ matrix.architecture }}..."
-          echo "   Tarball: $(du -h "$TARBALL_PATH" | cut -f1)"
-          LOCAL_TARBALL_PATH="${TARBALL_PATH}" \
+          echo "   Tarball: $(du -h "${{ steps.tarball.outputs.tarball_path }}" | cut -f1)"
+          LOCAL_TARBALL_PATH="${{ steps.tarball.outputs.tarball_path }}" \
             TEST_IMAGE_TAG="${TEST_IMAGE_TAG}" \
             SLURM_VERSION="${{ matrix.slurm_version }}" \
             TOOLCHAIN="${{ matrix.toolchain }}" \
             ARCHITECTURE="${{ matrix.architecture }}" \
             ./scripts/test-tarball.sh
 
-      - name: Cleanup
-        timeout-minutes: 120
-        if: always()
-        run: |
-          TEST_IMAGE_TAG="slurm-tarball-test:${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
-          docker rmi "${TEST_IMAGE_TAG}" 2>/dev/null || true
-          rm -rf "$GITHUB_WORKSPACE/.slurm-factory/tarball-test/${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
-
-  # ── Job 3: Publish ───────────────────────────────────────────────────
-  # GPG-signs the tarball and uploads tarball + detached signature to S3.
-  # Only runs after test-slurm succeeds.
-  publish-slurm:
-    needs: [prepare-matrix, test-slurm]
-    runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
-    timeout-minutes: 180
-    environment: release
-    permissions:
-      contents: read
-      id-token: write
-
-    strategy:
-      fail-fast: false
-      matrix:
-        slurm_version: ${{ fromJson(needs.prepare-matrix.outputs.slurm_matrix) }}
-        toolchain: ${{ fromJson(needs.prepare-matrix.outputs.toolchain_matrix) }}
-        architecture: ${{ fromJson(needs.prepare-matrix.outputs.architecture_matrix) }}
-
-    steps:
-      - name: Configure AWS credentials
+      - name: Refresh AWS credentials for tarball publish
         timeout-minutes: 120
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           aws-region: us-east-1
           role-duration-seconds: 3600
-
-      - name: Install AWS CLI
-        timeout-minutes: 10
-        run: |
-          if ! command -v aws &>/dev/null; then
-            echo "Installing AWS CLI..."
-            ARCH=$(uname -m)
-            if [ "$ARCH" = "aarch64" ]; then
-              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-aarch64.zip"
-            else
-              AWS_URL="https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip"
-            fi
-            AWS_INSTALL_WORKDIR="$GITHUB_WORKSPACE/.aws-cli-install"
-            rm -rf "$AWS_INSTALL_WORKDIR"
-            mkdir -p "$AWS_INSTALL_WORKDIR"
-            curl -fsSL "$AWS_URL" -o "$AWS_INSTALL_WORKDIR/awscliv2.zip"
-            unzip -q "$AWS_INSTALL_WORKDIR/awscliv2.zip" -d "$AWS_INSTALL_WORKDIR"
-            sudo "$AWS_INSTALL_WORKDIR/aws/install"
-            rm -rf "$AWS_INSTALL_WORKDIR"
-          fi
-          echo "✓ AWS CLI: $(aws --version)"
-
-      - name: Download staged tarball
-        timeout-minutes: 120
-        run: |
-          TARBALL_DIR="$GITHUB_WORKSPACE/.slurm-factory/tarball-publish/${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
-          rm -rf "$TARBALL_DIR"
-          mkdir -p "$TARBALL_DIR"
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${TARBALL_NAME}"
-          echo "📥 Downloading staged tarball from s3://${{ env.S3_BUCKET }}/${STAGING_KEY}"
-          aws s3 cp \
-            "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" \
-            "$TARBALL_DIR/${TARBALL_NAME}"
 
       - name: Sign and publish tarball to S3
         timeout-minutes: 120
@@ -497,9 +349,8 @@ jobs:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          TARBALL_DIR="$GITHUB_WORKSPACE/.slurm-factory/tarball-publish/${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
-          TARBALL_PATH="$TARBALL_DIR/${TARBALL_NAME}"
+          TARBALL_NAME="${{ steps.tarball.outputs.tarball_name }}"
+          TARBALL_PATH="${{ steps.tarball.outputs.tarball_path }}"
           S3_PATH="${{ matrix.toolchain }}/${{ matrix.slurm_version }}/${{ matrix.architecture }}"
 
           echo "📦 Publishing ${TARBALL_NAME}..."
@@ -536,17 +387,16 @@ jobs:
           echo "✅ Published to s3://${{ env.S3_BUCKET }}/${S3_PATH}/"
 
       - name: Cleanup
-        timeout-minutes: 120
+        timeout-minutes: 30
         if: always()
         run: |
-          TARBALL_NAME="slurm-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}-software.tar.gz"
-          STAGING_KEY="github-actions-artifacts/${{ github.run_id }}/${{ github.run_attempt }}/slurm-tarball-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}/${TARBALL_NAME}"
-          aws s3 rm "s3://${{ env.S3_BUCKET }}/${STAGING_KEY}" || true
-          rm -rf "$GITHUB_WORKSPACE/.slurm-factory/tarball-publish/${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
+          TEST_IMAGE_TAG="slurm-tarball-test:${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.slurm_version }}-${{ matrix.toolchain }}-${{ matrix.architecture }}"
+          docker rmi "${TEST_IMAGE_TAG}" 2>/dev/null || true
+          rm -rf "$SLURM_FACTORY_CACHE_DIR" || true
 
   # ── Summary ──────────────────────────────────────────────────────────
   summary:
-    needs: [prepare-matrix, build-slurm, test-slurm, publish-slurm]
+    needs: [prepare-matrix, build-slurm]
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     if: always()
@@ -569,5 +419,5 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Pipeline" >> $GITHUB_STEP_SUMMARY
           echo "1. **Build** — Compiled Slurm + pushed spack buildcache" >> $GITHUB_STEP_SUMMARY
-          echo "2. **Test** — Validated tarball (module load + sinfo)" >> $GITHUB_STEP_SUMMARY
-          echo "3. **Publish** — GPG-signed + uploaded tarball to S3" >> $GITHUB_STEP_SUMMARY
+          echo "2. **Test** — Validated local tarball (module load + sinfo)" >> $GITHUB_STEP_SUMMARY
+          echo "3. **Publish** — GPG-signed + uploaded validated tarball to S3" >> $GITHUB_STEP_SUMMARY

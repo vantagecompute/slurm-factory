@@ -1467,6 +1467,7 @@ def create_slurm_package(
             toolchain=toolchain,
             buildcache=buildcache,
             gpu_support=gpu_support,
+            architecture=_get_normalized_architecture(),
             enable_hierarchy=enable_hierarchy,
             install_tree_root=container_install_tree_root,
             view_root=container_view_root,

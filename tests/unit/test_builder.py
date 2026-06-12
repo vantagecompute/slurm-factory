@@ -117,6 +117,7 @@ class TestSlurmBuilderModule:
         assert yaml_kwargs["source_cache_root"] == f"/opt/spack-stage/{expected_namespace}/source-cache"
         assert yaml_kwargs["misc_cache_root"] == f"/opt/slurm-factory-cache/source/misc/{expected_namespace}"
         assert yaml_kwargs["lmod_root"] == f"{expected_build_root}/lmod"
+        assert yaml_kwargs["architecture"] == slurm_builder._get_normalized_architecture()
 
         mock_build_docker_image.assert_called_once()
         mock_run_spack_build.assert_called_once()

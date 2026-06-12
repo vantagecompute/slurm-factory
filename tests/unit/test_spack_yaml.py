@@ -25,6 +25,7 @@ from slurm_factory.spack_yaml import (
     generate_yaml_string,
     get_comment_header,
     gpu_enabled_config,
+    normalize_spack_target,
     verification_config,
 )
 
@@ -162,6 +163,25 @@ class TestSpackConfigGeneration:
         assert spack_config["modules"]["default"]["roots"]["lmod"] == "/opt/slurm/builds/build-123/lmod"
         assert spack_config["view"]["default"]["root"] == "/opt/slurm/builds/build-123/view"
 
+    @pytest.mark.parametrize(
+        ("architecture", "spack_target"),
+        [
+            ("amd64", "x86_64"),
+            ("x86_64", "x86_64"),
+            ("arm64", "aarch64"),
+            ("aarch64", "aarch64"),
+        ],
+    )
+    def test_generate_spack_config_uses_architecture_target(self, architecture: str, spack_target: str):
+        """Spack package targets should match the artifact architecture."""
+        config = generate_spack_config(architecture=architecture)
+
+        assert config["spack"]["packages"]["all"]["target"] == [spack_target]
+
+    def test_normalize_spack_target_preserves_unknown_targets(self):
+        """Unknown targets should pass through for Spack to validate."""
+        assert normalize_spack_target("neoverse_v2") == "neoverse_v2"
+
 
 class TestModuleConfiguration:
     """Test module configuration generation."""
@@ -267,6 +287,7 @@ class TestYAMLGeneration:
     def test_generate_yaml_string_custom_roots(self):
         """YAML generation should preserve caller-provided build roots."""
         yaml_string = generate_yaml_string(
+            architecture="arm64",
             install_tree_root="/opt/slurm/builds/build-123/software",
             view_root="/opt/slurm/builds/build-123/view",
             build_stage_root="/opt/spack-stage/build-123",
@@ -278,6 +299,7 @@ class TestYAMLGeneration:
 
         assert parsed["spack"]["config"]["install_tree"]["root"] == "/opt/slurm/builds/build-123/software"
         assert parsed["spack"]["config"]["build_stage"] == "/opt/spack-stage/build-123"
+        assert parsed["spack"]["packages"]["all"]["target"] == ["aarch64"]
         assert (
             parsed["spack"]["config"]["source_cache"]
             == "/opt/slurm-factory-cache/source/downloads/build-123"

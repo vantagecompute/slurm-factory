@@ -20,7 +20,6 @@ set -e
 SLURM_VERSION="${SLURM_VERSION:-25.11}"
 TOOLCHAIN="${TOOLCHAIN:-resolute}"
 ARCHITECTURE="${ARCHITECTURE:-amd64}"
-BASE_URL="${BASE_URL:-https://slurm-factory-spack-binary-cache.vantagecompute.ai}"
 LOCAL_TARBALL_PATH="${LOCAL_TARBALL_PATH:-}"
 TEST_IMAGE_TAG="${TEST_IMAGE_TAG:-slurm-tarball-test:${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}}"
 CLEANUP="${CLEANUP:-false}"
@@ -43,8 +42,7 @@ OPTIONS:
     -s, --slurm-version VERSION Set Slurm version (default: ${SLURM_VERSION})
     -t, --toolchain TOOLCHAIN   Set toolchain (default: ${TOOLCHAIN})
     -a, --architecture ARCH     Set CPU architecture (default: ${ARCHITECTURE})
-    -b, --base-url URL          Set base URL for tarball downloads (default: ${BASE_URL})
-    -l, --local-tarball PATH    Use a local tarball instead of downloading from remote
+    -l, --local-tarball PATH    Local tarball to test
     -c, --cleanup               Remove Docker images after test completion
     -v, --verbose               Enable verbose output
     -q, --quiet                 Suppress non-error output
@@ -55,7 +53,6 @@ ENVIRONMENT VARIABLES:
     TOOLCHAIN        Toolchain to use (can be overridden by --toolchain)
     ARCHITECTURE     CPU architecture (can be overridden by --architecture)
     LOCAL_TARBALL_PATH  Path to local tarball (can be overridden by --local-tarball)
-    BASE_URL         Base URL for tarball downloads (can be overridden by --base-url)
     CLEANUP          Set to 'true' to enable cleanup (can be overridden by --cleanup)
     VERBOSE          Set to 'true' to enable verbose output (can be overridden by --verbose)
     QUIET            Set to 'true' to enable quiet mode (can be overridden by --quiet)
@@ -65,17 +62,16 @@ SUPPORTED TOOLCHAINS:
     jammy, noble, resolute, rockylinux8, rockylinux9, rockylinux10
 
 EXAMPLES:
-    # Test with default values
-    $(basename "$0")
-
-    # Test specific version and toolchain
-    $(basename "$0") --slurm-version 24.11 --toolchain jammy
+    # Test a local tarball
+    $(basename "$0") --local-tarball ./slurm-26.05-rockylinux9-arm64-software.tar.gz \
+        --slurm-version 26.05 --toolchain rockylinux9 --architecture arm64
 
     # Test with cleanup
-    $(basename "$0") --cleanup
+    $(basename "$0") --local-tarball ./slurm-26.05-rockylinux9-arm64-software.tar.gz --cleanup
 
     # Test with environment variables
-    SLURM_VERSION=24.11 TOOLCHAIN=noble $(basename "$0")
+    LOCAL_TARBALL_PATH=./slurm-24.11-noble-amd64-software.tar.gz \
+        SLURM_VERSION=24.11 TOOLCHAIN=noble $(basename "$0")
 
     # Test with custom timeout
     $(basename "$0") --timeout 7200
@@ -151,10 +147,6 @@ while [[ $# -gt 0 ]]; do
             ARCHITECTURE="$2"
             shift 2
             ;;
-        -b|--base-url)
-            BASE_URL="$2"
-            shift 2
-            ;;
         -l|--local-tarball)
             LOCAL_TARBALL_PATH="$2"
             shift 2
@@ -182,6 +174,16 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+if [ -z "${LOCAL_TARBALL_PATH}" ]; then
+    log_error "LOCAL_TARBALL_PATH is required; use --local-tarball PATH"
+    exit 1
+fi
+
+if [ ! -f "${LOCAL_TARBALL_PATH}" ]; then
+    log_error "Local tarball not found: ${LOCAL_TARBALL_PATH}"
+    exit 1
+fi
 
 # Input validation: Check Docker is installed
 if ! command -v docker &> /dev/null; then
@@ -231,11 +233,7 @@ log_info "Slurm Tarball Validation Test"
 log_info "========================================="
 log_info "Slurm Version: ${SLURM_VERSION}"
 log_info "Toolchain: ${TOOLCHAIN}"
-if [ -n "${LOCAL_TARBALL_PATH}" ]; then
-    log_info "Source: local (${LOCAL_TARBALL_PATH})"
-else
-    log_info "Source: remote (${BASE_URL})"
-fi
+log_info "Source: local (${LOCAL_TARBALL_PATH})"
 log_info "Test Image Tag: ${TEST_IMAGE_TAG}"
 log_info "Cleanup: ${CLEANUP}"
 log_info "Verbose: ${VERBOSE}"
@@ -268,28 +266,19 @@ log_verbose "Using base image: ${BASE_IMAGE}"
 log_info ""
 log_info "==> Building test Docker image..."
 
-if [ -n "${LOCAL_TARBALL_PATH}" ]; then
-    # Local tarball mode: create isolated build context with tarball
-    CONTEXT_DIR=$(mktemp -d)
-    LOCAL_CLEANUP_CONTEXT_DIR="${CONTEXT_DIR}"
-    mkdir -p "${CONTEXT_DIR}/tarball"
-    cp "${LOCAL_TARBALL_PATH}" "${CONTEXT_DIR}/tarball/"
-    cp "tests/dockerfiles/Dockerfile.tarball-${DOCKER_IMAGE_BASE}" "${CONTEXT_DIR}/"
-    TARBALL_SOURCE="local"
-    DOCKERFILE_PATH="${CONTEXT_DIR}/Dockerfile.tarball-${DOCKER_IMAGE_BASE}"
-    BUILD_CONTEXT="${CONTEXT_DIR}"
-else
-    TARBALL_SOURCE="remote"
-    DOCKERFILE_PATH="tests/dockerfiles/Dockerfile.tarball-${DOCKER_IMAGE_BASE}"
-    BUILD_CONTEXT="."
-fi
+CONTEXT_DIR=$(mktemp -d)
+LOCAL_CLEANUP_CONTEXT_DIR="${CONTEXT_DIR}"
+mkdir -p "${CONTEXT_DIR}/tarball"
+cp "${LOCAL_TARBALL_PATH}" "${CONTEXT_DIR}/tarball/"
+cp "tests/dockerfiles/Dockerfile.tarball-${DOCKER_IMAGE_BASE}" "${CONTEXT_DIR}/"
+DOCKERFILE_PATH="${CONTEXT_DIR}/Dockerfile.tarball-${DOCKER_IMAGE_BASE}"
+BUILD_CONTEXT="${CONTEXT_DIR}"
 
 BUILD_ARGS=(
     --build-arg "SLURM_VERSION=${SLURM_VERSION}"
     --build-arg "TOOLCHAIN=${TOOLCHAIN}"
     --build-arg "ARCHITECTURE=${ARCHITECTURE}"
     --build-arg "BASE_IMAGE=${BASE_IMAGE}"
-    --build-arg "TARBALL_SOURCE=${TARBALL_SOURCE}"
     -f "${DOCKERFILE_PATH}"
     -t "${TEST_IMAGE_TAG}"
     "${BUILD_CONTEXT}"
