@@ -20,8 +20,8 @@ from unittest.mock import Mock, patch
 
 import pytest
 
+from slurm_factory.builders.slurm_builder import DOCKER_DNS_SERVERS, _push_slurm_to_buildcache
 from slurm_factory.exceptions import SlurmFactoryError
-from slurm_factory.builders.slurm_builder import _push_slurm_to_buildcache
 
 # Create alias for the test
 push_to_buildcache = _push_slurm_to_buildcache
@@ -80,6 +80,9 @@ class TestGPGKeyImport:
             assert "docker" in cmd
             assert "run" in cmd
             assert "--rm" in cmd
+            for dns_server in DOCKER_DNS_SERVERS:
+                dns_server_index = cmd.index(dns_server)
+                assert cmd[dns_server_index - 1] == "--dns"
 
             # Verify GPG key is passed as environment variable
             assert any("GPG_PRIVATE_KEY" in arg for arg in cmd)

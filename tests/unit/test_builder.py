@@ -162,6 +162,9 @@ class TestSlurmBuilderModule:
             f"{expected_inputs_dir}/build-script.sh:/root/spack-project/build-script.sh:ro"
             in docker_run_cmd
         )
+        for dns_server in slurm_builder.DOCKER_DNS_SERVERS:
+            dns_server_index = docker_run_cmd.index(dns_server)
+            assert docker_run_cmd[dns_server_index - 1] == "--dns"
         assert "/root/spack-project/build-script.sh" in exec_build_cmd
         assert f"SPACK_USER_CACHE_PATH=/opt/spack-stage/{expected_namespace}/user-cache" in docker_run_cmd
         assert f"TMPDIR=/opt/spack-stage/{expected_namespace}/tmp" in docker_run_cmd

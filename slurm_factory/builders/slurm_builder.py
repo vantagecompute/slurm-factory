@@ -50,6 +50,13 @@ from slurm_factory.utils import (
 logger = logging.getLogger(__name__)
 console = Console()
 
+DOCKER_DNS_SERVERS = ("1.1.1.1", "8.8.8.8", "9.9.9.9")
+
+
+def _docker_dns_args() -> list[str]:
+    """Return Docker run args for resilient public DNS resolution."""
+    return [arg for dns_server in DOCKER_DNS_SERVERS for arg in ("--dns", dns_server)]
+
 
 def _get_normalized_architecture() -> str:
     """Return the host architecture normalized to artifact naming conventions."""
@@ -770,6 +777,7 @@ def sign_and_push_tarball_to_buildcache(
             "docker",
             "run",
             "--rm",
+            *_docker_dns_args(),
             "-v",
             f"{tarball_path}:/workspace/{tarball_name}:ro",
             "-e",
@@ -916,7 +924,7 @@ def _push_slurm_to_buildcache(
 
         console.print(f"[dim]Pushing packages to {s3_mirror_url}...[/dim]")
         # Build docker run command with AWS environment variables
-        cmd = ["docker", "run", "--rm"]
+        cmd = ["docker", "run", "--rm", *_docker_dns_args()]
 
         # Add AWS environment variables
         for key, value in aws_env.items():
@@ -1165,6 +1173,7 @@ def _run_spack_build_in_container(
             "-dt",  # Detached mode with TTY for CUDA installer
             "--name",
             container_name,
+            *_docker_dns_args(),
             "-v",
             f"{spack_stage_mount_dir}:{CONTAINER_SPACK_STAGE_DIR}",
             "-v",
