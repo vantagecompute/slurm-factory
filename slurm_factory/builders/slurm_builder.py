@@ -409,6 +409,20 @@ def get_create_slurm_tarball_script(
         find . -name "__pycache__" -type d -exec rm -rf {{}} + 2>/dev/null || true && \\
         find . -name "*.pyc" -delete 2>/dev/null || true && \\
         find . -name "*.a" -delete 2>/dev/null || true && \\
+        echo "DEBUG: Configuring Pyxis SPANK plugin..." && \\
+        if [ -f lib/slurm/spank_pyxis.so ]; then \\
+            mkdir -p etc/slurm/plugstack.conf.d && \\
+            if [ -f share/pyxis/pyxis.conf ]; then \\
+                cp share/pyxis/pyxis.conf etc/slurm/plugstack.conf.d/pyxis.conf; \\
+            else \\
+                echo "required /usr/lib/slurm/spank_pyxis.so" > etc/slurm/plugstack.conf.d/pyxis.conf; \\
+            fi && \\
+            mkdir -p share/enroot/enroot-data && \\
+            chmod 777 share/enroot/enroot-data && \\
+            echo "DEBUG: Pyxis plugin configured"; \\
+        else \\
+            echo "WARNING: spank_pyxis.so not found in view"; \\
+        fi && \\
         mkdir -p assets/modules/slurm && \\
         cp {CONTAINER_SLURM_DIR}/modules/*.lua assets/modules/slurm/ && \\
         {modulerc_script} && \\

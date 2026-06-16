@@ -305,6 +305,8 @@ def generate_spack_config(
     specs.append(
         f"slurm_factory.slurm@{slurm_package_version} {gpu_flags} sysconfdir=/etc/slurm {compiler_spec}"
     )
+    # Pyxis SPANK plugin for container support via Enroot
+    specs.append(f"slurm_factory.pyxis@0.24.0 {compiler_spec}")
 
     config: Dict[str, Any] = {
         "spack": {
@@ -486,6 +488,10 @@ def generate_spack_config(
                     "version": [slurm_package_version],
                     "buildable": True,
                     "variants": "+shared ~static +pic",  # Consistent shared library preference
+                },
+                "slurm_factory.pyxis": {
+                    "version": ["0.24.0"],
+                    "buildable": True,
                 },
                 # OpenMPI configuration for consistent build
                 "openmpi": {
