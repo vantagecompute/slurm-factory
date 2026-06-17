@@ -22,8 +22,7 @@ slurm-factory [OPTIONS] COMMAND [ARGS]...
 
 **Available Commands:**
 
-- `build` - Build a specific Slurm version
-- `build-compiler` - Build a GCC compiler toolchain
+- `build-slurm` - Build a specific Slurm version
 - `clean` - Clean up Docker containers and images
 
 ---
@@ -42,13 +41,13 @@ Builds Slurm packages using Docker containers and Spack. Supports multiple OS to
 
 **Options:**
 
-- `--slurm-version [25.11|24.11|23.11]` - Slurm version to build [default: 25.11]
+- `--slurm-version [26.05|25.11|24.11|23.11]` - Slurm version to build [default: 25.11]
 - `--toolchain TEXT` - OS toolchain to use (noble, jammy, resolute, rockylinux10, rockylinux9, rockylinux8) [default: noble]
 - `--gpu` - Enable GPU support (CUDA/ROCm) - creates larger packages
 - `--verify` - Enable relocatability verification (for CI/testing)
 - `--no-cache` - Force a fresh build without using Docker cache
 - `--buildcache TEXT` - Use buildcache: none (default), all (dependencies + Slurm), deps (only dependencies) [default: none]
-- `--publish TEXT` - Publish to buildcache: none (default), slurm (only Slurm), deps (only dependencies) [default: none]
+- `--publish TEXT` - Publish to buildcache: none (default), slurm (Slurm tarball + Spack), spack (Spack only), deps (only dependencies), all [default: none]
 - `--enable-hierarchy` - Enable Core/Compiler/MPI module hierarchy
 - `--signing-key TEXT` - GPG key ID for signing buildcache packages (e.g., '0xKEYID')
 - `--gpg-private-key TEXT` - Base64-encoded GPG private key to import into Docker container for signing
@@ -59,12 +58,14 @@ Builds Slurm packages using Docker containers and Spack. Supports multiple OS to
 
 Each toolchain uses the OS-provided compiler for maximum binary compatibility:
 
-- **resolute**: Ubuntu 25.04, GCC 15.x, glibc 2.41 (latest)
-- **noble** (default): Ubuntu 24.04, GCC 13.x, glibc 2.39
-- **jammy**: Ubuntu 22.04, GCC 11.x, glibc 2.35
-- **rockylinux10**: Rocky Linux 10 / RHEL 10, GCC 14.x, glibc 2.39
-- **rockylinux9**: Rocky Linux 9 / RHEL 9, GCC 11.x, glibc 2.34
-- **rockylinux8**: Rocky Linux 8 / RHEL 8, GCC 8.x, glibc 2.28
+- **resolute**: Ubuntu 26.04, GCC 15.2.0, glibc 2.42
+- **noble** (default): Ubuntu 24.04, GCC 13.3.0, glibc 2.39
+- **jammy**: Ubuntu 22.04, GCC 11.4.0, glibc 2.35
+- **rockylinux10**: Rocky Linux 10 / RHEL 10, GCC 14.3.1, glibc 2.39
+- **rockylinux9**: Rocky Linux 9 / RHEL 9, GCC 11.5.0, glibc 2.34
+- **rockylinux8**: Rocky Linux 8 / RHEL 8, GCC 8.5.0, glibc 2.28
+
+See [Packages](./packages.md) for the generated package matrix sourced from the current code constants.
 
 **Build Types:**
 
@@ -114,9 +115,6 @@ slurm-factory build-slurm --publish=deps
 
 # Build and publish with GPG signing
 slurm-factory build-slurm --publish=all --signing-key 0xDFB92630BCA5AB71
-
-# Use local compiler tarball (advanced)
-slurm-factory build-slurm --use-local-buildcache
 ```
 
 ---
@@ -150,43 +148,6 @@ slurm-factory clean --full
 
 ---
 
-## Python API
-
-```python
-from slurm_factory.builder import build
-from slurm_factory.config import Settings
-
-# Basic build with defaults (Slurm 25.11, noble toolchain)
-build(slurm_version="25.11", toolchain="noble")
-
-# GPU-enabled build
-build(slurm_version="25.11", gpu=True)
-
-# Build with specific compiler for RHEL 8
-build(slurm_version="25.11", compiler_version="10.5.0")
-
-# Build with verification
-build(slurm_version="25.11", verify=True)
-
-# Build without cache
-build(slurm_version="25.11", no_cache=True)
-
-# Build and publish to buildcache
-build(
-    slurm_version="25.11",
-    publish="all",
-    signing_key="0xDFB92630BCA5AB71",
-    gpg_private_key="base64_encoded_key",
-    gpg_passphrase="passphrase"
-)
-
-# Custom settings
-settings = Settings(project_name="production")
-build(slurm_version="25.11", settings=settings)
-```
-
----
-
 ## Configuration
 
 ### Environment Variables
@@ -201,10 +162,10 @@ slurm-factory uses several cache directories under `~/.slurm-factory/`:
 ```
 ~/.slurm-factory/
 ├── builds/              # Final tarball packages
+├── spack-stage/         # Spack build stage cache
 ├── spack-buildcache/    # Binary package cache (compiled packages)
 ├── spack-sourcecache/   # Source archive downloads
-├── binary_index/        # Dependency resolution cache
-└── ccache/              # Compiler object cache
+└── build-debug/         # Build diagnostics and debug artifacts
 ```
 
 ### Build Artifacts
@@ -214,11 +175,14 @@ Build outputs are stored in `~/.slurm-factory/builds/`:
 ```
 ~/.slurm-factory/builds/
 ├── noble/
-│   └── 25.11/
-│       └── slurm-25.11-noble-amd64-software.tar.gz       # Ubuntu 24.04 build
+│   └── 26.05/
+│       └── slurm-26.05-noble-amd64-software.tar.gz       # Ubuntu 24.04 build
 ├── jammy/
 │   └── 25.11/
 │       └── slurm-25.11-jammy-amd64-software.tar.gz       # Ubuntu 22.04 build
+├── resolute/
+│   └── 26.05/
+│       └── slurm-26.05-resolute-arm64-software.tar.gz    # Ubuntu 26.04 build
 ├── rockylinux9/
 │   └── 25.11/
 │       └── slurm-25.11-rockylinux9-amd64-software.tar.gz # Rocky Linux 9 / RHEL 9
@@ -280,6 +244,7 @@ spack install slurm@25.11
 - [Installation Guide](./installation.md) - Setup and prerequisites
 - [Examples](./examples.md) - Real-world usage scenarios
 - [Architecture](./architecture.md) - Build system internals
+- [Packages](./packages.md) - Generated current package matrix
 - [Deployment](./deployment.md) - Installing and configuring built packages
 
 ## Exceptions

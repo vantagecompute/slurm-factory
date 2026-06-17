@@ -82,7 +82,7 @@ rockylinux9/slurm/deps/  # Dependencies for Rocky Linux 9
 **Workflow:** `build-and-publish-slurm.yml`
 
 - **Builds:** Complete Slurm installations (binary + dependencies + modules)
-- **Matrix:** 3 Slurm versions × 6 toolchains = 18 combinations
+- **Matrix:** 4 Slurm versions × 6 toolchains × 2 architectures = 48 public tarball combinations
 - **Runtime:** ~5 minutes (downloads from Stage 1, builds only Slurm binary)
 - **Frequency:** For each new Slurm release or configuration change
 - **Output:** Production-ready tarballs with Lmod modules

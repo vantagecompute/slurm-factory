@@ -84,7 +84,7 @@ s3://slurm-factory-spack-buildcache-4b670/
 ├── {toolchain}/slurm/deps/buildcache/     # Dependencies
 │   ├── noble/slurm/deps/buildcache/       # Ubuntu 24.04
 │   ├── jammy/slurm/deps/buildcache/       # Ubuntu 22.04
-│   ├── resolute/slurm/deps/buildcache/    # Ubuntu 25.04
+│   ├── resolute/slurm/deps/buildcache/    # Ubuntu 26.04
 │   ├── rockylinux10/slurm/deps/buildcache/ # Rocky 10
 │   ├── rockylinux9/slurm/deps/buildcache/ # Rocky 9
 │   └── rockylinux8/slurm/deps/buildcache/ # Rocky 8

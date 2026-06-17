@@ -121,7 +121,7 @@ cd slurm-factory
 curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to ~/.local/bin
 
 # Install dependencies
-just install
+just env
 
 # Run tests
 just unit
@@ -174,10 +174,10 @@ Build caches are stored in your home directory:
 # Default cache location
 ~/.slurm-factory/
 ├── builds/           # Built packages (TAR files)
+├── spack-stage/      # Spack build stage cache
 ├── spack-buildcache/ # Compiled package binaries
 ├── spack-sourcecache/# Downloaded source archives
-├── binary_index/     # Dependency resolution cache
-└── ccache/          # Compiler object cache
+└── build-debug/      # Build diagnostics and debug artifacts
 ```
 
 ## Quick Start
@@ -186,10 +186,10 @@ Once installed, you can immediately start building Slurm packages:
 
 ```bash
 # Build latest Slurm for Ubuntu 24.04 (noble)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
+slurm-factory build-slurm --slurm-version 26.05 --toolchain noble
 
 # Build for Ubuntu 22.04 (jammy)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain jammy
+slurm-factory build-slurm --slurm-version 26.05 --toolchain jammy
 
 # Build for Rocky Linux 9 / RHEL 9
 slurm-factory build-slurm --slurm-version 24.11 --toolchain rockylinux9
@@ -209,10 +209,10 @@ slurm-factory clean --full
 
 **Available Versions:**
 
-- **Slurm**: 25.11, 24.11, 23.11
+- **Slurm**: 26.05, 25.11, 24.11, 23.11
 - **Toolchains**: resolute, noble, jammy, rockylinux10, rockylinux9, rockylinux8
 
-See [Build Artifacts](build-artifacts.md) for pre-built packages.
+See [Packages](packages.md) for the generated current package matrix.
 
 ## Troubleshooting
 

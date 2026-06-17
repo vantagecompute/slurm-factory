@@ -345,13 +345,13 @@ RUN dd if=/dev/urandom bs=1 count=1024 of=/etc/slurm/slurm.key 2>/dev/null && \
 CMD ["/opt/slurm-factory/view/bin/sinfo"]
 ```
 
-### Ubuntu 20.04 (Focal)
+### Ubuntu 24.04 (Noble)
 
 ```dockerfile
-FROM ubuntu:20.04
+FROM ubuntu:24.04
 
-ARG SLURM_VERSION=25.11
-ARG TOOLCHAIN=focal
+ARG SLURM_VERSION=26.05
+ARG TOOLCHAIN=noble
 ARG ARCHITECTURE=amd64
 ARG TARBALL_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai/${TOOLCHAIN}/${SLURM_VERSION}/${ARCHITECTURE}/slurm-${SLURM_VERSION}-${TOOLCHAIN}-${ARCHITECTURE}-software.tar.gz
 

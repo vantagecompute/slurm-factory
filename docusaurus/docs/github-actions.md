@@ -26,7 +26,7 @@ flowchart TD
     Start([Workflow Dispatch]) --> PrepareMatrix[Prepare Toolchain Matrix]
     PrepareMatrix --> Matrix{Matrix Build<br/>6 Toolchains}
     
-    Matrix -->|resolute| Build1[Build Deps - Ubuntu 25.04]
+    Matrix -->|resolute| Build1[Build Deps - Ubuntu 26.04]
     Matrix -->|noble| Build2[Build Deps - Ubuntu 24.04]
     Matrix -->|jammy| Build3[Build Deps - Ubuntu 22.04]
     Matrix -->|rockylinux10| Build4[Build Deps - Rocky 10]
@@ -99,11 +99,11 @@ env:
 
 | Toolchain | OS/Distribution | System GCC | Use Case |
 |-----------|-----------------|------------|----------|
-| **resolute** | Ubuntu 25.04 | 15.2.0 | Latest features |
-| **noble** | Ubuntu 24.04 | 13.2.0 | **Recommended** |
+| **resolute** | Ubuntu 26.04 | 15.2.0 | Latest Ubuntu toolchain |
+| **noble** | Ubuntu 24.04 | 13.3.0 | **Recommended** |
 | **jammy** | Ubuntu 22.04 | 11.4.0 | LTS |
 | **rockylinux10** | Rocky Linux 10 | 14.3.1 | RHEL 10 |
-| **rockylinux9** | Rocky Linux 9 | 11.4.1 | RHEL 9 |
+| **rockylinux9** | Rocky Linux 9 | 11.5.0 | RHEL 9 |
 | **rockylinux8** | Rocky Linux 8 | 8.5.0 | RHEL 8 |
 
 **Outputs**:
@@ -120,14 +120,14 @@ env:
 
 \`\`\`mermaid
 flowchart TD
-    Start([Workflow Dispatch]) --> PrepareMatrix[Prepare Matrix<br/>Slurm × Toolchain]
+    Start([Workflow Dispatch]) --> PrepareMatrix[Prepare Matrix<br/>Slurm × Toolchain × Architecture]
     
-    PrepareMatrix --> Matrix{Matrix Build<br/>3 Slurm × 6 Toolchains = 18 combinations}
+    PrepareMatrix --> Matrix{Matrix Build<br/>4 Slurm × 6 Toolchains × 2 Architectures = 48 combinations}
     
-    Matrix --> Build1[Slurm 25.11 + noble]
-    Matrix --> Build2[Slurm 25.11 + jammy]
+    Matrix --> Build1[Slurm 26.05 + noble + amd64]
+    Matrix --> Build2[Slurm 26.05 + jammy + arm64]
     Matrix --> Build3[Slurm 24.11 + noble]
-    Matrix --> BuildN[... 18 combinations ...]
+    Matrix --> BuildN[... 48 combinations ...]
     
     Build1 --> Docker1[Docker Build<br/>Spack Container]
     Build2 --> Docker2[Docker Build<br/>Spack Container]
@@ -349,6 +349,8 @@ The buildcache is organized by toolchain first, then by type:
 │   └── slurm/
 │       ├── deps/                   # Shared dependencies
 │       │   └── build_cache/        # Spack binary cache
+│       ├── 26.05/                  # Slurm 26.05 packages
+│       │   └── build_cache/
 │       ├── 25.11/                  # Slurm 25.11 packages
 │       │   └── build_cache/
 │       ├── 24.11/                  # Slurm 24.11 packages
@@ -361,7 +363,7 @@ The buildcache is organized by toolchain first, then by type:
 │       ├── 25.11/
 │       ├── 24.11/
 │       └── 23.11/
-├── resolute/                       # Ubuntu 25.04 toolchain
+├── resolute/                       # Ubuntu 26.04 toolchain
 │   └── slurm/...
 ├── rockylinux10/                   # Rocky Linux 10 toolchain
 │   └── slurm/...

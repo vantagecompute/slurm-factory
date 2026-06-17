@@ -8,7 +8,7 @@ Slurm Factory produces two types of artifacts: **relocatable tarballs** for dire
 
 **Purpose**: Complete, self-contained Slurm installations ready to extract and deploy
 
-**Location**: `s3://vantage-public-assets/slurm-factory/`
+**Location**: `s3://slurm-factory-spack-buildcache-4b670/{toolchain}/{slurm_version}/{architecture}/`
 
 **Format**: Single tarball containing Slurm binaries, modules, and installation scripts
 
@@ -31,8 +31,6 @@ Slurm Factory produces two types of artifacts: **relocatable tarballs** for dire
 - Custom Slurm builds with modified dependencies
 - Development and testing environments
 - CI/CD pipelines
-
-## Tarball Structure
 
 ## Tarball Structure
 
@@ -149,10 +147,10 @@ slurm-{slurm_version}-{toolchain}-{architecture}-software.tar.gz
 
 ### S3 Distribution
 
-**Tarballs**: Stored in public S3 bucket for direct download
+**Tarballs**: Stored in the public buildcache bucket for direct download
 
 ```text
-s3://vantage-public-assets/slurm-factory/{slurm_version}/{toolchain}/{architecture}/
+s3://slurm-factory-spack-buildcache-4b670/{toolchain}/{slurm_version}/{architecture}/
 └── slurm-{version}-{toolchain}-{architecture}-software.tar.gz
 ```
 
@@ -173,19 +171,12 @@ s3://slurm-factory-spack-buildcache-4b670/
 
 ### CloudFront CDN
 
-Both S3 buckets are distributed via CloudFront for fast global access:
+The S3 bucket is distributed via CloudFront for fast global access:
 
-**Buildcache CDN**:
+**Buildcache and tarball CDN**:
 ```
 https://slurm-factory-spack-binary-cache.vantagecompute.ai
 ```
-
-**Tarball CDN** (planned):
-```
-https://vantage-public-assets.s3.amazonaws.com/slurm-factory/
-```
-
-## Available Builds
 
 ## Available Builds
 
@@ -209,28 +200,15 @@ Notes:
 
 ### Tarballs
 
-All Slurm × Compiler combinations are pre-built and available:
+Current Slurm versions, OS toolchains, architectures, and public URLs are generated from the source constants in [Packages](./packages.md).
 
-#### Slurm 25.11 (Latest)
+Tarball URLs use this pattern:
 
-| Toolchain | Target OS | Public URL |
-|-----------|-----------|------------|
-| resolute | Ubuntu 26.04 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/resolute/25.11/amd64/slurm-25.11-resolute-amd64-software.tar.gz` |
-| noble | Ubuntu 24.04 **(recommended)** | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/amd64/slurm-25.11-noble-amd64-software.tar.gz` |
-| jammy | Ubuntu 22.04 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/jammy/25.11/amd64/slurm-25.11-jammy-amd64-software.tar.gz` |
-| rockylinux10 | Rocky Linux 10 / RHEL 10 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux10/25.11/amd64/slurm-25.11-rockylinux10-amd64-software.tar.gz` |
-| rockylinux9 | Rocky Linux 9 / RHEL 9 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux9/25.11/amd64/slurm-25.11-rockylinux9-amd64-software.tar.gz` |
-| rockylinux8 | Rocky Linux 8 / RHEL 8 | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux8/25.11/amd64/slurm-25.11-rockylinux8-amd64-software.tar.gz` |
+```text
+https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/{slurm_version}/{architecture}/slurm-{slurm_version}-{toolchain}-{architecture}-software.tar.gz
+```
 
-For `arm64`, use the same path with `arm64` as the architecture segment and filename suffix.
-
-#### Slurm 24.11 (LTS)
-
-Similar URLs for Slurm 24.11 with all compiler versions.
-
-#### Slurm 23.11 (Stable)
-
-Similar URLs for Slurm 23.11 with all compiler versions.
+Each tarball has a detached signature at the same path with `.asc` appended.
 
 ### Buildcache
 
@@ -256,27 +234,27 @@ See [Slurm Factory Spack Build Cache](./slurm-factory-spack-build-cache.md) for 
 
 ```bash
 # Download a specific build
-aws s3 cp s3://vantage-public-assets/slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz .
+aws s3 cp s3://slurm-factory-spack-buildcache-4b670/noble/26.05/amd64/slurm-26.05-noble-amd64-software.tar.gz .
 
 # List all available builds
-aws s3 ls s3://vantage-public-assets/slurm-factory/ --recursive
+aws s3 ls s3://slurm-factory-spack-buildcache-4b670/ --recursive
 
 # Download all builds for a specific Slurm version
-aws s3 sync s3://vantage-public-assets/slurm-factory/25.11/ ./slurm-25.11/
+aws s3 sync s3://slurm-factory-spack-buildcache-4b670/noble/26.05/ ./slurm-26.05-noble/
 ```
 
 #### wget (Public Access)
 
 ```bash
 # Download via HTTPS
-wget https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/26.05/amd64/slurm-26.05-noble-amd64-software.tar.gz
 ```
 
 #### curl
 
 ```bash
 # Download with curl
-curl -O https://vantage-public-assets.s3.amazonaws.com/slurm-factory/25.11/noble/amd64/slurm-25.11-noble-amd64-software.tar.gz
+curl -O https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/26.05/amd64/slurm-26.05-noble-amd64-software.tar.gz
 ```
 
 ### Using Buildcache
@@ -293,27 +271,27 @@ spack mirror add slurm-factory-slurm-deps \
   https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/deps/
 
 spack mirror add slurm-factory-slurm \
-  https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/25.11/
+  https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/26.05/
 
 # 3. Import and trust GPG signing keys
 spack buildcache keys --install --trust
 
 # 4. Install from signed buildcache
-spack install slurm@25.11
+spack install slurm@26.05
 
 # 5. Load and use
-spack load slurm@25.11
+spack load slurm@26.05
 sinfo --version
 ```
 
 #### With slurm-factory CLI
 
 ```bash
-# The CLI uses buildcache automatically
+# The CLI can use the dependency buildcache when requested
 pip install slurm-factory
 
-# Build will use buildcache for dependencies
-slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
+# Build will use buildcache for dependencies when requested
+slurm-factory build-slurm --slurm-version 26.05 --toolchain noble --buildcache=deps
 ```
 
 ## Artifact Verification
@@ -322,11 +300,11 @@ Each tarball includes verification information:
 
 ```bash
 # Extract and verify contents
-tar -tzf slurm-25.11-noble-amd64-software.tar.gz | head -20
+tar -tzf slurm-26.05-noble-amd64-software.tar.gz | head -20
 
 # Check modulefile
-tar -xzf slurm-25.11-noble-amd64-software.tar.gz modules/slurm/25.11-noble.lua
-cat modules/slurm/25.11-noble.lua
+tar -xzf slurm-26.05-noble-amd64-software.tar.gz modules/slurm/26.05-noble.lua
+cat modules/slurm/26.05-noble.lua
 ```
 
 ## Installation from Artifacts
@@ -337,11 +315,11 @@ Complete installation example:
 
 ```bash
 # 1. Download the tarball
-wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/amd64/slurm-25.11-noble-amd64-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/26.05/amd64/slurm-26.05-noble-amd64-software.tar.gz
 
 # 2. Extract to target location
 sudo mkdir -p /opt
-sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/
+sudo tar -xzf slurm-26.05-noble-amd64-software.tar.gz -C /opt/
 
 # 3. Run installation script
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
@@ -350,11 +328,11 @@ cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name 
 export MODULEPATH=/opt/modules:$MODULEPATH
 
 # 5. Load the module
-module load slurm/25.11-noble
+module load slurm/26.05-noble
 
 # 6. Verify installation
 sinfo --version
-# Output: slurm 25.11.0
+# Output: slurm 26.05.x
 ```
 
 ### From Buildcache

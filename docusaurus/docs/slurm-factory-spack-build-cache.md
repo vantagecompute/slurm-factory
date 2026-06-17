@@ -6,10 +6,10 @@ The Slurm Factory Spack Build Cache is a public, **GPG-signed** binary package r
 
 The build cache is a **CloudFront-distributed S3 bucket** with a **toolchain-based architecture**:
 
-- **OS Toolchains** - Ubuntu (noble, jammy, resolute) and Rocky Linux (8, 9, 10)
+- **OS Toolchains** - Ubuntu (resolute, noble, jammy) and Rocky Linux (8, 9, 10)
 - **Slurm Dependencies** - Pre-built dependencies for each toolchain
-- **Slurm Packages** (versions 23.11, 24.11, 25.11) - **3 versions**
-- **Total: 18 Slurm combinations** (3 Slurm × 6 OS toolchains)
+- **Slurm Packages** (versions 26.05, 25.11, 24.11, 23.11) - **4 versions**
+- **Total: 48 public tarball combinations** (4 Slurm × 6 OS toolchains × 2 architectures), with matching Spack mirrors per Slurm/toolchain pair
 
 All packages are:
 
@@ -38,6 +38,7 @@ slurm-factory-spack-binary-cache.vantagecompute.ai/
 ├── noble/                       # Ubuntu 24.04 (recommended)
 │   └── slurm/
 │       ├── deps/                # Slurm dependencies (GPG-signed)
+│       ├── 26.05/               # Slurm 26.05 packages (GPG-signed)
 │       ├── 25.11/               # Slurm 25.11 packages (GPG-signed)
 │       ├── 24.11/               # Slurm 24.11 packages (GPG-signed)
 │       └── 23.11/               # Slurm 23.11 packages (GPG-signed)
@@ -47,7 +48,7 @@ slurm-factory-spack-binary-cache.vantagecompute.ai/
 │       ├── 25.11/
 │       ├── 24.11/
 │       └── 23.11/
-├── resolute/                    # Ubuntu 25.04
+├── resolute/                    # Ubuntu 26.04
 │   └── slurm/
 │       └── ...
 ├── rockylinux10/                # Rocky Linux 10 / RHEL 10
@@ -60,23 +61,25 @@ slurm-factory-spack-binary-cache.vantagecompute.ai/
 │   └── slurm/
 │       └── ...
 └── builds/
-    ├── 25.11/
+    ├── 26.05/
     │   ├── noble/
   │   │   ├── amd64/
-  │   │   │   ├── slurm-25.11-noble-amd64-software.tar.gz      # Complete tarball
-  │   │   │   └── slurm-25.11-noble-amd64-software.tar.gz.asc  # GPG signature
+  │   │   │   ├── slurm-26.05-noble-amd64-software.tar.gz      # Complete tarball
+  │   │   │   └── slurm-26.05-noble-amd64-software.tar.gz.asc  # GPG signature
     │   ├── jammy/
   │   │   ├── amd64/
-  │   │   │   ├── slurm-25.11-jammy-amd64-software.tar.gz
-  │   │   │   └── slurm-25.11-jammy-amd64-software.tar.gz.asc
+  │   │   │   ├── slurm-26.05-jammy-amd64-software.tar.gz
+  │   │   │   └── slurm-26.05-jammy-amd64-software.tar.gz.asc
     │   └── ...                  # All OS toolchains
+    ├── 25.11/
+    │   └── ...                  # All toolchains with tarballs + signatures
     ├── 24.11/
     │   └── ...                  # All toolchains with tarballs + signatures
     └── 23.11/
         └── ...                  # All toolchains with tarballs + signatures
 ```
 
-**All 18 combinations are GPG-signed and ready to install.**
+See [Packages](./packages.md) for the generated current package matrix.
 
 ### Toolchain-Based Architecture Benefits
 
@@ -168,7 +171,7 @@ git clone --depth 1 --branch v1.0.0 https://github.com/spack/spack.git
 source spack/share/spack/setup-env.sh
 
 # 2. Set versions
-SLURM_VERSION=25.11
+SLURM_VERSION=26.05
 TOOLCHAIN=noble  # or: jammy, resolute, rockylinux9, rockylinux10, rockylinux8
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
@@ -185,7 +188,7 @@ spack install slurm@${SLURM_VERSION} target=x86_64_v3
 # 6. Load and verify
 spack load slurm@${SLURM_VERSION}
 sinfo --version
-# Output: slurm 25.11.4
+# Output: slurm 26.05.x
 ```
 
 ### Download Pre-built Tarball
@@ -194,7 +197,7 @@ Alternatively, download a complete Slurm installation as a signed tarball:
 
 ```bash
 # Set versions
-SLURM_VERSION=25.11
+SLURM_VERSION=26.05
 TOOLCHAIN=noble  # or: jammy, resolute, rockylinux9, rockylinux10, rockylinux8
 ARCHITECTURE=amd64  # or: arm64
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
@@ -227,14 +230,14 @@ The `slurm-factory` CLI can leverage the build cache automatically:
 pip install slurm-factory
 
 # Build uses buildcache by default for dependencies
-slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
+slurm-factory build-slurm --slurm-version 26.05 --toolchain noble --buildcache=deps
 ```
 
 The CLI will:
 
-1. Pull the compiler from the buildcache (if available)
-2. Pull all Slurm dependencies from the buildcache
-3. Only compile Slurm itself from source
+1. Add the dependency mirror for the selected OS toolchain
+2. Pull matching Slurm dependencies from the buildcache
+3. Compile Slurm itself when a full Slurm buildcache is not requested
 4. Package everything into a relocatable tarball
 
 ## Available Packages
@@ -245,11 +248,11 @@ All OS toolchains use the system GCC and glibc from the base OS:
 
 | Toolchain | OS/Distribution | System GCC | Glibc | Use Case |
 |-----------|-----------------|------------|-------|----------|
-| **noble** | Ubuntu 24.04 | 13.2.0 | 2.39 | **Recommended** - Modern stable |
-| resolute | Ubuntu 25.04 | 15.2.0 | 2.42 | Latest features |
+| **noble** | Ubuntu 24.04 | 13.3.0 | 2.39 | **Recommended** - Modern stable |
+| resolute | Ubuntu 26.04 | 15.2.0 | 2.42 | Latest Ubuntu toolchain |
 | jammy | Ubuntu 22.04 | 11.4.0 | 2.35 | LTS - Wide compatibility |
-| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.3.1 | 2.40 | RHEL 10 compatible |
-| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.4.1 | 2.34 | RHEL 9 compatible |
+| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.3.1 | 2.39 | RHEL 10 compatible |
+| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.5.0 | 2.34 | RHEL 9 compatible |
 | rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.5.0 | 2.28 | RHEL 8 compatible |
 
 ### Slurm Packages
@@ -258,7 +261,8 @@ All combinations of Slurm version × OS toolchain are available:
 
 | Slurm Version | Status | Available Toolchains | Buildcache URL Pattern |
 |---------------|--------|---------------------|------------------------|
-| 25.11 | Latest | All 6 toolchains | `{toolchain}/slurm/25.11/` |
+| 26.05 | Latest | All 6 toolchains | `{toolchain}/slurm/26.05/` |
+| 25.11 | Supported | All 6 toolchains | `{toolchain}/slurm/25.11/` |
 | 24.11 | LTS | All 6 toolchains | `{toolchain}/slurm/24.11/` |
 | 23.11 | Stable | All 6 toolchains | `{toolchain}/slurm/23.11/` |
 
