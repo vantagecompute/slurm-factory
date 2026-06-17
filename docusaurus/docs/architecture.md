@@ -350,7 +350,7 @@ slurm-{version}-{toolchain}-{architecture}-software.tar.gz (2-25GB depending on 
 
 **Package naming examples:**
 
-- `slurm-25.11-noble-amd64-software.tar.gz` - Slurm 25.11 for Ubuntu 24.04 on AMD64
+- `slurm-26.05-noble-amd64-software.tar.gz` - Slurm 26.05 for Ubuntu 24.04 on AMD64
 - `slurm-24.11-jammy-arm64-software.tar.gz` - Slurm 24.11 for Ubuntu 22.04 on ARM64
 - `slurm-23.11-rockylinux9-amd64-software.tar.gz` - Slurm 23.11 for Rocky Linux 9 on AMD64
 
@@ -360,12 +360,12 @@ Builds support multiple OS toolchains for cross-distribution compatibility:
 
 | Toolchain | Target OS | GCC Version | glibc |
 |-----------|-----------|-------------|-------|
-| resolute | Ubuntu 25.04 | 15.x | 2.41+ |
-| noble | Ubuntu 24.04 | 13.x | 2.39 |
-| jammy | Ubuntu 22.04 | 11.x | 2.35 |
-| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.x | 2.39+ |
-| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.x | 2.34 |
-| rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.x | 2.28 |
+| resolute | Ubuntu 26.04 | 15.2.0 | 2.42 |
+| noble | Ubuntu 24.04 | 13.3.0 | 2.39 |
+| jammy | Ubuntu 22.04 | 11.4.0 | 2.35 |
+| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.3.1 | 2.39 |
+| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.5.0 | 2.34 |
+| rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.5.0 | 2.28 |
 
 Each toolchain uses the OS-provided compiler for maximum binary compatibility.
 
@@ -373,16 +373,16 @@ Each toolchain uses the OS-provided compiler for maximum binary compatibility.
 
 ```bash
 # CPU-optimized for Ubuntu 24.04 (recommended)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
+slurm-factory build-slurm --slurm-version 26.05 --toolchain noble
 
 # For Rocky Linux 9 compatibility
-slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9
+slurm-factory build-slurm --slurm-version 26.05 --toolchain rockylinux9
 
 # With GPU support (CUDA/ROCm)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain noble --gpu
+slurm-factory build-slurm --slurm-version 26.05 --toolchain noble --gpu
 
 # Combined: Rocky Linux 8 with GPU support
-slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux8 --gpu
+slurm-factory build-slurm --slurm-version 26.05 --toolchain rockylinux8 --gpu
 ```
 
 ## Docker Integration

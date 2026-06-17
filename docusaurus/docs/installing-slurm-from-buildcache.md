@@ -50,7 +50,7 @@ The buildcache uses three separate mirrors for optimal caching:
 
 ```bash
 # Set versions
-SLURM_VERSION=25.11
+SLURM_VERSION=26.05
 TOOLCHAIN=noble
 CLOUDFRONT_URL=https://slurm-factory-spack-binary-cache.vantagecompute.ai
 
@@ -80,18 +80,19 @@ spack load slurm@${SLURM_VERSION}
 
 # Verify installation
 sinfo --version
-# Output: slurm 25.11.4
+# Output: slurm 26.05.x
 ```
 
 ## Supported Versions
 
-All 27 combinations of Slurm × GCC are available in the buildcache:
+Current Slurm version, OS toolchain, and architecture combinations are generated from the source constants in [Packages](./packages.md).
 
 ### Slurm Versions
 
 | Version | Status | Description |
 |---------|--------|-------------|
-| **25.11** | Latest | Most recent features and improvements |
+| **26.05** | Latest | Most recent features and improvements |
+| **25.11** | Supported | Previous supported release |
 | **24.11** | LTS | Long-term support, production recommended |
 | **23.11** | Stable | Previous stable release |
 
@@ -205,14 +206,10 @@ https://slurm-factory-spack-binary-cache.vantagecompute.ai/
 │   └── slurm/
 │       ├── deps/buildcache/
 │       └── {version}/buildcache/
-├── resolute/                       # Ubuntu 25.04 toolchain
+├── resolute/                       # Ubuntu 26.04 toolchain
 │   └── slurm/
 │       ├── deps/buildcache/
 │       └── {version}/buildcache/
-└── focal/                          # Ubuntu 20.04 toolchain (legacy)
-    └── slurm/
-        ├── deps/buildcache/
-        └── {version}/buildcache/
 ```
 
 ### Tarball Downloads

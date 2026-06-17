@@ -4,29 +4,29 @@ Practical examples for building and deploying Slurm packages with different vers
 
 ## Supported Versions
 
-**Slurm Versions:** 25.11, 24.11, 23.11
+**Slurm Versions:** 26.05, 25.11, 24.11, 23.11
 
 **Toolchains:** resolute, noble (default), jammy, rockylinux10, rockylinux9, rockylinux8
 
-See [Build Artifacts](build-artifacts.md) for pre-built packages covering all version combinations.
+See [Packages](packages.md) for the generated package matrix covering current version, toolchain, and architecture combinations.
 
 ## Basic Build Examples
 
 ```bash
 # Standard build with default toolchain (noble)
-slurm-factory build-slurm --slurm-version 25.11
+slurm-factory build-slurm --slurm-version 26.05
 
 # Build specific version with default toolchain
 slurm-factory build-slurm --slurm-version 24.11
 
 # GPU support (~15-25GB)
-slurm-factory build-slurm --slurm-version 25.11 --gpu
+slurm-factory build-slurm --slurm-version 26.05 --gpu
 
 # Verbose output
-slurm-factory --verbose build-slurm --slurm-version 25.11
+slurm-factory --verbose build-slurm --slurm-version 26.05
 
 # Custom project name
-slurm-factory --project-name prod build-slurm --slurm-version 25.11
+slurm-factory --project-name prod build-slurm --slurm-version 26.05
 ```
 
 ## Toolchain Examples
@@ -34,17 +34,17 @@ slurm-factory --project-name prod build-slurm --slurm-version 25.11
 Build for different operating systems:
 
 ```bash
-# Ubuntu 25.04 (latest)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain resolute
+# Ubuntu 26.04 (latest Ubuntu toolchain)
+slurm-factory build-slurm --slurm-version 26.05 --toolchain resolute
 
 # Ubuntu 24.04 (default, recommended)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
+slurm-factory build-slurm --slurm-version 26.05 --toolchain noble
 
 # Ubuntu 22.04 LTS
 slurm-factory build-slurm --slurm-version 24.11 --toolchain jammy
 
 # Rocky Linux 10 / RHEL 10
-slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux10
+slurm-factory build-slurm --slurm-version 26.05 --toolchain rockylinux10
 
 # Rocky Linux 9 / RHEL 9
 slurm-factory build-slurm --slurm-version 23.11 --toolchain rockylinux9
@@ -53,19 +53,19 @@ slurm-factory build-slurm --slurm-version 23.11 --toolchain rockylinux9
 slurm-factory build-slurm --slurm-version 23.11 --toolchain rockylinux8
 
 # Combine with GPU support
-slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9 --gpu
+slurm-factory build-slurm --slurm-version 26.05 --toolchain rockylinux9 --gpu
 ```
 
 **Toolchain Selection Guide:**
 
 | Toolchain | Target OS | GCC Version | glibc | Use Case |
 |-----------|-----------|-------------|-------|----------|
-| resolute | Ubuntu 25.04 | 15.x | 2.41+ | Latest features |
-| noble | Ubuntu 24.04 | 13.x | 2.39 | **Default** |
-| jammy | Ubuntu 22.04 | 11.x | 2.35 | LTS distributions |
-| rockylinux10 | Rocky 10 / RHEL 10 | 14.x | 2.39+ | Latest Enterprise Linux |
-| rockylinux9 | Rocky 9 / RHEL 9 | 11.x | 2.34 | Enterprise Linux |
-| rockylinux8 | Rocky 8 / RHEL 8 | 8.x | 2.28 | Legacy Enterprise |
+| resolute | Ubuntu 26.04 | 15.2.0 | 2.42 | Latest Ubuntu toolchain |
+| noble | Ubuntu 24.04 | 13.3.0 | 2.39 | **Default** |
+| jammy | Ubuntu 22.04 | 11.4.0 | 2.35 | LTS distributions |
+| rockylinux10 | Rocky 10 / RHEL 10 | 14.3.1 | 2.39 | Latest Enterprise Linux |
+| rockylinux9 | Rocky 9 / RHEL 9 | 11.5.0 | 2.34 | Enterprise Linux |
+| rockylinux8 | Rocky 8 / RHEL 8 | 8.5.0 | 2.28 | Legacy Enterprise |
 
 ## Deployment Examples
 

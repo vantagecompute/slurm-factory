@@ -40,6 +40,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'slurm-factory-spack-build-cache',
         'build-artifacts',
+        'packages',
         'spack-repo',
       ],
     },

@@ -8,37 +8,37 @@ Deploy relocatable Slurm packages to HPC clusters. Packages can be built locally
 
 ```bash
 # Build package for Ubuntu 24.04 (Noble)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain noble
+slurm-factory build-slurm --slurm-version 26.05 --toolchain noble
 
 # Build for Ubuntu 22.04 (Jammy)
-slurm-factory build-slurm --slurm-version 25.11 --toolchain jammy
+slurm-factory build-slurm --slurm-version 26.05 --toolchain jammy
 
 # Build for Rocky Linux 9
-slurm-factory build-slurm --slurm-version 25.11 --toolchain rockylinux9
+slurm-factory build-slurm --slurm-version 26.05 --toolchain rockylinux9
 
 # Deploy
-sudo tar -xzf ~/.slurm-factory/builds/noble/25.11/slurm-25.11-noble-amd64-software.tar.gz -C /opt/
+sudo tar -xzf ~/.slurm-factory/builds/noble/26.05/slurm-26.05-noble-amd64-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
-module load slurm/25.11-noble
+module load slurm/26.05-noble
 ```
 
 ### Option 2: Download Pre-Built Package from S3
 
 ```bash
 # Download from S3 (Ubuntu 24.04)
-wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/25.11/amd64/slurm-25.11-noble-amd64-software.tar.gz
+wget https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/26.05/amd64/slurm-26.05-noble-amd64-software.tar.gz
 
 # Deploy
-sudo tar -xzf slurm-25.11-noble-amd64-software.tar.gz -C /opt/
+sudo tar -xzf slurm-26.05-noble-amd64-software.tar.gz -C /opt/
 cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name mycluster
 
 # Load module
-module load slurm/25.11-noble
+module load slurm/26.05-noble
 ```
 
-See [Build Artifacts](build-artifacts.md) for all available packages.
+See [Packages](packages.md) for the generated current package matrix.
 
 ## Toolchain Compatibility
 
@@ -46,12 +46,12 @@ Use `--toolchain` to build packages for your target distribution:
 
 | Toolchain | Target OS | GCC Version | glibc |
 |-----------|-----------|-------------|-------|
-| resolute | Ubuntu 25.04 | 15.x | 2.41+ |
-| noble | Ubuntu 24.04 | 13.x | 2.39 |
-| jammy | Ubuntu 22.04 | 11.x | 2.35 |
-| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.x | 2.39+ |
-| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.x | 2.34 |
-| rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.x | 2.28 |
+| resolute | Ubuntu 26.04 | 15.2.0 | 2.42 |
+| noble | Ubuntu 24.04 | 13.3.0 | 2.39 |
+| jammy | Ubuntu 22.04 | 11.4.0 | 2.35 |
+| rockylinux10 | Rocky Linux 10 / RHEL 10 | 14.3.1 | 2.39 |
+| rockylinux9 | Rocky Linux 9 / RHEL 9 | 11.5.0 | 2.34 |
+| rockylinux8 | Rocky Linux 8 / RHEL 8 | 8.5.0 | 2.28 |
 
 **Note**: Each toolchain uses the OS-provided compiler for maximum binary compatibility.
 
