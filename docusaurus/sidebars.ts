@@ -16,6 +16,7 @@ const sidebars: SidebarsConfig = {
   // Manually curated sidebar for Slurm Factory documentation
   tutorialSidebar: [
     'index', // Homepage/Overview (consolidated)
+    'packages', // Public package and cache index
     {
       type: 'category',
       label: 'Getting Started',
@@ -40,7 +41,6 @@ const sidebars: SidebarsConfig = {
       items: [
         'slurm-factory-spack-build-cache',
         'build-artifacts',
-        'packages',
         'spack-repo',
       ],
     },

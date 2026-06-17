@@ -1,0 +1,61 @@
+import SpackCacheBrowser from '@site/src/components/SpackCacheBrowser';
+
+# Packages
+
+Use this page to inspect both the supported Slurm Factory build matrix and the live public Spack cache.
+The cache browser runs in your browser and fetches current package manifests directly from the CloudFront-backed cache.
+
+<SpackCacheBrowser />
+
+## Current Support Matrix
+
+Slurm Factory currently defines **4 Slurm versions**, **6 OS toolchains**, and **2 artifact architectures**, for **48 public tarball combinations** plus matching Spack buildcache mirrors.
+
+### Slurm Versions
+
+| Slurm version | Spack package version | Status |
+|---------------|-----------------------|--------|
+| `26.05` | `26-05-0-1` | Latest supported |
+| `25.11` | `25-11-6-1` | Supported |
+| `24.11` | `24-11-6-1` | Supported |
+| `23.11` | `23-11-11-1` | Supported |
+
+### OS Toolchains
+
+| Toolchain | OS/Distribution | System GCC | glibc | Base image |
+|-----------|-----------------|------------|-------|------------|
+| `resolute` | Ubuntu 26.04 (Resolute) | 15.2.0 | 2.42 | `ubuntu:resolute` |
+| `noble` | Ubuntu 24.04 (Noble) | 13.3.0 | 2.39 | `ubuntu:noble` |
+| `jammy` | Ubuntu 22.04 (Jammy) | 11.4.0 | 2.35 | `ubuntu:jammy` |
+| `rockylinux10` | Rocky Linux 10 | 14.3.1 | 2.39 | `rockylinux/rockylinux:10` |
+| `rockylinux9` | Rocky Linux 9 | 11.5.0 | 2.34 | `rockylinux/rockylinux:9` |
+| `rockylinux8` | Rocky Linux 8 | 8.5.0 | 2.28 | `rockylinux/rockylinux:8` |
+
+### Architectures
+
+| Architecture | Notes |
+|--------------|-------|
+| `amd64` | Built on x86_64 runners and published with the `amd64` artifact label. |
+| `arm64` | Built on ARM64 runners and published with the `arm64` artifact label. |
+
+## Cache URL Patterns
+
+| Artifact | URL pattern |
+|----------|-------------|
+| Slurm Spack mirror | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/slurm/{slurm_version}/` |
+| Dependency Spack mirror | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/slurm/deps/` |
+| Complete tarball | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/{slurm_version}/{architecture}/slurm-{slurm_version}-{toolchain}-{architecture}-software.tar.gz` |
+| Tarball signature | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/{toolchain}/{slurm_version}/{architecture}/slurm-{slurm_version}-{toolchain}-{architecture}-software.tar.gz.asc` |
+
+## Dependency Buildcaches
+
+Dependencies are shared across Slurm versions within each OS toolchain.
+
+| Toolchain | Dependency buildcache |
+|-----------|-----------------------|
+| `resolute` | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/resolute/slurm/deps/` |
+| `noble` | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/deps/` |
+| `jammy` | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/jammy/slurm/deps/` |
+| `rockylinux10` | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux10/slurm/deps/` |
+| `rockylinux9` | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux9/slurm/deps/` |
+| `rockylinux8` | `https://slurm-factory-spack-binary-cache.vantagecompute.ai/rockylinux8/slurm/deps/` |

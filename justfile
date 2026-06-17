@@ -48,7 +48,6 @@ docs-dev-port port="3000": docs-install
 docs-build: docs-install
     #{{uv_run}} python3 ./scripts/generate_complete_docs.py
     {{uv_run}} python3 ./scripts/update_docs_version.py
-    {{uv_run}} python3 ./scripts/generate_packages_page.py
     @echo "🏗️ Building Docusaurus for production..."
     cd docusaurus && yarn build
 
