@@ -60,7 +60,7 @@ def get_mirrors(buildcache: str, toolchain: str, slurm_version: str) -> Dict[str
             "signed": False,
             "binary": False,
             "source": True,
-        }
+        },
     }
 
     if (buildcache == "all") or (buildcache == "deps"):

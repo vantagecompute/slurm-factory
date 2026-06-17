@@ -82,6 +82,21 @@ class SlurmFactoryBinaryCache(Stack):
                     noncurrent_version_expiration=Duration.days(90),
                 ),
             ],
+            cors=[
+                s3.CorsRule(
+                    id="PublicReadCors",
+                    allowed_methods=[s3.HttpMethods.GET, s3.HttpMethods.HEAD],
+                    allowed_origins=["*"],
+                    allowed_headers=["*"],
+                    exposed_headers=[
+                        "ETag",
+                        "x-amz-id-2",
+                        "x-amz-request-id",
+                        "x-amz-version-id",
+                    ],
+                    max_age=3600,
+                )
+            ],
         )
 
         # Origin Access Control for CloudFront (newer than OAI)
@@ -108,6 +123,27 @@ class SlurmFactoryBinaryCache(Stack):
             enable_accept_encoding_gzip=True,
             enable_accept_encoding_brotli=True,
         )
+
+        buildcache_cors_response_headers_policy = cloudfront.ResponseHeadersPolicy(
+            self,
+            "BuildcacheCorsResponseHeadersPolicy",
+            response_headers_policy_name=f"spack-buildcache-cors-{account_hash}",
+            comment="CORS policy for public Spack buildcache browser clients",
+            cors_behavior=cloudfront.ResponseHeadersCorsBehavior(
+                access_control_allow_credentials=False,
+                access_control_allow_headers=["*"],
+                access_control_allow_methods=["GET", "HEAD", "OPTIONS"],
+                access_control_allow_origins=["*"],
+                access_control_expose_headers=[
+                    "ETag",
+                    "x-amz-id-2",
+                    "x-amz-request-id",
+                    "x-amz-version-id",
+                ],
+                access_control_max_age=Duration.hours(1),
+                origin_override=True,
+            ),
+        )
         
         distribution_props = {
             "default_behavior": cloudfront.BehaviorOptions(
@@ -117,6 +153,8 @@ class SlurmFactoryBinaryCache(Stack):
                 ),
                 viewer_protocol_policy=cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
                 cache_policy=buildcache_cache_policy,
+                origin_request_policy=cloudfront.OriginRequestPolicy.CORS_S3_ORIGIN,
+                response_headers_policy=buildcache_cors_response_headers_policy,
                 compress=True,
                 allowed_methods=cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
                 cached_methods=cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,

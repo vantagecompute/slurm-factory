@@ -136,12 +136,14 @@ infra outputs
    - Encryption: S3-managed (AES-256)
    - Lifecycle: Delete old versions after 90 days
    - Retention: Bucket retained on stack deletion
+    - CORS: Public read/list responses for browser-based documentation clients
 
 2. **CloudFront Distribution**
    - Domain: `slurm-factory-spack-binary-cache.vantagecompute.ai`
-   - Origin: S3 bucket via Origin Access Identity (OAI)
+    - Origin: S3 bucket via Origin Access Control (OAC)
    - HTTPS: Redirect HTTP to HTTPS
    - Caching: Optimized cache policy
+    - CORS: Response headers policy for public `GET`, `HEAD`, and `OPTIONS` requests
    - Compression: Enabled
    - Price class: US/Europe/Asia (PriceClass100)
 
@@ -158,7 +160,7 @@ infra outputs
 ### Security
 
 - S3 bucket access restricted to:
-  - CloudFront OAI (read-only for public distribution)
+  - CloudFront OAC (read/list for public distribution)
   - IAM user `james` (read/write)
   - GitHub Actions role (read/write via OIDC)
 - HTTPS-only access via CloudFront
