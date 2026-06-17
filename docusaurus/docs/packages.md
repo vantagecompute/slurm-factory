@@ -7,7 +7,7 @@ Regenerate it with:
 uv run python scripts/generate_packages_page.py
 ```
 
-Generated: 2026-06-17 18:12 UTC
+Generated: 2026-06-17 19:51 UTC
 
 ## Current Support Matrix
 
