@@ -7,7 +7,7 @@ Regenerate it with:
 uv run python scripts/generate_packages_page.py
 ```
 
-Generated: 2026-06-17 17:25 UTC
+Generated: 2026-06-17 18:12 UTC
 
 ## Current Support Matrix
 
@@ -97,6 +97,4 @@ Dependencies are shared across Slurm versions within each OS toolchain.
 The generator scans `SLURM_FACTORY_CACHE_DIR` when it is set, otherwise it scans `~/.slurm-factory`.
 Set `SLURM_FACTORY_CACHE_DIR` before running the generator to scan a different cache.
 
-| Slurm | Toolchain | Architecture | Size | Cache-relative path |
-|-------|-----------|--------------|------|------------|
-| `26.05` | `noble` | `unspecified` | 215.6 MB | `builds/noble/26.05/slurm-26.05-noble-software.tar.gz` |
+No local tarballs were found in the configured cache when this page was generated.
