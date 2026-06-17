@@ -79,7 +79,7 @@ slurm-factory-spack-binary-cache.vantagecompute.ai/
         └── ...                  # All toolchains with tarballs + signatures
 ```
 
-See [Packages](./packages.md) for the generated current package matrix.
+See [Packages](./packages) for the live cache browser and current support matrix.
 
 ### Toolchain-Based Architecture Benefits
 

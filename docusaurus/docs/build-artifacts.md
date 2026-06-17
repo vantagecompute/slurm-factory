@@ -200,7 +200,7 @@ Notes:
 
 ### Tarballs
 
-Current Slurm versions, OS toolchains, architectures, and public URLs are generated from the source constants in [Packages](./packages.md).
+Current Slurm versions, OS toolchains, architectures, and public URLs are listed in [Packages](./packages).
 
 Tarball URLs use this pattern:
 

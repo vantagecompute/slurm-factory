@@ -65,7 +65,7 @@ Each toolchain uses the OS-provided compiler for maximum binary compatibility:
 - **rockylinux9**: Rocky Linux 9 / RHEL 9, GCC 11.5.0, glibc 2.34
 - **rockylinux8**: Rocky Linux 8 / RHEL 8, GCC 8.5.0, glibc 2.28
 
-See [Packages](./packages.md) for the generated package matrix sourced from the current code constants.
+See [Packages](./packages) for the live cache browser and current support matrix.
 
 **Build Types:**
 
@@ -244,7 +244,7 @@ spack install slurm@25.11
 - [Installation Guide](./installation.md) - Setup and prerequisites
 - [Examples](./examples.md) - Real-world usage scenarios
 - [Architecture](./architecture.md) - Build system internals
-- [Packages](./packages.md) - Generated current package matrix
+- [Packages](./packages) - Live cache browser and current support matrix
 - [Deployment](./deployment.md) - Installing and configuring built packages
 
 ## Exceptions

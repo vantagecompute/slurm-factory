@@ -38,7 +38,7 @@ cd /opt && sudo ./data/slurm_assets/slurm_install.sh --full-init --cluster-name 
 module load slurm/26.05-noble
 ```
 
-See [Packages](packages.md) for the generated current package matrix.
+See [Packages](./packages) for the live cache browser and current support matrix.
 
 ## Toolchain Compatibility
 

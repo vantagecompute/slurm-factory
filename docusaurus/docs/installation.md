@@ -212,7 +212,7 @@ slurm-factory clean --full
 - **Slurm**: 26.05, 25.11, 24.11, 23.11
 - **Toolchains**: resolute, noble, jammy, rockylinux10, rockylinux9, rockylinux8
 
-See [Packages](packages.md) for the generated current package matrix.
+See [Packages](./packages) for the live cache browser and current support matrix.
 
 ## Troubleshooting
 

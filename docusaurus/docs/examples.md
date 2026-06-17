@@ -8,7 +8,7 @@ Practical examples for building and deploying Slurm packages with different vers
 
 **Toolchains:** resolute, noble (default), jammy, rockylinux10, rockylinux9, rockylinux8
 
-See [Packages](packages.md) for the generated package matrix covering current version, toolchain, and architecture combinations.
+See [Packages](./packages) for the live cache browser and current support matrix.
 
 ## Basic Build Examples
 

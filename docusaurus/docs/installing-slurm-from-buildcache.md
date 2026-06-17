@@ -85,7 +85,7 @@ sinfo --version
 
 ## Supported Versions
 
-Current Slurm version, OS toolchain, and architecture combinations are generated from the source constants in [Packages](./packages.md).
+Current Slurm version, OS toolchain, and architecture combinations are listed in [Packages](./packages).
 
 ### Slurm Versions
 
