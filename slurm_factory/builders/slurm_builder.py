@@ -934,7 +934,10 @@ def _push_slurm_to_buildcache(
                 "--only=dependencies --with-build-dependencies s3-buildcache slurm"
             )
         else:  # all
-            push_cmd = f"spack -e . buildcache push {signing_flags} --force --update-index s3-buildcache"
+            push_cmd = (
+                f"spack -e . buildcache push {signing_flags} --force --update-index "
+                "--with-build-dependencies s3-buildcache"
+            )
 
         console.print(f"[dim]Pushing packages to {s3_mirror_url}...[/dim]")
         # Build docker run command with AWS environment variables
