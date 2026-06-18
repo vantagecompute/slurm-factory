@@ -856,32 +856,30 @@ def _push_slurm_to_buildcache(
     image_tag: str,
     slurm_version: str,
     toolchain: str,
-    publish_mode: str = "all",
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
     gpg_passphrase: str | None = None,
 ) -> None:
     """
-    Push Slurm specs to buildcache using spack buildcache push.
+    Push all spack packages to a single buildcache mirror.
 
-    This runs `spack buildcache push` inside the Docker container with AWS
-    credentials/role passed as environment variables.
+    Pushes everything (slurm + deps + build deps) to
+    ``s3://{bucket}/{toolchain}/slurm/{slurm_version}``.
 
     Args:
         image_tag: Tag of the build Docker image
         slurm_version: Slurm version
         toolchain: OS toolchain identifier
-        publish_mode: What to publish - "slurm", "deps", or "all"
         signing_key: GPG key ID for signing packages (e.g., "0xKEYID")
         gpg_private_key: GPG private key (base64 encoded) to import into container
         gpg_passphrase: GPG key passphrase for non-interactive signing
 
     """
-    console.print(f"[bold blue]Publishing to buildcache (mode: {publish_mode})...[/bold blue]")
+    console.print("[bold blue]Publishing to buildcache...[/bold blue]")
 
-    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/deps"
+    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/{slurm_version}"
 
-    logger.debug(f"Publishing Slurm {slurm_version} to {S3_BUILDCACHE_BUCKET} (mode: {publish_mode})")
+    logger.debug(f"Publishing Slurm {slurm_version} to {s3_mirror_url}")
 
     # Check for AWS credentials - support both direct credentials and OIDC role
 
@@ -919,25 +917,10 @@ def _push_slurm_to_buildcache(
             signing_flags = "--unsigned"
             logger.debug("Publishing unsigned packages")
 
-        # Determine what to push based on publish_mode
-        if publish_mode == "slurm":
-            s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/{slurm_version}"
-            # Push only slurm package
-            push_cmd = (
-                f"spack buildcache push {signing_flags} --force --update-index "
-                "--only=package s3-buildcache slurm"
-            )
-        elif publish_mode == "deps":
-            # Push only dependencies (everything except slurm)
-            push_cmd = (
-                f"spack -e . buildcache push {signing_flags} --force --update-index "
-                "--only=dependencies --with-build-dependencies s3-buildcache slurm"
-            )
-        else:  # all
-            push_cmd = (
-                f"spack -e . buildcache push {signing_flags} --force --update-index "
-                "--with-build-dependencies s3-buildcache"
-            )
+        push_cmd = (
+            f"spack -e . buildcache push {signing_flags} --force --update-index "
+            "--with-build-dependencies s3-buildcache"
+        )
 
         console.print(f"[dim]Pushing packages to {s3_mirror_url}...[/dim]")
         # Build docker run command with AWS environment variables
@@ -1061,7 +1044,7 @@ def _push_slurm_to_buildcache(
         if result.stderr:
             console.print(f"[yellow]Buildcache push stderr:\n{escape(result.stderr)}[/yellow]")
 
-        console.print(f"[bold green]✓ Published to buildcache ({publish_mode})[/bold green]")
+        console.print(f"[bold green]✓ Published to buildcache ({s3_mirror_url})[/bold green]")
         logger.debug(f"Successfully published to {s3_mirror_url}")
 
     except subprocess.TimeoutExpired:
@@ -1343,7 +1326,7 @@ def create_slurm_package(
     gpu_support: bool = False,
     no_cache: bool = False,
     publish: str = "none",
-    buildcache: str = "none",
+    buildcache: bool = False,
     enable_hierarchy: bool = False,
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
@@ -1429,7 +1412,7 @@ def create_slurm_package(
             gpg_private_key
             and gpg_passphrase
             and signing_key
-            and publish in ("slurm", "spack", "deps", "all")
+            and publish in ("spack", "all")
         )
 
         # Run the Spack build inside a container with mounted volumes
@@ -1448,12 +1431,7 @@ def create_slurm_package(
         tarball_build_output_dir = settings.builds_dir / toolchain / slurm_version
 
         # If publish is enabled, push to buildcache
-        if (gpg_private_key and gpg_passphrase and signing_key) and publish in (
-            "slurm",
-            "spack",
-            "deps",
-            "all",
-        ):
+        if (gpg_private_key and gpg_passphrase and signing_key) and publish in ("spack", "all"):
             console.print(f"[bold cyan]Publishing to buildcache ({publish})...[/bold cyan]")
 
             # Commit the container to an image so we can use it with _push_slurm_to_buildcache
@@ -1478,14 +1456,12 @@ def create_slurm_package(
                     image_tag=temp_image_tag,
                     slurm_version=slurm_version,
                     toolchain=toolchain,
-                    publish_mode="slurm" if publish == "spack" else publish,
                     signing_key=signing_key,
                     gpg_private_key=gpg_private_key,
                     gpg_passphrase=gpg_passphrase,
                 )
 
-                # Sign and upload the tarball if publishing slurm (skip for spack-only mode)
-                if publish == "slurm":
+                if publish == "all":
                     console.print("[bold cyan]Signing and uploading tarball...[/bold cyan]")
                     tarball_name = _get_slurm_tarball_name(slurm_version, toolchain)
                     tarball_path = tarball_build_output_dir / tarball_name

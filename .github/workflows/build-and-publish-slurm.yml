@@ -32,13 +32,8 @@ on:
         required: true
         default: 'all'
         type: string
-      use_slurm_buildcache:
-        description: 'Use Slurm buildcache (download pre-built Slurm packages)'
-        required: false
-        default: false
-        type: boolean
-      use_deps_buildcache:
-        description: 'Use dependencies buildcache (download pre-built dependencies)'
+      use_buildcache:
+        description: 'Use remote spack binary buildcache during build'
         required: false
         default: false
         type: boolean
@@ -222,15 +217,9 @@ jobs:
           echo "Using GPG signing key: $GPG_KEY_ID"
 
           BUILDCACHE_OPT=""
-          if [ "${{ inputs.use_slurm_buildcache }}" = "true" ] && [ "${{ inputs.use_deps_buildcache }}" = "true" ]; then
-            BUILDCACHE_OPT="--buildcache=all"
-            echo "Using buildcache: all (dependencies + Slurm)"
-          elif [ "${{ inputs.use_slurm_buildcache }}" = "true" ]; then
-            BUILDCACHE_OPT="--buildcache=slurm"
-            echo "Using buildcache: slurm only"
-          elif [ "${{ inputs.use_deps_buildcache }}" = "true" ]; then
-            BUILDCACHE_OPT="--buildcache=deps"
-            echo "Using buildcache: dependencies only"
+          if [ "${{ inputs.use_buildcache }}" = "true" ]; then
+            BUILDCACHE_OPT="--buildcache"
+            echo "Using remote spack binary buildcache"
           else
             echo "Not using buildcache (building from source)"
           fi
@@ -455,8 +444,7 @@ jobs:
           echo "**Slurm Versions:** ${{ inputs.slurm_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "**Toolchains:** ${{ inputs.toolchains }}" >> $GITHUB_STEP_SUMMARY
           echo "**Architectures:** ${{ inputs.architectures }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Use Slurm Buildcache:** ${{ inputs.use_slurm_buildcache }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Use Deps Buildcache:** ${{ inputs.use_deps_buildcache }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Use Buildcache:** ${{ inputs.use_buildcache }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
           echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/slurm/" >> $GITHUB_STEP_SUMMARY

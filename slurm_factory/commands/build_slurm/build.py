@@ -40,7 +40,7 @@ def build_slurm(
     verify: bool = False,
     no_cache: bool = False,
     publish: str = "none",
-    buildcache: str = "none",
+    buildcache: bool = False,
     enable_hierarchy: Annotated[
         bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
     ] = False,
@@ -153,19 +153,19 @@ def build_slurm_command(
         typer.Option(
             "--publish",
             help=(
-                "Publish to buildcache: none (default), slurm (Slurm tarball + spack), "
-                "spack (spack buildcache only, no tarball upload), deps "
-                "(only dependencies), all (Slurm and dependencies)"
+                "Publish to buildcache: none (default), "
+                "spack (push spack binary packages only), "
+                "all (push spack packages + sign and upload tarball)"
             ),
         ),
     ] = "none",
     buildcache: Annotated[
-        str,
+        bool,
         typer.Option(
-            "--buildcache",
-            help=("Use buildcache: none (default), all (dependencies + Slurm), deps (only dependencies)"),
+            "--buildcache/--no-buildcache",
+            help="Use the remote spack binary buildcache during build",
         ),
-    ] = "none",
+    ] = False,
     enable_hierarchy: Annotated[
         bool, typer.Option("--enable-hierarchy", help="Enable Core/Compiler/MPI module hierarchy")
     ] = False,
@@ -209,15 +209,12 @@ def build_slurm_command(
 
     Buildcache publishing (--publish):
     - none (default): Don't publish to buildcache
-    - all: Publish all packages (Slurm and dependencies)
-    - slurm: Publish Slurm spack packages + sign and upload tarball to S3
     - spack: Push spack binary packages only (no tarball upload)
-    - deps: Publish only dependencies (excluding Slurm)
+    - all: Push spack packages + sign and upload tarball to S3
 
     Remote Spack buildcache (--buildcache):
-    - none (default): Don't use the buildcache
-    - all: Use dependencies buildcache and slurm buildcache
-    - deps: Use buildcache for only dependencies (excluding Slurm)
+    - --no-buildcache (default): Build everything from source
+    - --buildcache: Use the remote spack binary buildcache
 
     Advanced Spack 1.x features:
     - --enable-hierarchy: Enable Core/Compiler/MPI 3-tier module hierarchy
@@ -241,14 +238,15 @@ def build_slurm_command(
         slurm-factory build-slurm --verify                          # Build with verification (CI)
         slurm-factory build-slurm --no-cache                        # Build without Docker cache
         slurm-factory build-slurm --enable-hierarchy                # Build with module hierarchy
-        slurm-factory build-slurm --publish=slurm                   # Build and publish only Slurm
-        slurm-factory build-slurm --publish=deps                    # Build and publish only dependencies
+        slurm-factory build-slurm --publish=spack                    # Build and push spack buildcache
+        slurm-factory build-slurm --publish=all                     # Build, push buildcache, upload tarball
+        slurm-factory build-slurm --buildcache                      # Build using remote buildcache
 
     """
     console = Console()
 
     # Validate publish parameter
-    valid_publish_options = ["none", "slurm", "spack", "deps", "all"]
+    valid_publish_options = ["none", "spack", "all"]
     if publish not in valid_publish_options:
         console.print(f"[bold red]Error: Invalid --publish value '{publish}'[/bold red]")
         console.print(f"[bold yellow]Valid options: {', '.join(valid_publish_options)}[/bold yellow]")

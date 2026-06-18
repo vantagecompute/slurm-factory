@@ -363,11 +363,10 @@ class TestConfigurationValidation:
         # Reuse is enabled (True) to allow using buildcache packages
         assert concretizer["reuse"] is True
 
-    def test_mirror_configuration(self):
-        """Test mirror configuration."""
+    def test_mirror_configuration_no_buildcache(self):
+        """Test mirror configuration without buildcache."""
         config = generate_spack_config()
         mirrors = config["spack"]["mirrors"]
-        # Prefer the slurm-factory source cache before falling back to Spack's public mirror.
         assert list(mirrors)[:2] == ["slurm-factory-source-cache", "spack-public"]
         assert mirrors["slurm-factory-source-cache"]["url"] == (
             "https://slurm-factory-spack-binary-cache.vantagecompute.ai/source"
@@ -375,9 +374,21 @@ class TestConfigurationValidation:
         assert mirrors["slurm-factory-source-cache"]["signed"] is False
         assert mirrors["slurm-factory-source-cache"]["binary"] is False
         assert mirrors["slurm-factory-source-cache"]["source"] is True
-        assert "spack-public" in mirrors
         assert mirrors["spack-public"]["url"] == "https://mirror.spack.io"
         assert mirrors["spack-public"]["signed"] is False
+        assert "slurm-buildcache" not in mirrors
+
+    def test_mirror_configuration_with_buildcache(self):
+        """Test mirror configuration with buildcache enabled."""
+        config = generate_spack_config(buildcache=True, slurm_version="25.11", toolchain="noble")
+        mirrors = config["spack"]["mirrors"]
+        assert "slurm-buildcache" in mirrors
+        assert mirrors["slurm-buildcache"]["url"] == (
+            "https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/25.11"
+        )
+        assert mirrors["slurm-buildcache"]["signed"] is True
+        assert mirrors["slurm-buildcache"]["binary"] is True
+        assert mirrors["slurm-buildcache"]["source"] is False
 
 
 class TestParameterValidation:

@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: "Build and Publish Slurm + Dependencies for Each Supported OS"
+name: "Build and Publish Slurm for Each Supported OS"
 
 on:
   workflow_dispatch:
@@ -78,7 +78,7 @@ jobs:
           echo "architecture_matrix=${ARCHITECTURES}" >> $GITHUB_OUTPUT
           echo "Building for architectures: ${ARCHITECTURES}"
 
-  build-and-publish-slurm-dependencies:
+  build-and-publish-slurm:
     needs: prepare-matrix
     runs-on: ${{ fromJSON(matrix.architecture == 'arm64' && '["self-hosted","ARM64"]' || '["self-hosted","X64"]') }}
     timeout-minutes: 3600
@@ -86,7 +86,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    
+
     strategy:
       fail-fast: false
       matrix:
@@ -113,7 +113,7 @@ jobs:
         run: |
           # Clean up any previous builds for this version/compiler combo
           docker images | grep "slurm-factory:25.11-${{ matrix.toolchain }}" | awk '{print $3}' | xargs -r docker rmi -f || true
-          
+
           # Clean Spack cache directories to prevent state leakage between runs
           # This ensures the buildcache test truly validates buildcache installation
           rm -rf "$HOME/.spack"
@@ -143,14 +143,14 @@ jobs:
           echo "✓ GPG secrets are configured"
           echo "  GPG_KEY_ID: $GPG_KEY_ID"
 
-      - name: Build Slurm dependencies and publish to buildcache
+      - name: Build Slurm and publish to buildcache
         timeout-minutes: 360
         env:
           GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          echo "🔨 Building Slurm 25.11 dependencies with ${{ matrix.toolchain }} on architecture ${{ matrix.architecture }}..."
+          echo "🔨 Building Slurm 25.11 with ${{ matrix.toolchain }} on architecture ${{ matrix.architecture }}..."
           if [ -z "$GPG_KEY_ID" ]; then
             echo "Error: GPG_KEY_ID is not set. Signed packages are required for publishing."
             exit 1
@@ -184,23 +184,21 @@ jobs:
         timeout-minutes: 360
         if: always()
         run: |
-          echo "## Slurm Dependencies Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "## Slurm Buildcache Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Slurm Version:** 25.11" >> $GITHUB_STEP_SUMMARY
           echo "**Toolchain:** ${{ matrix.toolchain }}" >> $GITHUB_STEP_SUMMARY
           echo "**Architecture:** ${{ matrix.architecture }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Buildcache Location:**" >> $GITHUB_STEP_SUMMARY
-          echo "- S3: \`s3://${{ env.S3_BUCKET }}/${{ matrix.toolchain }}/slurm/deps/\`" >> $GITHUB_STEP_SUMMARY
-          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/deps/" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Note:** This buildcache contains only Slurm dependencies (excluding Slurm itself)" >> $GITHUB_STEP_SUMMARY
+          echo "- S3: \`s3://${{ env.S3_BUCKET }}/${{ matrix.toolchain }}/slurm/25.11/\`" >> $GITHUB_STEP_SUMMARY
+          echo "- CloudFront: ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/25.11/" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Usage:**" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
-          echo "spack mirror add slurm-factory-deps-buildcache ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/deps" >> $GITHUB_STEP_SUMMARY
+          echo "spack mirror add slurm-factory-buildcache ${{ env.CLOUDFRONT_URL }}/${{ matrix.toolchain }}/slurm/25.11" >> $GITHUB_STEP_SUMMARY
           echo "spack buildcache keys --install --trust" >> $GITHUB_STEP_SUMMARY
-          echo "spack install <dependency>" >> $GITHUB_STEP_SUMMARY
+          echo "spack install slurm" >> $GITHUB_STEP_SUMMARY
           echo '```' >> $GITHUB_STEP_SUMMARY
 
   # ── Consolidate buildcache indexes ──────────────────────────────────
@@ -208,7 +206,7 @@ jobs:
   # buildcache index for each toolchain's deps mirror to guarantee it
   # includes packages from all architectures.
   consolidate-buildcache-index:
-    needs: [prepare-matrix, build-and-publish-slurm-dependencies]
+    needs: [prepare-matrix, build-and-publish-slurm]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -235,8 +233,8 @@ jobs:
           TOOLCHAINS='${{ needs.prepare-matrix.outputs.toolchain_matrix }}'
 
           for toolchain in $(echo "$TOOLCHAINS" | jq -r '.[]'); do
-            MIRROR_URL="s3://${{ env.S3_BUCKET }}/${toolchain}/slurm/deps"
-            MIRROR_NAME="idx-${toolchain}-deps"
+            MIRROR_URL="s3://${{ env.S3_BUCKET }}/${toolchain}/slurm/25.11"
+            MIRROR_NAME="idx-${toolchain}-25.11"
             echo "==> Rebuilding index for ${MIRROR_URL}..."
             spack mirror add "${MIRROR_NAME}" "${MIRROR_URL}"
             spack buildcache update-index "${MIRROR_NAME}"
@@ -245,7 +243,7 @@ jobs:
           echo "✓ All buildcache indexes consolidated"
 
   summary:
-    needs: [build-and-publish-slurm-dependencies, consolidate-buildcache-index]
+    needs: [build-and-publish-slurm, consolidate-buildcache-index]
     runs-on: ubuntu-24.04
     timeout-minutes: 3600
     if: always()
@@ -255,11 +253,11 @@ jobs:
         run: |
           echo "## Overall Build Summary" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "All Slurm dependency buildcaches have been built and published." >> $GITHUB_STEP_SUMMARY
+          echo "All Slurm buildcaches have been built and published." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Slurm Versions:** 25.11" >> $GITHUB_STEP_SUMMARY
           echo "**Toolchain Versions:** ${{ inputs.toolchain_versions }}" >> $GITHUB_STEP_SUMMARY
           echo "**Architectures:** ${{ inputs.architectures }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/${{ inputs.toolchain_versions }}/slurm/deps/\`" >> $GITHUB_STEP_SUMMARY
-          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/${{ inputs.toolchain_versions }}/slurm/deps/" >> $GITHUB_STEP_SUMMARY
+          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/{toolchain}/slurm/25.11/\`" >> $GITHUB_STEP_SUMMARY
+          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/{toolchain}/slurm/25.11/" >> $GITHUB_STEP_SUMMARY

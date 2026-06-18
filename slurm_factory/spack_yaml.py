@@ -46,8 +46,8 @@ def normalize_spack_target(architecture: str) -> str:
     return architecture_aliases.get(architecture.lower(), architecture.lower())
 
 
-def get_mirrors(buildcache: str, toolchain: str, slurm_version: str) -> Dict[str, Dict[str, bool | str]]:
-    """Return the mirrors dictionary based on buildcache."""
+def get_mirrors(buildcache: bool, toolchain: str, slurm_version: str) -> Dict[str, Dict[str, bool | str]]:
+    """Return the mirrors dictionary."""
     mirrors: Dict[str, Dict[str, bool | str]] = {
         "slurm-factory-source-cache": {
             "url": SLURM_FACTORY_SPACK_SOURCE_CACHE_URL,
@@ -63,21 +63,13 @@ def get_mirrors(buildcache: str, toolchain: str, slurm_version: str) -> Dict[str
         },
     }
 
-    if (buildcache == "all") or (buildcache == "deps"):
-        mirrors["slurm-deps-buildcache"] = {
-            "url": f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/{toolchain}/slurm/deps",
+    if buildcache:
+        mirrors["slurm-buildcache"] = {
+            "url": f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/{toolchain}/slurm/{slurm_version}",
             "signed": True,
             "binary": True,
             "source": False,
         }
-
-        if buildcache == "all":
-            mirrors["slurm-buildcache"] = {
-                "url": f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/{toolchain}/slurm/{slurm_version}",
-                "signed": True,
-                "binary": True,
-                "source": False,
-            }
 
     return mirrors
 
@@ -209,7 +201,7 @@ def generate_spack_config(
     misc_cache_root: str | None = None,
     lmod_root: str | None = None,
     toolchain: str = "noble",
-    buildcache: str = "none",
+    buildcache: bool = False,
     enable_hierarchy: bool = False,
 ) -> Dict[str, Any]:
     """
@@ -226,7 +218,7 @@ def generate_spack_config(
         misc_cache_root: Root directory for Spack's misc cache
         lmod_root: Root directory for generated Lmod module files
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
-        buildcache: Buildcache source ("none", "s3", "oci")
+        buildcache: Whether to use the remote spack binary buildcache
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
 
     Returns:
@@ -562,7 +554,7 @@ def get_comment_header(slurm_version: str, gpu_support: bool) -> str:
 def generate_yaml_string(
     slurm_version: str = "25.11",
     toolchain: str = "noble",
-    buildcache: str = "none",
+    buildcache: bool = False,
     gpu_support: bool = False,
     architecture: str = "x86_64",
     enable_hierarchy: bool = False,
@@ -579,7 +571,7 @@ def generate_yaml_string(
     Args:
         slurm_version: Slurm version to build
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
-        buildcache: "none", "all", "deps"
+        buildcache: Whether to use the remote spack binary buildcache
         gpu_support: Whether to include GPU support
         architecture: CPU architecture target for Spack packages
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy
