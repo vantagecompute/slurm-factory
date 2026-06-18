@@ -501,7 +501,7 @@ def generate_spack_config(
                 },
                 "cuda": {
                     "buildable": True,
-                    "version": ["12.9.0"],
+                    "version": ["13.0.2"],
                 },
             },
             "develop": {},
