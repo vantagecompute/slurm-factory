@@ -197,7 +197,7 @@ jobs:
       - name: Prepare local buildcache
         timeout-minutes: 5
         run: |
-          LOCAL_CACHE="/srv/spack-buildcache"
+          LOCAL_CACHE="$HOME/.slurm-factory/spack-buildcache"
           mkdir -p "$LOCAL_CACHE"
           echo "LOCAL_BUILDCACHE_DIR=$LOCAL_CACHE" >> $GITHUB_ENV
           echo "✓ Local buildcache at $LOCAL_CACHE ($(du -sh "$LOCAL_CACHE" 2>/dev/null | cut -f1 || echo 'empty'))"

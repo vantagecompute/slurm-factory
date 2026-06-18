@@ -254,7 +254,7 @@ def build_slurm_command(
         slurm-factory build-slurm --publish=spack                    # Build and push spack buildcache
         slurm-factory build-slurm --publish=all                     # Build, push buildcache, upload tarball
         slurm-factory build-slurm --buildcache                      # Build using remote buildcache
-        slurm-factory build-slurm --local-cache /srv/spack-buildcache  # Use local filesystem cache
+        slurm-factory build-slurm --local-cache ~/.slurm-factory/spack-buildcache
 
     """
     console = Console()
