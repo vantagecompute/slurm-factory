@@ -47,6 +47,7 @@ def build_slurm(
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
     gpg_passphrase: str | None = None,
+    local_cache: str | None = None,
 ):
     """Build a specific Slurm version in a Docker container."""
     console = Console()
@@ -113,6 +114,7 @@ def build_slurm(
             signing_key=signing_key,
             gpg_private_key=gpg_private_key,
             gpg_passphrase=gpg_passphrase,
+            local_cache=local_cache,
         )
         logger.debug("Slurm package creation completed")
         console.print("[bold green]✓ Slurm package created successfully[/bold green]")
@@ -187,6 +189,13 @@ def build_slurm_command(
             help="Passphrase for the GPG private key (if encrypted)",
         ),
     ] = None,
+    local_cache: Annotated[
+        str | None,
+        typer.Option(
+            "--local-cache",
+            help="Host path to local filesystem buildcache (e.g. /srv/spack-buildcache)",
+        ),
+    ] = None,
 ):
     """
     Build a specific Slurm version.
@@ -216,6 +225,10 @@ def build_slurm_command(
     - --no-buildcache (default): Build everything from source
     - --buildcache: Use the remote spack binary buildcache
 
+    Local filesystem buildcache (--local-cache):
+    - Persists built packages on the host for reuse across builds
+    - Packages are read during build and pushed after publish
+
     Advanced Spack 1.x features:
     - --enable-hierarchy: Enable Core/Compiler/MPI 3-tier module hierarchy
 
@@ -241,6 +254,7 @@ def build_slurm_command(
         slurm-factory build-slurm --publish=spack                    # Build and push spack buildcache
         slurm-factory build-slurm --publish=all                     # Build, push buildcache, upload tarball
         slurm-factory build-slurm --buildcache                      # Build using remote buildcache
+        slurm-factory build-slurm --local-cache /srv/spack-buildcache  # Use local filesystem cache
 
     """
     console = Console()
@@ -290,4 +304,5 @@ def build_slurm_command(
         signing_key,
         gpg_private_key,
         gpg_passphrase,
+        local_cache,
     )

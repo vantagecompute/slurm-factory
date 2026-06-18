@@ -380,15 +380,34 @@ class TestConfigurationValidation:
 
     def test_mirror_configuration_with_buildcache(self):
         """Test mirror configuration with buildcache enabled."""
-        config = generate_spack_config(buildcache=True, slurm_version="25.11", toolchain="noble")
+        config = generate_spack_config(buildcache=True, toolchain="noble")
         mirrors = config["spack"]["mirrors"]
         assert "slurm-buildcache" in mirrors
         assert mirrors["slurm-buildcache"]["url"] == (
-            "https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/slurm/25.11"
+            "https://slurm-factory-spack-binary-cache.vantagecompute.ai/noble/spack"
         )
         assert mirrors["slurm-buildcache"]["signed"] is True
         assert mirrors["slurm-buildcache"]["binary"] is True
         assert mirrors["slurm-buildcache"]["source"] is False
+
+    def test_mirror_configuration_with_local_cache(self):
+        """Test mirror configuration with local filesystem buildcache."""
+        config = generate_spack_config(local_cache="/local-buildcache")
+        mirrors = config["spack"]["mirrors"]
+        assert "local-buildcache" in mirrors
+        assert mirrors["local-buildcache"]["url"] == "file:///local-buildcache"
+        assert mirrors["local-buildcache"]["signed"] is False
+        assert mirrors["local-buildcache"]["binary"] is True
+        assert mirrors["local-buildcache"]["source"] is False
+
+    def test_mirror_configuration_local_cache_and_buildcache(self):
+        """Test local cache ordered before remote buildcache."""
+        config = generate_spack_config(
+            buildcache=True, toolchain="noble", local_cache="/local-buildcache"
+        )
+        mirrors = config["spack"]["mirrors"]
+        keys = list(mirrors.keys())
+        assert keys.index("local-buildcache") < keys.index("slurm-buildcache")
 
 
 class TestParameterValidation:

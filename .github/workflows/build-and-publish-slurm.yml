@@ -194,6 +194,14 @@ jobs:
           echo "✓ GPG secrets are configured"
           echo "  GPG_KEY_ID: $GPG_KEY_ID"
 
+      - name: Prepare local buildcache
+        timeout-minutes: 5
+        run: |
+          LOCAL_CACHE="/srv/spack-buildcache"
+          mkdir -p "$LOCAL_CACHE"
+          echo "LOCAL_BUILDCACHE_DIR=$LOCAL_CACHE" >> $GITHUB_ENV
+          echo "✓ Local buildcache at $LOCAL_CACHE ($(du -sh "$LOCAL_CACHE" 2>/dev/null | cut -f1 || echo 'empty'))"
+
       - name: Build Slurm and push spack buildcache
         timeout-minutes: 360
         env:
@@ -235,6 +243,7 @@ jobs:
             --signing-key "$GPG_KEY_ID" \
             --gpg-private-key "$GPG_PRIVATE_KEY" \
             --gpg-passphrase "$GPG_PASSPHRASE" \
+            --local-cache "$LOCAL_BUILDCACHE_DIR" \
             $BUILDCACHE_OPT
 
       - name: Summarize build diagnostics
@@ -416,14 +425,12 @@ jobs:
           TOOLCHAINS='${{ needs.prepare-matrix.outputs.toolchain_matrix }}'
 
           for toolchain in $(echo "$TOOLCHAINS" | jq -r '.[]'); do
-            for version in $(echo "$SLURM_VERSIONS" | jq -r '.[]'); do
-              MIRROR_URL="s3://${{ env.S3_BUCKET }}/${toolchain}/slurm/${version}"
-              MIRROR_NAME="idx-${toolchain}-${version}"
-              echo "==> Rebuilding index for ${MIRROR_URL}..."
-              spack mirror add "${MIRROR_NAME}" "${MIRROR_URL}"
-              spack buildcache update-index "${MIRROR_NAME}"
-              spack mirror rm "${MIRROR_NAME}"
-            done
+            MIRROR_URL="s3://${{ env.S3_BUCKET }}/${toolchain}/spack"
+            MIRROR_NAME="idx-${toolchain}"
+            echo "==> Rebuilding index for ${MIRROR_URL}..."
+            spack mirror add "${MIRROR_NAME}" "${MIRROR_URL}"
+            spack buildcache update-index "${MIRROR_NAME}"
+            spack mirror rm "${MIRROR_NAME}"
           done
           echo "✓ All buildcache indexes consolidated"
 
@@ -446,8 +453,8 @@ jobs:
           echo "**Architectures:** ${{ inputs.architectures }}" >> $GITHUB_STEP_SUMMARY
           echo "**Use Buildcache:** ${{ inputs.use_buildcache }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/slurm/\`" >> $GITHUB_STEP_SUMMARY
-          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/slurm/" >> $GITHUB_STEP_SUMMARY
+          echo "**S3 Bucket:** \`s3://${{ env.S3_BUCKET }}/{toolchain}/spack/\`" >> $GITHUB_STEP_SUMMARY
+          echo "**CloudFront URL:** ${{ env.CLOUDFRONT_URL }}/{toolchain}/spack/" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Pipeline" >> $GITHUB_STEP_SUMMARY
           echo "1. **Build** — Compiled Slurm + pushed spack buildcache" >> $GITHUB_STEP_SUMMARY

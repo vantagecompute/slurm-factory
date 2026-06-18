@@ -28,6 +28,7 @@ from slurm_factory.constants import (
     COMPILER_TOOLCHAINS,
     CONTAINER_BUILD_OUTPUT_DIR,
     CONTAINER_CACHE_DIR,
+    CONTAINER_LOCAL_BUILDCACHE_DIR,
     CONTAINER_ROOT_DIR,
     CONTAINER_SLURM_DIR,
     CONTAINER_SPACK_PROJECT_DIR,
@@ -859,12 +860,14 @@ def _push_slurm_to_buildcache(
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
     gpg_passphrase: str | None = None,
+    local_cache: str | None = None,
 ) -> None:
     """
-    Push all spack packages to a single buildcache mirror.
+    Push all spack packages to buildcache mirror(s).
 
     Pushes everything (slurm + deps + build deps) to
-    ``s3://{bucket}/{toolchain}/slurm/{slurm_version}``.
+    ``s3://{bucket}/{toolchain}/spack``.  When *local_cache* is set,
+    also pushes unsigned packages to the local filesystem mirror.
 
     Args:
         image_tag: Tag of the build Docker image
@@ -873,11 +876,12 @@ def _push_slurm_to_buildcache(
         signing_key: GPG key ID for signing packages (e.g., "0xKEYID")
         gpg_private_key: GPG private key (base64 encoded) to import into container
         gpg_passphrase: GPG key passphrase for non-interactive signing
+        local_cache: Host path to local filesystem buildcache (mounted into container)
 
     """
     console.print("[bold blue]Publishing to buildcache...[/bold blue]")
 
-    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/slurm/{slurm_version}"
+    s3_mirror_url = f"{S3_BUILDCACHE_BUCKET}/{toolchain}/spack"
 
     logger.debug(f"Publishing Slurm {slurm_version} to {s3_mirror_url}")
 
@@ -944,6 +948,9 @@ def _push_slurm_to_buildcache(
         if "AWS_ACCESS_KEY_ID" not in aws_env:
             cmd.extend(["-v", f"{Path.home() / '.aws'}:/root/.aws:ro"])
 
+        if local_cache:
+            cmd.extend(["-v", f"{local_cache}:{CONTAINER_LOCAL_BUILDCACHE_DIR}"])
+
         # Build the bash script to run in the container
         bash_script_parts = ["source /opt/spack/share/spack/setup-env.sh"]
 
@@ -1006,11 +1013,19 @@ def _push_slurm_to_buildcache(
                 "cd /root/spack-project",
                 "spack env activate .",
                 f"spack mirror add --scope site s3-buildcache {s3_mirror_url}",
-                # Don't install/trust keys or update index before push - buildcache may be empty
-                # The push command with --update-index will create the index after pushing
                 push_cmd,
             ]
         )
+
+        if local_cache:
+            local_mirror_url = f"file://{CONTAINER_LOCAL_BUILDCACHE_DIR}"
+            bash_script_parts.extend(
+                [
+                    f"spack mirror add --scope site local-buildcache {local_mirror_url}",
+                    "spack -e . buildcache push --unsigned --force --update-index "
+                    "--with-build-dependencies local-buildcache",
+                ]
+            )
 
         # Join the script parts with &&
         bash_script = " && ".join(bash_script_parts)
@@ -1068,6 +1083,7 @@ def _run_spack_build_in_container(
     slurm_version: str,
     gpu_support: bool,
     keep_container: bool = False,
+    local_cache: str | None = None,
 ) -> None:
     """
     Run the Spack build process inside a Docker container with mounted volumes.
@@ -1084,6 +1100,7 @@ def _run_spack_build_in_container(
         slurm_version: Slurm version being built
         gpu_support: Whether GPU support is enabled
         keep_container: If True, don't remove container after build (for publishing)
+        local_cache: Host path to local filesystem buildcache (bind-mounted into container)
 
     """
     console.print(f"[bold cyan]Running Spack build in container {container_name}...[/bold cyan]")
@@ -1188,6 +1205,11 @@ def _run_spack_build_in_container(
             f"{module_template_file}:{CONTAINER_SPACK_TEMPLATES_DIR}/modules/relocatable_modulefile.lua",
             "-v",
             f"{build_script_file}:{CONTAINER_SPACK_PROJECT_DIR}/build-script.sh:ro",
+            *(
+                ["-v", f"{local_cache}:{CONTAINER_LOCAL_BUILDCACHE_DIR}"]
+                if local_cache
+                else []
+            ),
             "-e",
             f"SPACK_USER_CACHE_PATH={container_spack_user_cache_root}",
             "-e",
@@ -1331,6 +1353,7 @@ def create_slurm_package(
     signing_key: str | None = None,
     gpg_private_key: str | None = None,
     gpg_passphrase: str | None = None,
+    local_cache: str | None = None,
 ) -> None:
     """Create slurm package in a Docker container using a multi-stage build."""
     console.print("[bold blue]Creating slurm package in Docker container...[/bold blue]")
@@ -1384,6 +1407,7 @@ def create_slurm_package(
             source_cache_root=container_source_cache_root,
             misc_cache_root=container_misc_cache_root,
             lmod_root=container_lmod_root,
+            local_cache=CONTAINER_LOCAL_BUILDCACHE_DIR if local_cache else None,
         )
         logger.debug(f"Generated Spack YAML configuration ({len(spack_yaml)} chars)")
 
@@ -1425,6 +1449,7 @@ def create_slurm_package(
             slurm_version=slurm_version,
             gpu_support=gpu_support,
             keep_container=needs_publish,
+            local_cache=local_cache,
         )
 
         # Calculate tarball output directory for publishing
@@ -1459,6 +1484,7 @@ def create_slurm_package(
                     signing_key=signing_key,
                     gpg_private_key=gpg_private_key,
                     gpg_passphrase=gpg_passphrase,
+                    local_cache=local_cache,
                 )
 
                 if publish == "all":

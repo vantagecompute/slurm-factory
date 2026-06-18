@@ -46,7 +46,9 @@ def normalize_spack_target(architecture: str) -> str:
     return architecture_aliases.get(architecture.lower(), architecture.lower())
 
 
-def get_mirrors(buildcache: bool, toolchain: str, slurm_version: str) -> Dict[str, Dict[str, bool | str]]:
+def get_mirrors(
+    buildcache: bool, toolchain: str, local_cache: str | None = None
+) -> Dict[str, Dict[str, bool | str]]:
     """Return the mirrors dictionary."""
     mirrors: Dict[str, Dict[str, bool | str]] = {
         "slurm-factory-source-cache": {
@@ -63,9 +65,17 @@ def get_mirrors(buildcache: bool, toolchain: str, slurm_version: str) -> Dict[st
         },
     }
 
+    if local_cache:
+        mirrors["local-buildcache"] = {
+            "url": f"file://{local_cache}",
+            "signed": False,
+            "binary": True,
+            "source": False,
+        }
+
     if buildcache:
         mirrors["slurm-buildcache"] = {
-            "url": f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/{toolchain}/slurm/{slurm_version}",
+            "url": f"{SLURM_FACTORY_SPACK_CACHE_BASE_URL}/{toolchain}/spack",
             "signed": True,
             "binary": True,
             "source": False,
@@ -203,6 +213,7 @@ def generate_spack_config(
     toolchain: str = "noble",
     buildcache: bool = False,
     enable_hierarchy: bool = False,
+    local_cache: str | None = None,
 ) -> Dict[str, Any]:
     """
     Generate a Spack environment configuration dictionary.
@@ -220,6 +231,7 @@ def generate_spack_config(
         toolchain: OS toolchain identifier (e.g., "noble", "jammy", "rockylinux9")
         buildcache: Whether to use the remote spack binary buildcache
         enable_hierarchy: Whether to use Core/Compiler/MPI hierarchy (default: False)
+        local_cache: Filesystem path for a local spack binary buildcache (file:// mirror)
 
     Returns:
         Dictionary representing the Spack environment configuration
@@ -525,7 +537,7 @@ def generate_spack_config(
                     + (["cuda", "rocm-core", "rocm-smi-lib"] if gpu_support else []),
                 }
             },
-            "mirrors": get_mirrors(buildcache, toolchain, slurm_version),
+            "mirrors": get_mirrors(buildcache, toolchain, local_cache=local_cache),
             # Start with empty compilers - GCC will be downloaded from buildcache and explicitly detected
             # via spack compiler find (system compiler detection is disabled)
             "compilers": [],
@@ -564,6 +576,7 @@ def generate_yaml_string(
     source_cache_root: str | None = None,
     misc_cache_root: str | None = None,
     lmod_root: str | None = None,
+    local_cache: str | None = None,
 ) -> str:
     """
     Generate a YAML string representation of the Spack environment configuration.
@@ -581,6 +594,7 @@ def generate_yaml_string(
         source_cache_root: Root directory for Spack's downloaded source cache
         misc_cache_root: Root directory for Spack's misc cache
         lmod_root: Root directory for generated Lmod module files
+        local_cache: Filesystem path for a local spack binary buildcache (file:// mirror)
 
     Returns:
         YAML string representation of the configuration
@@ -599,6 +613,7 @@ def generate_yaml_string(
         source_cache_root=source_cache_root,
         misc_cache_root=misc_cache_root,
         lmod_root=lmod_root,
+        local_cache=local_cache,
     )
     header = get_comment_header(slurm_version, gpu_support)
 
