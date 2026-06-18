@@ -12,13 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-name: "Build and Publish Slurm Dependencies for Each Supported OS"
+name: "Build and Publish Slurm + Dependencies for Each Supported OS"
 
 on:
   workflow_dispatch:
     inputs:
       toolchain_versions:
-        description: 'Toolchain versions to use (comma-separated, e.g., "resolute,noble,rockylinux10" or "all")'
+        description: 'Toolchain versions to use (comma-separated, e.g., "jammy,noble,resolute,rockylinux8,rockylinux9,rockylinux10" or "all")'
         required: true
         default: 'all'
         type: string
